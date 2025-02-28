@@ -1,0 +1,63 @@
+package Main
+
+import Transform
+import Core
+import SDL
+
+import OS
+import JSON
+
+state Test
+{
+	i: int
+}
+
+state SingletonTest
+{
+	myValue: float
+}
+
+transformComponent := ECS.instance.RegisterComponent<Transform>();
+testComponent := ECS.instance.RegisterComponent<Test>();
+
+system := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
+	//log "System called", dt;
+	
+	for (item in scene.Iterate<Transform>())
+	{
+		//log item;
+	}
+	
+	for (item in scene.Iterate<Test>())
+	{
+		//log item;
+	}
+
+	scene.GetSingleton<SingletonTest>().myValue += 1;
+});
+
+Main()
+{
+	scene := ECS.instance.CreateScene();
+
+	scene.SetSingleton<SingletonTest>({9.0});
+
+	for (i .. 10)
+	{
+		entity := scene.CreateEntity();
+		val := i as float;
+		scene.SetComponent<Transform>(entity, Transform(val, val, val));
+		scene.SetComponent<Test>(entity, i as Test);
+	}
+
+	scene.RemoveEntity(Entity(4));
+
+	//log OS.ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Text.txt");
+
+	json := JSON.ParseJSONFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Text.txt");
+	obj := json.root.Object().GetMember("widget").Object().members;
+	log obj;
+	
+	//Core.Initialize();
+	//Core.Start();
+}
