@@ -5,7 +5,10 @@ extern
 	#link windows "./SDL3";
 
 	bool SDL_PollEvent(event: *Event);
+    void SDL_AddEventWatch(filter: ::int(*void, *Event), userdata: *void);
 }
+
+OnEvent(callback: ::int(*void, *Event), userdata: *void) => SDL_AddEventWatch(callback, userdata);
 
 state CommonEvent 
 {

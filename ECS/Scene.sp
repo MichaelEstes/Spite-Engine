@@ -101,13 +101,26 @@ Scene::RemoveEntity(entity: Entity)
 {
 	for (keyValue in this.commonComponents)
 	{
-		keyValue.value.Remove(entity);
+		componentID := keyValue.key;
+		component := ECS.instance.GetComponentByID(componentID);
+		if (keyValue.value.Has(entity))
+		{
+			componentData := keyValue.value.GetUntyped(entity, component.size);
+			ECS.instance.OnComponentRemove(componentID, componentData);
+			keyValue.value.Remove(entity);
+		}
 	}
 
 	for (keyValue in this.sparseComponents)
 	{
-		component := ECS.instance.GetComponentByID(keyValue.key);
-		keyValue.value.RemoveUntyped(entity, component.size);
+		componentID := keyValue.key;
+		component := ECS.instance.GetComponentByID(componentID);
+		if (keyValue.value.Has(entity))
+		{
+			componentData := keyValue.value.GetUntyped(entity, component.size);
+			ECS.instance.OnComponentRemove(componentID, componentData);
+			keyValue.value.RemoveUntyped(entity, component.size);
+		}
 	}
 }
 
@@ -115,13 +128,32 @@ Scene::RemoveEntities(entities: []Entity)
 {
 	for (keyValue in this.commonComponents)
 	{
-		for (entity in entities) keyValue.value.Remove(entity);
+		componentID := keyValue.key;
+		component := ECS.instance.GetComponentByID(componentID);
+		for (entity in entities) 
+		{
+			if (keyValue.value.Has(entity))
+			{
+				componentData := keyValue.value.GetUntyped(entity, component.size);
+				ECS.instance.OnComponentRemove(componentID, componentData);
+				keyValue.value.Remove(entity);
+			}
+		}
 	}
 
 	for (keyValue in this.sparseComponents)
 	{
-		component := ECS.instance.GetComponentByID(keyValue.key);
-		for (entity in entities) keyValue.value.RemoveUntyped(entity, component.size);
+		componentID := keyValue.key;
+		component := ECS.instance.GetComponentByID(componentID);
+		for (entity in entities) 
+		{
+			if (keyValue.value.Has(entity))
+			{
+				componentData := keyValue.value.GetUntyped(entity, component.size);
+				ECS.instance.OnComponentRemove(componentID, componentData);
+				keyValue.value.RemoveUntyped(entity, component.size);
+			}
+		}
 	}
 }
 
@@ -172,22 +204,33 @@ Scene::SetComponent<Type>(entity: Entity, value: Type)
 Scene::RemoveComponent<Type>(entity: Entity)
 {
 	component := ECS.instance.GetComponent<Type>();
+	id := component.id
 
 	switch (component.kind)
 	{
 		case (ComponentKind.Common)
 		{
-			componentArrPtr := this.GetCommon<Type>(component.id);
+			componentArrPtr := this.GetCommon<Type>(id);
 			if (!componentArrPtr) break;
 
-			componentArrPtr.Remove(entity);
+			if (componentArrPtr.Has(entity))
+			{
+				componentData := componentArrPtr.Get(entity);
+				ECS.instance.OnComponentRemove(id, componentData);
+				componentArrPtr.Remove(entity);
+			}
 		}
 		case (ComponentKind.Sparse)
 		{
-			componentMapPtr := this.GetSparse<Type>(component.id);
+			componentMapPtr := this.GetSparse<Type>(id);
 			if (!componentMapPtr) break;
 			
-			componentMapPtr.Remove(entity);
+			if (componentMapPtr.Has(entity))
+			{
+				componentData := componentMapPtr.Get(entity);
+				ECS.instance.OnComponentRemove(id, componentData);
+				componentMapPtr.Remove(entity);
+			}
 		}
 	}
 }

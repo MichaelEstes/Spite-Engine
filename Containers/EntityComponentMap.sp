@@ -131,6 +131,16 @@ uint16 EntityComponentMap::GetIndex(entity: Entity)
 	return this.componentArr[index];
 }
 
+*any EntityComponentMap::GetUntyped(entity: Entity, size: uint32)
+{
+	index := this.GetIndex(entity);
+	if (!index) return null;
+	index -= 1;
+
+	byteArr := this.componentArr.ptr as *byte;
+	return byteArr[index * size];
+}
+
 EntityComponentMap::Remove(entity: Entity)
 {
 	index := this.GetIndex(entity);

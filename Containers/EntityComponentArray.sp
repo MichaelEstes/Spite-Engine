@@ -88,6 +88,15 @@ bool EntityComponentArray::Has(entity: Entity)
 	return this.componentArr[index];
 }
 
+*any EntityComponentArray::GetUntyped(entity: Entity, size: uint32)
+{
+	if (!this.Has(entity)) return null;
+
+	index := entity.id;
+	byteArr := this.componentArr.ptr as *byte;
+	return byteArr[index * size];
+}
+
 EntityComponentArray::Remove(entity: Entity)
 {
 	if (!this.Has(entity)) return;

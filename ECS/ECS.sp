@@ -28,12 +28,14 @@ state ECS
 	systems: Systems,
 	componentTypeMap := Map<*_Type, Component>(),
 	componentIDMap := SparseSet<Component>(),
+	componentRemoveCallbacks := SparseSet<::(*any)>(),
 	recycledScenes := Stack<uint16>(),
 	componentCount: uint16,
 	sceneCount: uint16
 }
 
-Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse)
+Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
+										onRemove: ::(*Type) = null)
 {
 	type := #typeof Type;
 	assert !this.componentTypeMap.Has(type), "Cannot register a component twice";
@@ -41,6 +43,7 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 	component := { this.componentCount, componentKind, uint32(#sizeof Type) } as Component;
 	this.componentTypeMap.Insert(type, component);
 	this.componentIDMap.Insert(component.id, component);
+	if (onRemove) this.componentRemoveCallbacks.Insert(component.id, onRemove);
 	this.componentCount += 1;
 	return component;
 }
@@ -90,6 +93,14 @@ Component ECS::GetComponent<Type>()
 Component ECS::GetComponentByID(id: uint16)
 {
 	return this.componentIDMap.Get(id)~;
+}
+
+ECS::OnComponentRemove(id: uint16, componentData: *any)
+{
+	if (!this.componentRemoveCallbacks.Has(id)) return;
+
+	callback := this.componentRemoveCallbacks.Get(id)~;
+	callback(componentData);
 }
 
 ECS::RunSystems(systems: []System)
