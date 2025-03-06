@@ -14,6 +14,7 @@ extern
 	) as WinCreateThread;
 
 	uint32 WaitForSingleObject(hHandle: *void, dwMilliseconds: uint32);
+	uint32 GetCurrentThreadId();
 }
 
 state WinSecurityAttributes
@@ -23,44 +24,65 @@ state WinSecurityAttributes
 	bInheritHandle: bool
 }
 
-uint CreateThreadWin(func: ::uint32(*void), data: *void)
+uint CreateThreadWin(func: ::uint32(*void), data: *void, id: *uint32)
 {
-	return WinCreateThread(null, 0, func, data, 0, null) as uint;
+	return WinCreateThread(null, 0, func, data, 0, id) as uint;
 }
 
-uint CreateThreadLinux(func: ::uint32(*void), data: *void)
+uint CreateThreadLinux(func: ::uint32(*void), data: *void, id: *uint32)
 {
 	return 0;
 }
 
-uint Create(func: ::uint32(*any), data: *any = null) 
+uint Create(func: ::uint32(*any), data: *any = null, id: *uint32 = null) 
 {
-	create := #compile ::uint(::int32(*void), *void) 
+	create := #compile ::uint(::int32(*void), *void, *uint32) 
 	{
 		if(targetOs == OS_Kind.Windows) return CreateThreadWin;
 		else return CreateThreadLinux;
 	}
 
-	return create(func, data);
+	return create(func, data, id);
 }
 
-int32 WaitThreadWin(thread: *void)
+uint32 WaitThreadWin(thread: *void)
 {
 	return WaitForSingleObject(thread, uint32(-1));
 }
 
-int32 WaitThreadLinux(thread: *void)
+uint32 WaitThreadLinux(thread: *void)
 {
 	return 0;
 }
 
-int32 Wait(thread: uint) 
+uint32 Wait(thread: uint) 
 {
-	wait := #compile ::uint(*void) 
+	wait := #compile ::uint32(*void) 
 	{
 		if(targetOs == OS_Kind.Windows) return WaitThreadWin;
 		else return WaitThreadLinux;
 	}
 
 	return wait(thread as *void);
+}
+
+uint32 GetCurrentThreadIDWin()
+{
+	return GetCurrentThreadId();
+}
+
+uint32 GetCurrentThreadIDLinux()
+{
+	return 0;
+}
+
+uint32 GetCurrentThreadID()
+{
+	get := #compile ::uint32() 
+	{
+		if(targetOs == OS_Kind.Windows) return GetCurrentThreadIDWin;
+		else return GetCurrentThreadIDLinux;
+	}
+
+	return get();
 }

@@ -8,6 +8,9 @@ import OS
 import JSON
 
 import Thread
+import SystemInfo
+import Fiber
+
 
 state Test
 {
@@ -74,6 +77,7 @@ Main()
 	//obj := json.root.Object().GetMember("widget").Object().members;
 	//log obj;
 	
+	Fiber.InitalizeFibers();
 
 	thread := Thread.Create(::int32(data: *void) {
 		log "Running on a thread", data;
@@ -81,6 +85,8 @@ Main()
 	}, 9999999 as *any);
 
 	Thread.Wait(thread);
+
+	log GetSystemInfo();
 
 	//Core.Initialize();
 	//SDL.OnEvent(::int(userdata: *void, event: *SDL.Event) {
