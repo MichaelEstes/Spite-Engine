@@ -79,6 +79,10 @@ Main()
 	
 	Fiber.InitalizeFibers();
 
+	Fiber.AddJob(::(num: *void) {
+		log "Running fiber job", num;
+	}, 7777777 as *any);
+
 	thread := Thread.Create(::int32(data: *void) {
 		log "Running on a thread", data;
 		return 0;

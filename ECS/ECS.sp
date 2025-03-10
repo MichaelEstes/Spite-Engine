@@ -6,6 +6,7 @@ import Scene
 import SparseSet
 import Time
 import Stack
+import Fiber
 
 instance: ECS = ECS();
 
