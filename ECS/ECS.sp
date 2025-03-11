@@ -6,6 +6,7 @@ import Scene
 import SparseSet
 import Time
 import Stack
+import RingBuffer
 import Fiber
 
 instance: ECS = ECS();
@@ -104,17 +105,28 @@ ECS::OnComponentRemove(id: uint16, componentData: *any)
 	callback(componentData);
 }
 
+
+state SceneSystem { scene: *Scene, system: *System }
+systemBuffer := RingBuffer<SceneSystem>();
+
 ECS::RunSystems(systems: []System)
 {
 	for (scene in this.scenes.Values())
 	{
-		currTime := Time.SecondsSinceStart();
-		dt := currTime - scene.lastFrameTime;
-		scene.lastFrameTime = currTime;
-
 		for (system in systems) 
 		{
-			system.run(scene~, dt);
+			sceneSystem := systemBuffer.Insert({scene, system@} as SceneSystem);
+			Fiber.AddJob(::(data: *SceneSystem) {
+				log "Running system job: ", data;
+				scene := data.scene;
+				system := data.system;
+
+				currTime := Time.SecondsSinceStart();
+				dt := currTime - scene.lastFrameTime;
+				scene.lastFrameTime = currTime;
+				
+				system.run(scene~, dt);
+			}, sceneSystem);
 		}
 	}
 }

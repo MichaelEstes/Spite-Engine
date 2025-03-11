@@ -36,13 +36,17 @@ testComponent := ECS.instance.RegisterComponent<Test>(
 	}
 );
 
-system := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
+transformSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 	//log "System called", dt;
 	
 	for (item in scene.Iterate<Transform>())
 	{
 		log item;
 	}
+});
+
+testSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
+	//log "System called", dt;
 	
 	for (item in scene.Iterate<Test>())
 	{
@@ -76,26 +80,12 @@ Main()
 	//json := JSON.ParseJSONFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Text.txt");
 	//obj := json.root.Object().GetMember("widget").Object().members;
 	//log obj;
-	
-	Fiber.InitalizeFibers();
 
-	Fiber.AddJob(::(num: *void) {
-		log "Running fiber job", num;
-	}, 7777777 as *any);
+	Core.Initialize();
+	Core.Start();
 
-	thread := Thread.Create(::int32(data: *void) {
-		log "Running on a thread", data;
-		return 0;
-	}, 9999999 as *any);
-
-	Thread.Wait(thread);
-
-	log GetSystemInfo();
-
-	//Core.Initialize();
 	//SDL.OnEvent(::int(userdata: *void, event: *SDL.Event) {
 	//	log "Event Callback: ", event;
 	//	return 1;
 	//}, null)
-	//Core.Start();
 }

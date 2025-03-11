@@ -12,6 +12,7 @@ SDLEventEmitter := Event.Emitter();
 
 Initialize()
 {
+	Fiber.InitalizeFibers();
 	SDL.Init(SDL.InitFlags.VIDEO);
 	InitializeTime();
 	InitializeMainWindow();
