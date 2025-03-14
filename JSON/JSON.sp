@@ -173,6 +173,7 @@ JSONEatWhitespace(view: StringView)
 		case ('"') return ParseJSONString(view, arena);
 		
 		case ('-') continue;
+		case ('0') continue;
 		case ('1') continue;
 		case ('2') continue;
 		case ('3') continue;

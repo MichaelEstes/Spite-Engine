@@ -8,10 +8,11 @@ import Time
 import Stack
 import RingBuffer
 import Fiber
+import Atomic
 
 instance: ECS = ECS();
 
-enum ComponentKind: uint16
+enum ComponentKind: uint32
 {
 	Common,
 	Sparse
@@ -19,10 +20,12 @@ enum ComponentKind: uint16
 
 state Component
 {
-	id: uint16,
+	id: uint32,
 	kind: ComponentKind,
 	size: uint32
 }
+
+state SceneSystem { scene: *Scene, system: *System }
 
 state ECS
 {
@@ -32,7 +35,9 @@ state ECS
 	componentIDMap := SparseSet<Component>(),
 	componentRemoveCallbacks := SparseSet<::(*any)>(),
 	recycledScenes := Stack<uint16>(),
-	componentCount: uint16,
+	systemBuffer := RingBuffer<SceneSystem>(),
+	systemFrameCount := Atomic<uint32>(0),
+	componentCount: uint32,
 	sceneCount: uint16
 }
 
@@ -42,7 +47,7 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 	type := #typeof Type;
 	assert !this.componentTypeMap.Has(type), "Cannot register a component twice";
 
-	component := { this.componentCount, componentKind, uint32(#sizeof Type) } as Component;
+	component := { this.componentCount, componentKind, uint32(#sizeof Type)} as Component;
 	this.componentTypeMap.Insert(type, component);
 	this.componentIDMap.Insert(component.id, component);
 	if (onRemove) this.componentRemoveCallbacks.Insert(component.id, onRemove);
@@ -50,11 +55,19 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 	return component;
 }
 
-{ id: uint, step: SystemStep } ECS::RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.OnFrame)
+{id: uint, step: SystemStep} ECS::RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.OnFrame)
 {	
 	assert run != null, "Cannot register null systems";
 
 	system := {run} as System;
+	data := this.AddSystem(system, step);
+	// Make sure systemBuffer is always large enough to hold the largest array of systems
+	this.systemBuffer.Expand(data.id);
+	return data;
+}
+
+{id: uint, step: SystemStep} ECS::AddSystem(system: System, step: SystemStep)
+{
 	switch (step)
 	{
 		case (SystemStep.OnFixed) return { this.systems.onFixed.Add(system), step };
@@ -71,7 +84,10 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 *Scene ECS::CreateScene()
 {
 	sceneID := this.sceneCount;
+
 	if (this.recycledScenes.count) sceneID = this.recycledScenes.Pop();
+	else this.sceneCount += 1;
+
 	this.scenes.Insert(sceneID, Scene(sceneID));
 	return this.GetScene(sceneID);
 }
@@ -105,19 +121,14 @@ ECS::OnComponentRemove(id: uint16, componentData: *any)
 	callback(componentData);
 }
 
-
-state SceneSystem { scene: *Scene, system: *System }
-systemBuffer := RingBuffer<SceneSystem>();
-
 ECS::RunSystems(systems: []System)
 {
 	for (scene in this.scenes.Values())
 	{
 		for (system in systems) 
 		{
-			sceneSystem := systemBuffer.Insert({scene, system@} as SceneSystem);
+			sceneSystem := instance.systemBuffer.Insert({scene, system@} as SceneSystem);
 			Fiber.AddJob(::(data: *SceneSystem) {
-				log "Running system job: ", data;
 				scene := data.scene;
 				system := data.system;
 
@@ -126,9 +137,13 @@ ECS::RunSystems(systems: []System)
 				scene.lastFrameTime = currTime;
 				
 				system.run(scene~, dt);
+				instance.systemFrameCount.Add(1, MemoryOrder.Relaxed);
 			}, sceneSystem);
 		}
 	}
+
+	while (instance.systemFrameCount.Load(MemoryOrder.Relaxed) != systems.count) {}
+	instance.systemFrameCount.Store(0, MemoryOrder.Relaxed);
 }
 
 ECS::Start()

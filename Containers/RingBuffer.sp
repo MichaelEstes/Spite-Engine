@@ -24,6 +24,7 @@ RingBuffer::()
 
 RingBuffer::Expand(capacity: uint32)
 {
+	if (capacity <= this.capacity) return;
 	this.mem.Resize(capacity, this.capacity);
 	this.capacity = capacity;
 }

@@ -41,7 +41,7 @@ MainLoop()
 	while (running)
 	{
 		while (SDL.PollEvent(currEvent@)) HandleSDLEvent(currEvent);
-	
+		
 		ECS.instance.Update();
 	}
 
@@ -51,7 +51,7 @@ MainLoop()
 HandleSDLEvent(event: SDL.Event)
 {
 	SDLEventEmitter.Emit<SDL.Event>(event.type, event);
-	log event;
+	//log event;
 }
 
 Stop()
