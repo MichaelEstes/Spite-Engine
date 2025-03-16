@@ -117,7 +117,7 @@ state JSONString
 
 state JSONNumber
 {
-	value: float,
+	value: ?{i: int, f: float},
 }
 
 state JSONBoolean
@@ -305,8 +305,10 @@ bool IsDigit(char: byte)
 	numValue.value.number = arena.Emplace<JSONNumber>();
 	
 	start := view[0];
-	count := 0
+	count := 0;
 	
+	isFloat := false;
+
 	if (view[0]~ == '-')
 	{
 		view.Increment();
@@ -321,6 +323,7 @@ bool IsDigit(char: byte)
 
 	if (view[0]~ == '.')
 	{
+		isFloat = true;
 		view.Increment();
 		count += 1;
 
@@ -351,7 +354,14 @@ bool IsDigit(char: byte)
 
 	strCopy := ZeroedAllocator<byte>().Alloc(count + 1);
 	copy_bytes(strCopy, start, count);
-	numValue.value.number.value = atof(strCopy[0]);
+	if (isFloat)
+	{
+		numValue.value.number.value.f = atof(strCopy[0]);
+	}
+	else
+	{
+		numValue.value.number.value.i = StringToInt(string(count, strCopy[0]));
+	}
 	delete strCopy;
 
 	return numValue;

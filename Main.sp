@@ -76,15 +76,6 @@ Main()
 	//scene.RemoveComponent<Test>(Entity(7));
 	//ECS.instance.Update();
 
-
-	ParseVulkan.ParseHeaderJSON("C:\\Users\\Flynn\\Documents\\Spite Engine\\Vulkan\\vulkan.h.json");
-
-	//log OS.ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Text.txt");
-
-	//json := JSON.ParseJSONFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Text.txt");
-	//obj := json.root.Object().GetMember("widget").Object().members;
-	//log obj;
-
 	//Core.Initialize();
 	//Core.Start();
 
