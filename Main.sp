@@ -76,7 +76,7 @@ Main()
 	//scene.RemoveComponent<Test>(Entity(7));
 	//ECS.instance.Update();
 
-	//Core.Initialize();
+	Core.Initialize();
 	//Core.Start();
 
 	//SDL.OnEvent(::int(userdata: *void, event: *SDL.Event) {

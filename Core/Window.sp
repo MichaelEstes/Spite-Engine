@@ -6,10 +6,11 @@ import SparseSet
 mainWindow: *SDL.Window = null;
 windowMap := SparseSet<*SDL.Window>();
 
-InitializeMainWindow()
+*SDL.Window InitializeMainWindow()
 {
 	mainWindow := CreateWindow(null, 1000, 1000, 
 								SDL.WindowFlags.Vulkan | SDL.WindowFlags.Resizable);
+	return mainWindow;
 }
 
 *SDL.Window CreateWindow(title: *byte, width: int32, height: int32, flags: uint)
