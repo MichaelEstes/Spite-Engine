@@ -5,66 +5,11 @@ import Time
 import Window
 import SDL
 import Event
-import Vulkan
+import VulkanRenderer
 
 running := false;
 
 SDLEventEmitter := Event.Emitter();
-
-appInfo := {
-	VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO,
-	null,
-	"Spite Engine"[0],
-	uint32(0),
-	"Spite Engine"[0],
-	uint32(0),
-	uint32(0),
-} as VkApplicationInfo;
-
-InitializeVulkan(window: *SDL.Window)
-{
-	extensionCount := uint32(0);
-    extensionNames := SDL.VulkanGetInstanceExtensions(extensionCount@);
-    instanceCreateInfo := {
-        VkStructureType.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, 
-        null,													
-        uint32(0),												
-        appInfo@,													
-        uint32(0),												
-        null,												
-        extensionCount,											
-        extensionNames,											
-    } as VkInstanceCreateInfo;
-
-    vkInstance: *VkInstance_T = null;
-    createResult := vkCreateInstance(instanceCreateInfo@, null, vkInstance@);
-	assert createResult == VkResult.VK_SUCCESS, "Error creating Vulkan instance";
-
-	physicalDeviceCount := uint32(0);
-	physicalDevices := Allocator<*VkPhysicalDevice_T>();
-    vkEnumeratePhysicalDevices(vkInstance, physicalDeviceCount@, null);
-	physicalDevices.Alloc(physicalDeviceCount);
-    deviceResult := vkEnumeratePhysicalDevices(vkInstance, physicalDeviceCount@, physicalDevices[0]);
-    assert createResult == VkResult.VK_SUCCESS, "Error finding device for Vulkan";
-
-	physicalDevice := physicalDevices[0]~;
-	log "Device count: ", physicalDeviceCount;
-	log physicalDevice;
-
-	queueFamilyCount := uint32(0);
-	queueFamilies := Allocator<VkQueueFamilyProperties>();
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount@, null);
-	queueFamilies.Alloc(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, queueFamilyCount@, queueFamilies[0]);
-
-	log "Queue family count: ", queueFamilyCount;
-
-	vkSurface: *VkSurfaceKHR_T = null;
-	surfaceResult := SDL.VulkanCreateSurface(window, vkInstance, null, vkSurface@);
-	assert surfaceResult, "Error creating Vulkan surface";
-
-	log "VkSurface: ", vkSurface;
-}
 
 Initialize()
 {
@@ -75,7 +20,8 @@ Initialize()
 	SDL.VulkanLoadLibrary(null);
 	mainWindow := InitializeMainWindow();
 
-	InitializeVulkan(mainWindow);
+	VulkanRenderer.InitializeVulkanRenderer();
+	mainSurface := VulkanRenderer.InitializeSurface(mainWindow);
 
 	SDLEventEmitter.On(SDL.EventType.QUIT, ::(event: SDL.Event) {
 		running = false;
