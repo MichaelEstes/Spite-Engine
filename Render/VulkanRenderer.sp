@@ -16,6 +16,8 @@ appInfo := {
 state VulkanRenderer
 {
 	vkInstance :*VkInstance_T,
+	vkDevice: *VkDevice_T,
+	vkSurface: *VkSurfaceKHR_T,
 	
 	extensionNames: **byte,
 
@@ -26,16 +28,21 @@ state VulkanRenderer
 
 	queueFamilies: Allocator<VkQueueFamilyProperties>,
 	graphicsQueueIndices: Allocator<uint32>,
+	presentationQueueIndices: Allocator<uint32>,
+
+	graphicsQueue: *VkQueue_T,
+	presentationQueue: *VkQueue_T,
 
 	extensionCount: uint32,
 	physicalDeviceCount: uint32,
 	queueFamilyCount: uint32,
 	graphicsQueueCount: uint32,
+	presentationQueueCount: uint32,
 }
 
 vulkanRenderer := VulkanRenderer();
 
-InitializeVulkanRenderer()
+InitializeVulkanRenderer(window: *SDL.Window)
 {
 	vulkanRenderer.extensionNames = SDL.VulkanGetInstanceExtensions(vulkanRenderer.extensionCount@);
     instanceCreateInfo := {
@@ -52,10 +59,24 @@ InitializeVulkanRenderer()
     createResult := vkCreateInstance(instanceCreateInfo@, null, vulkanRenderer.vkInstance@);
 	assert createResult == VkResult.VK_SUCCESS, "Error creating Vulkan instance";
 
+	InitializeSurface(window);
     InitializeCurrentDevice();
 	InitializeQueues();
+	BuildQueueFamilyIndices();
+	InitializeLogicalDevice();
 
 	log "Device name: ", string(256, fixed vulkanRenderer.currentDeviceProperties.deviceName);
+}
+
+InitializeSurface(window: *SDL.Window)
+{
+	surfaceResult := SDL.VulkanCreateSurface(
+		window, 
+		vulkanRenderer.vkInstance, 
+		null, 
+		vulkanRenderer.vkSurface@
+	);
+	assert surfaceResult, "Error creating Vulkan surface";
 }
 
 InitializeCurrentDevice()
@@ -87,48 +108,101 @@ InitializeQueues()
 		vulkanRenderer.queueFamilyCount@, 
 		vulkanRenderer.queueFamilies[0]
 	);
+}
 
-	BuildQueueFamilyIndices(
-		VkQueueFlagBits.VK_QUEUE_GRAPHICS_BIT, 
-		vulkanRenderer.graphicsQueueCount@,
-		vulkanRenderer.graphicsQueueIndices@
-	);
+BuildQueueFamilyIndices()
+{
+	for (i .. vulkanRenderer.queueFamilyCount)
+	{
+		queueFamily := vulkanRenderer.queueFamilies[i];
+		if (queueFamily.queueFlags & VkQueueFlagBits.VK_QUEUE_GRAPHICS_BIT) 
+		{
+			vulkanRenderer.graphicsQueueCount += 1;
+		}
 
+		presentationSupport := uint32(0);
+		vkGetPhysicalDeviceSurfaceSupportKHR(
+			vulkanRenderer.currentPhysicalDevice, 
+			i, 
+			vulkanRenderer.vkSurface, 
+			presentationSupport@
+		);
+		if (presentationSupport)
+		{
+			vulkanRenderer.presentationQueueCount += 1;
+		}
+
+    }
+
+	vulkanRenderer.graphicsQueueIndices.Alloc(vulkanRenderer.graphicsQueueCount);
+	vulkanRenderer.presentationQueueIndices.Alloc(vulkanRenderer.presentationQueueCount)
+	graphicsIndex := 0;
+	presentationIndex := 0;
+	for (i .. vulkanRenderer.queueFamilyCount)
+	{
+		queueFamily := vulkanRenderer.queueFamilies[i];
+		if (queueFamily.queueFlags & VkQueueFlagBits.VK_QUEUE_GRAPHICS_BIT) 
+		{
+			vulkanRenderer.graphicsQueueIndices[graphicsIndex]~ = i;
+			graphicsIndex += 1;
+		}
+
+		presentationSupport := uint32(0);
+		vkGetPhysicalDeviceSurfaceSupportKHR(
+			vulkanRenderer.currentPhysicalDevice, 
+			i, 
+			vulkanRenderer.vkSurface, 
+			presentationSupport@
+		);
+		if (presentationSupport)
+		{
+			vulkanRenderer.presentationQueueIndices[presentationIndex]~ = i;
+			presentationIndex += 1;
+		}
+    }
+}
+
+InitializeLogicalDevice()
+{
 	queuePriorities := float32(1.0);
+
+
+
 	graphicsQueueCreateInfo := VkDeviceQueueCreateInfo();
+	graphicsQueueCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 	graphicsQueueCreateInfo.queueFamilyIndex = vulkanRenderer.graphicsQueueIndices[0]~;
 	graphicsQueueCreateInfo.queueCount = 1;
 	graphicsQueueCreateInfo.pQueuePriorities = queuePriorities@;
+
+	deviceCreateInfo := VkDeviceCreateInfo();
+	deviceCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	deviceCreateInfo.queueCreateInfoCount = 1;
+	deviceCreateInfo.pQueueCreateInfos = graphicsQueueCreateInfo@;
+	deviceCreateInfo.pEnabledFeatures = vulkanRenderer.currentDeviceFeatures@;
+
+	createDeviceResult := vkCreateDevice(
+		vulkanRenderer.currentPhysicalDevice, 
+		deviceCreateInfo@, 
+		null, 
+		vulkanRenderer.vkDevice@
+	);
+	assert createDeviceResult == VkResult.VK_SUCCESS, "Error creating a logical Vulkan device";
+
+	vkGetDeviceQueue(
+		vulkanRenderer.vkDevice,
+		vulkanRenderer.graphicsQueueIndices[0]~,
+		0,
+		vulkanRenderer.graphicsQueue@
+	);
 }
 
-BuildQueueFamilyIndices(flag: VkQueueFlagBits, count: *uint32, indices: *Allocator<uint32>)
+InitializePresentationQueue()
 {
-	count~ = uint32(0);
-	for (i .. vulkanRenderer.queueFamilyCount)
-	{
-		queueFamily := vulkanRenderer.queueFamilies[i];
-		if (queueFamily.queueFlags & flag) {
-			count~ += 1;
-		}
-    }
 
-	indices.Alloc(count~);
-	index := 0;
-	for (i .. vulkanRenderer.queueFamilyCount)
-	{
-		queueFamily := vulkanRenderer.queueFamilies[i];
-		if (queueFamily.queueFlags & flag) {
-			indices~[index]~ = i;
-			index += 1;
-		}
-    }
 }
 
-*VkSurfaceKHR_T InitializeSurface(window: *SDL.Window)
-{
-	vkSurface := null as *VkSurfaceKHR_T;
-	surfaceResult := SDL.VulkanCreateSurface(window, vulkanRenderer.vkInstance, null, vkSurface@);
-	assert surfaceResult, "Error creating Vulkan surface";
 
-	return vkSurface;
+DestroyVulkanRenderer()
+{
+	vkDestroyDevice(vulkanRenderer.vkDevice, null);
 }

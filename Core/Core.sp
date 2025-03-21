@@ -20,8 +20,7 @@ Initialize()
 	SDL.VulkanLoadLibrary(null);
 	mainWindow := InitializeMainWindow();
 
-	VulkanRenderer.InitializeVulkanRenderer();
-	mainSurface := VulkanRenderer.InitializeSurface(mainWindow);
+	VulkanRenderer.InitializeVulkanRenderer(mainWindow);
 
 	SDLEventEmitter.On(SDL.EventType.QUIT, ::(event: SDL.Event) {
 		running = false;
@@ -52,6 +51,7 @@ MainLoop()
 	}
 
 	ECS.instance.Stop();
+	VulkanRenderer.DestroyVulkanRenderer();
 }
 
 HandleSDLEvent(event: SDL.Event)
