@@ -30,8 +30,7 @@ state VulkanRenderer
 	graphicsQueueIndices: Allocator<uint32>,
 	presentationQueueIndices: Allocator<uint32>,
 
-	graphicsQueue: *VkQueue_T,
-	presentationQueue: *VkQueue_T,
+	deviceQueues: Allocator<*VkQueue_T>,
 
 	extensionCount: uint32,
 	physicalDeviceCount: uint32,
@@ -162,22 +161,67 @@ BuildQueueFamilyIndices()
     }
 }
 
+{queues: Allocator<uint32>, count: uint32} GetUniquePresentationQueues()
+{
+	queues := Allocator<uint32>();
+	queues.Alloc(vulkanRenderer.graphicsQueueCount + vulkanRenderer.presentationQueueCount);
+
+	count := uint32(0);
+	for (i .. vulkanRenderer.presentationQueueCount)
+	{
+		queues[i]~ = vulkanRenderer.presentationQueueIndices[i]~;
+		count += 1;
+	}
+
+	for (i .. vulkanRenderer.graphicsQueueCount)
+	{
+		queue := vulkanRenderer.graphicsQueueIndices[i]~;
+		unique := true;
+		for (j .. count)
+		{
+			if (queue == queues[j]~)
+			{
+				unique = false;
+				break;
+			}
+		}
+
+		if (unique)
+		{
+			queues[count]~ = queue;
+			count += 1;
+		}
+	}
+
+	return {queues, count};
+}
+
 InitializeLogicalDevice()
 {
-	queuePriorities := float32(1.0);
+	queuePriority := float32(1.0);
 
+	uniqueQueues := GetUniquePresentationQueues();
+	defer uniqueQueues.queues.Dealloc(uniqueQueues.count);
 
+	queueCreateInfos := Allocator<VkDeviceQueueCreateInfo>();
+	queueCreateInfos.Alloc(uniqueQueues.count);
+	defer queueCreateInfos.Dealloc(uniqueQueues.count);
 
-	graphicsQueueCreateInfo := VkDeviceQueueCreateInfo();
-	graphicsQueueCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	graphicsQueueCreateInfo.queueFamilyIndex = vulkanRenderer.graphicsQueueIndices[0]~;
-	graphicsQueueCreateInfo.queueCount = 1;
-	graphicsQueueCreateInfo.pQueuePriorities = queuePriorities@;
+	for (i .. uniqueQueues.count)
+	{
+		queueFamilyIndex := uniqueQueues.queues[i]~;
+		queueCreateInfo := VkDeviceQueueCreateInfo();
+		queueCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.pQueuePriorities = queuePriority@;
+		queueCreateInfos[i]~ = queueCreateInfo;
+	}
 
 	deviceCreateInfo := VkDeviceCreateInfo();
 	deviceCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	deviceCreateInfo.queueCreateInfoCount = 1;
-	deviceCreateInfo.pQueueCreateInfos = graphicsQueueCreateInfo@;
+	deviceCreateInfo.queueCreateInfoCount = uniqueQueues.count;
+	deviceCreateInfo.pQueueCreateInfos = queueCreateInfos[0];
 	deviceCreateInfo.pEnabledFeatures = vulkanRenderer.currentDeviceFeatures@;
 
 	createDeviceResult := vkCreateDevice(
@@ -188,12 +232,16 @@ InitializeLogicalDevice()
 	);
 	assert createDeviceResult == VkResult.VK_SUCCESS, "Error creating a logical Vulkan device";
 
-	vkGetDeviceQueue(
-		vulkanRenderer.vkDevice,
-		vulkanRenderer.graphicsQueueIndices[0]~,
-		0,
-		vulkanRenderer.graphicsQueue@
-	);
+	vulkanRenderer.deviceQueues.Alloc(uniqueQueues.count);
+	for (i .. uniqueQueues.count)
+	{
+		vkGetDeviceQueue(
+			vulkanRenderer.vkDevice,
+			uniqueQueues.queues[i]~,
+			0,
+			vulkanRenderer.deviceQueues[i]
+		);
+	}
 }
 
 InitializePresentationQueue()
