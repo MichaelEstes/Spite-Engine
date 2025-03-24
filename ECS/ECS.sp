@@ -96,6 +96,7 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 
 ECS::RemoveScene(id: uint16)
 {
+	delete this.GetScene(id)~;
 	this.scenes.Remove(id);
 	this.recycledScenes.Push(id);
 }
