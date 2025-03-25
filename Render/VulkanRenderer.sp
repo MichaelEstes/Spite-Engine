@@ -1,5 +1,6 @@
 package VulkanRenderer
 
+import Math
 import Vulkan
 import SDL
 
@@ -18,6 +19,7 @@ requiredDeviceExtensionCount := #compile uint32 => (#typeof requiredDeviceExtens
 
 state VulkanRenderer
 {
+	window: *SDL.Window,
 	vkInstance :*VkInstance_T,
 	vkDevice: *VkDevice_T,
 	vkSurface: *VkSurfaceKHR_T,
@@ -36,11 +38,17 @@ state VulkanRenderer
 	graphicsQueues: Allocator<*VkQueue_T>,
 	presentationQueues: Allocator<*VkQueue_T>,
 
+	surfaceCapabilities: VkSurfaceCapabilitiesKHR,
+	surfaceFormats: Allocator<VkSurfaceFormatKHR>,
+	presentModes: Allocator<VkPresentModeKHR>,
+
 	extensionCount: uint32,
 	physicalDeviceCount: uint32,
 	queueFamilyCount: uint32,
 	graphicsQueueCount: uint32,
 	presentationQueueCount: uint32,
+	surfaceFormatCount: uint32,
+	presentModeCount: uint32,
 }
 
 vulkanRenderer := VulkanRenderer();
@@ -74,6 +82,7 @@ DebugLogExtensions()
 
 InitializeVulkanRenderer(window: *SDL.Window)
 {
+	vulkanRenderer.window = window;
 	vulkanRenderer.extensionNames = SDL.VulkanGetInstanceExtensions(vulkanRenderer.extensionCount@);
     instanceCreateInfo := {
         VkStructureType.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, 
@@ -89,7 +98,7 @@ InitializeVulkanRenderer(window: *SDL.Window)
     createResult := vkCreateInstance(instanceCreateInfo@, null, vulkanRenderer.vkInstance@);
 	assert createResult == VkResult.VK_SUCCESS, "Error creating Vulkan instance";
 
-	InitializeSurface(window);
+	InitializeSurface();
     InitializeCurrentDevice();
 
 	//DebugLogExtensions();
@@ -97,14 +106,15 @@ InitializeVulkanRenderer(window: *SDL.Window)
 	InitializeQueues();
 	BuildQueueFamilyIndices();
 	InitializeLogicalDevice();
+	InitializeSwapchain();
 
 	log "Device name: ", string(256, fixed vulkanRenderer.currentDeviceProperties.deviceName);
 }
 
-InitializeSurface(window: *SDL.Window)
+InitializeSurface()
 {
 	surfaceResult := SDL.VulkanCreateSurface(
-		window, 
+		vulkanRenderer.window, 
 		vulkanRenderer.vkInstance, 
 		null, 
 		vulkanRenderer.vkSurface@
@@ -292,6 +302,118 @@ GetDeviceQueues(count: uint32, indices: Allocator<uint32>, queues: *Allocator<*V
 			0,
 			queues~[i]
 		);
+	}
+}
+
+InitializeSwapchain()
+{
+	result := vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+		vulkanRenderer.currentPhysicalDevice, 
+		vulkanRenderer.vkSurface,
+		vulkanRenderer.surfaceCapabilities@
+	);
+	assert result == VkResult.VK_SUCCESS, "Error getting device surface capabilities";
+
+	vkGetPhysicalDeviceSurfaceFormatsKHR(
+		vulkanRenderer.currentPhysicalDevice, 
+		vulkanRenderer.vkSurface,
+		vulkanRenderer.surfaceFormatCount@, 
+		null
+	);
+	if (vulkanRenderer.surfaceFormatCount)
+	{
+		vulkanRenderer.surfaceFormats.Alloc(vulkanRenderer.surfaceFormatCount);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(
+			vulkanRenderer.currentPhysicalDevice, 
+			vulkanRenderer.vkSurface,
+			vulkanRenderer.surfaceFormatCount@, 
+			vulkanRenderer.surfaceFormats[0]
+		);
+	}
+
+	vkGetPhysicalDeviceSurfacePresentModesKHR(
+		vulkanRenderer.currentPhysicalDevice, 
+		vulkanRenderer.vkSurface,
+		vulkanRenderer.presentModeCount@, 
+		null
+	);
+	if (vulkanRenderer.presentModeCount)
+	{
+		vulkanRenderer.presentModes.Alloc(vulkanRenderer.presentModeCount);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(
+			vulkanRenderer.currentPhysicalDevice, 
+			vulkanRenderer.vkSurface,
+			vulkanRenderer.presentModeCount@, 
+			vulkanRenderer.presentModes[0]
+		);
+	}
+
+	selectedFormat := SelectSwapSurfaceFormat();
+	selectedPresentMode := SelectSwapPresentMode();
+	selectedExtent := SelectSwapExtent();
+
+	imageCount: uint32 = vulkanRenderer.surfaceCapabilities.minImageCount + 1;
+	if (vulkanRenderer.surfaceCapabilities.maxImageCount > 0 && 
+		imageCount > vulkanRenderer.surfaceCapabilities.maxImageCount) 
+	{
+		imageCount = vulkanRenderer.surfaceCapabilities.maxImageCount;
+	}
+
+	swapchainCreateInfo := VkSwapchainCreateInfoKHR();
+	swapchainCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapchainCreateInfo.surface = vulkanRenderer.vkSurface;
+	swapchainCreateInfo.minImageCount = imageCount;
+	swapchainCreateInfo.imageFormat = selectedFormat.format;
+	swapchainCreateInfo.imageColorSpace = selectedFormat.colorSpace;
+	swapchainCreateInfo.imageExtent = selectedExtent;
+	swapchainCreateInfo.imageArrayLayers = 1;
+	swapchainCreateInfo.imageUsage = VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+}
+
+*VkSurfaceFormatKHR SelectSwapSurfaceFormat()
+{
+	for (i .. vulkanRenderer.surfaceFormatCount)
+	{
+		surfaceFormat := vulkanRenderer.surfaceFormats[i];
+		if (surfaceFormat.format == VkFormat.VK_FORMAT_B8G8R8A8_SRGB &&
+			surfaceFormat.colorSpace == VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+			return surfaceFormat;
+	}
+
+	return vulkanRenderer.surfaceFormats[0];
+}
+
+VkPresentModeKHR SelectSwapPresentMode()
+{
+	for (i .. vulkanRenderer.presentModeCount)
+	{
+		presentMode := vulkanRenderer.presentModes[i]~;
+		if (presentMode == VkPresentModeKHR.VK_PRESENT_MODE_MAILBOX_KHR)
+			return presentMode;
+	}
+
+	return VkPresentModeKHR.VK_PRESENT_MODE_FIFO_KHR;
+}
+
+VkExtent2D SelectSwapExtent()
+{
+	capabilities := vulkanRenderer.surfaceCapabilities;
+	if(capabilities.currentExtent.width != uint32(-1))
+		return capabilities.currentExtent;
+	else
+	{
+		width := uint32(0);
+		height := uint32(0);
+		SDL.GetWindowSizeInPixels(
+			vulkanRenderer.window,
+			width@,
+			height@
+		);
+
+		extent := VkExtent2D();
+		extent.width = Math.Clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+		extent.height = Math.Clamp(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+		return extent;
 	}
 }
 

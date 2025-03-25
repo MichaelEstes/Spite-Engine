@@ -8,6 +8,7 @@ extern
 	void SDL_DestroyWindow(window: *Window);
 	bool SDL_Init(flags: uint32);
 	void SDL_Quit();
+	bool SDL_GetWindowSizeInPixels(window: *Window, width: *int32, height: *int32);
 }
 
 enum InitFlags
@@ -62,3 +63,4 @@ enum WindowFlags: uint64
 
 *Window CreateWindow(title: *byte, w: int32, h: int32, flags: uint) => SDL_CreateWindow(title, w, h, flags);
 void DestroyWindow(window: *Window) => SDL_DestroyWindow(window);
+bool GetWindowSizeInPixels(window: *Window, width: *int32, height: *int32) => SDL_GetWindowSizeInPixels(window, width, height);
