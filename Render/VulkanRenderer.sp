@@ -23,6 +23,7 @@ state VulkanRenderer
 	vkInstance :*VkInstance_T,
 	vkDevice: *VkDevice_T,
 	vkSurface: *VkSurfaceKHR_T,
+	vkSwapChain: *VkSwapchainKHR_T,
 	
 	extensionNames: **byte,
 
@@ -42,6 +43,12 @@ state VulkanRenderer
 	surfaceFormats: Allocator<VkSurfaceFormatKHR>,
 	presentModes: Allocator<VkPresentModeKHR>,
 
+	swapChainImages: Allocator<*VkImage_T>,
+	swapChainExtent: VkExtent2D,
+	swapChainImageFormat: VkFormat,
+
+	swapChainImageViews: Allocator<*VkImageView_T>,
+
 	extensionCount: uint32,
 	physicalDeviceCount: uint32,
 	queueFamilyCount: uint32,
@@ -49,7 +56,12 @@ state VulkanRenderer
 	presentationQueueCount: uint32,
 	surfaceFormatCount: uint32,
 	presentModeCount: uint32,
+	swapChainImageCount: uint32,
+	swapChainImageViewCount: uint32,
 }
+
+*VkQueue_T VulkanRenderer::GraphicsQueue() => this.graphicsQueues[0]~;
+*VkQueue_T VulkanRenderer::PresentationQueue() => this.presentationQueues[0]~;
 
 vulkanRenderer := VulkanRenderer();
 
@@ -107,6 +119,8 @@ InitializeVulkanRenderer(window: *SDL.Window)
 	BuildQueueFamilyIndices();
 	InitializeLogicalDevice();
 	InitializeSwapchain();
+	InitializeImageViews();
+	InitializePipeline();
 
 	log "Device name: ", string(256, fixed vulkanRenderer.currentDeviceProperties.deviceName);
 }
@@ -368,6 +382,52 @@ InitializeSwapchain()
 	swapchainCreateInfo.imageExtent = selectedExtent;
 	swapchainCreateInfo.imageArrayLayers = 1;
 	swapchainCreateInfo.imageUsage = VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+	queueIndices := [vulkanRenderer.graphicsQueueIndices[0]~, vulkanRenderer.presentationQueueIndices[0]~];
+	if (vulkanRenderer.GraphicsQueue() != vulkanRenderer.PresentationQueue())
+	{
+		swapchainCreateInfo.imageSharingMode = VkSharingMode.VK_SHARING_MODE_CONCURRENT;
+		swapchainCreateInfo.queueFamilyIndexCount = 2
+		swapchainCreateInfo.pQueueFamilyIndices = fixed queueIndices;
+	}
+	else
+	{
+		swapchainCreateInfo.imageSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+		swapchainCreateInfo.queueFamilyIndexCount = 0
+		swapchainCreateInfo.pQueueFamilyIndices = null;
+	}
+
+	swapchainCreateInfo.preTransform = vulkanRenderer.surfaceCapabilities.currentTransform;
+	swapchainCreateInfo.compositeAlpha = VkCompositeAlphaFlagBitsKHR.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	swapchainCreateInfo.presentMode = selectedPresentMode;
+	swapchainCreateInfo.clipped = uint32(1);
+	swapchainCreateInfo.oldSwapchain = null;
+
+	swapChainResult := vkCreateSwapchainKHR(
+		vulkanRenderer.vkDevice,
+		swapchainCreateInfo@,
+		null,
+		vulkanRenderer.vkSwapChain@
+	)
+	assert swapChainResult == VkResult.VK_SUCCESS, "Error creating Vulkan swap chain";
+
+	swapChainImageCount := uint32(0);
+	vkGetSwapchainImagesKHR(
+		vulkanRenderer.vkDevice,
+		vulkanRenderer.vkSwapChain,
+		swapChainImageCount@,
+		null
+	);
+	vulkanRenderer.swapChainImages.Alloc(swapChainImageCount);
+	vkGetSwapchainImagesKHR(
+		vulkanRenderer.vkDevice,
+		vulkanRenderer.vkSwapChain,
+		swapChainImageCount@,
+		vulkanRenderer.swapChainImages[0]
+	);
+
+	vulkanRenderer.swapChainImageFormat = selectedFormat.format;
+	vulkanRenderer.swapChainExtent = selectedExtent;
 }
 
 *VkSurfaceFormatKHR SelectSwapSurfaceFormat()
@@ -417,8 +477,49 @@ VkExtent2D SelectSwapExtent()
 	}
 }
 
+InitializeImageViews()
+{
+	vulkanRenderer.swapChainImageViews.Alloc(vulkanRenderer.swapChainImageCount);
+
+	for (i .. vulkanRenderer.swapChainImageCount)
+	{
+		imageViewCreateInfo := VkImageViewCreateInfo();
+		imageViewCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		imageViewCreateInfo.image = vulkanRenderer.swapChainImages[i]~;
+		imageViewCreateInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
+		imageViewCreateInfo.format = vulkanRenderer.swapChainImageFormat;
+		imageViewCreateInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewCreateInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewCreateInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewCreateInfo.components.a = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewCreateInfo.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+		imageViewCreateInfo.subresourceRange.baseMipLevel = uint32(0);
+		imageViewCreateInfo.subresourceRange.levelCount = uint32(1);
+		imageViewCreateInfo.subresourceRange.baseArrayLayer = uint32(0);
+		imageViewCreateInfo.subresourceRange.layerCount = uint32(1);
+
+		imageViewResult := vkCreateImageView(
+			vulkanRenderer.vkDevice,
+			imageViewCreateInfo@,
+			null,
+			vulkanRenderer.swapChainImageViews[0]
+		)
+		assert imageViewResult == VkResult.VK_SUCCESS, "Error creating Vulkan image view";
+	}
+}
+
+InitializePipeline()
+{
+
+}
+
 DestroyVulkanRenderer()
 {
+	for (i .. vulkanRenderer.swapChainImageCount) 
+	{
+		vkDestroyImageView(vulkanRenderer.vkDevice, vulkanRenderer.swapChainImageViews[i]~, null);
+	}
+	vkDestroySwapchainKHR(vulkanRenderer.vkDevice, vulkanRenderer.vkSwapChain, null);
 	vkDestroyDevice(vulkanRenderer.vkDevice, null);
 	vkDestroySurfaceKHR(vulkanRenderer.vkInstance, vulkanRenderer.vkSurface, null);
 	vkDestroyInstance(vulkanRenderer.vkInstance, null);
