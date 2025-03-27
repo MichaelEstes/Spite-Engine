@@ -1,8 +1,12 @@
 package VulkanRenderer
 
+import OS
 import Math
 import Vulkan
 import SDL
+
+VkFalse := uint32(0);
+VkTrue := uint32(1);
 
 appInfo := {
 	VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -510,7 +514,67 @@ InitializeImageViews()
 
 InitializePipeline()
 {
+	vertShader := ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Shaders\\vert.spv");
+	fragShader := ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Shaders\\frag.spv");
 
+	vertShaderModule := CreateShaderModule(vertShader);
+	fragShaderModule := CreateShaderModule(fragShader);
+
+	vertShaderStageInfo := VkPipelineShaderStageCreateInfo();
+	vertShaderStageInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertShaderModule;
+	vertShaderStageInfo.pName = "main"[0];
+
+	fragShaderStageInfo := VkPipelineShaderStageCreateInfo();
+	fragShaderStageInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragShaderModule;
+	fragShaderStageInfo.pName = "main"[0];
+
+	shaderStages := [vertShaderStageInfo, fragShaderStageInfo];
+
+	vertexInputInfo := VkPipelineVertexInputStateCreateInfo();
+	vertexInputInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputInfo.vertexBindingDescriptionCount = uint32(0);
+	vertexInputInfo.pVertexBindingDescriptions = null;
+	vertexInputInfo.vertexAttributeDescriptionCount = uint32(0);
+	vertexInputInfo.pVertexAttributeDescriptions = null;
+
+	inputAssembly := VkPipelineInputAssemblyStateCreateInfo();
+	inputAssembly.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssembly.topology = VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssembly.primitiveRestartEnable = VkFalse;
+
+	viewport := VkViewport();
+	viewport.x = float32(0.0);
+	viewport.y = float32(0.0);
+	viewport.width = vulkanRenderer.swapChainExtent.width as float32;
+	viewport.height = vulkanRenderer.swapChainExtent.height as float32;
+	viewport.minDepth = float32(0.0);
+	viewport.maxDepth = float32(1.0);
+
+	scissor := VkRect2D();
+	scissor.offset = {int32(0), int32(0)};
+	scissor.extent = vulkanRenderer.swapChainExtent;
+
+	viewportState := VkPipelineViewportStateCreateInfo;
+	viewportState.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportState.viewportCount = 1;
+	viewportState.scissorCount = 1;
+}
+
+*VkShaderModule_T CreateShaderModule(byteCode: string)
+{
+	shaderCreateInfo := VkShaderModuleCreateInfo();
+	shaderCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	shaderCreateInfo.codeSize = byteCode.count;
+	shaderCreateInfo.pCode = byteCode[0] as *uint32;
+
+	shaderModule := null as *VkShaderModule_T;
+	result := vkCreateShaderModule(vulkanRenderer.vkDevice, shaderCreateInfo@, null, shaderModule@);
+	assert result == VkResult.VK_SUCCESS, "Error creating Vulkan shader module";
+	return shaderModule;
 }
 
 DestroyVulkanRenderer()
