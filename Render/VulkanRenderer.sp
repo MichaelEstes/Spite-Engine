@@ -522,7 +522,7 @@ InitializeImageViews()
 			vulkanRenderer.vkDevice,
 			imageViewCreateInfo@,
 			null,
-			vulkanRenderer.swapChainImageViews[0]
+			vulkanRenderer.swapChainImageViews[i]
 		)
 		assert imageViewResult == VkResult.VK_SUCCESS, "Error creating Vulkan image view";
 	}
@@ -819,6 +819,7 @@ RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageIndex: uint32)
 		vkCmdSetViewport(commandBuffer, uint32(0), uint32(1), viewport@);
 		log "Setting cmd viewport";
 	}
+
 }
 
 DestroyVulkanRenderer()
