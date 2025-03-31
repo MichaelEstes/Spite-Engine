@@ -42,7 +42,7 @@ transformSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 	
 	for (item in scene.Iterate<Transform>())
 	{
-		log item;
+		//log item;
 	}
 });
 
@@ -51,7 +51,7 @@ testSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 	
 	for (item in scene.Iterate<Test>())
 	{
-		log item;
+		//log item;
 	}
 
 	scene.GetSingleton<SingletonTest>().myValue += 1;
@@ -77,7 +77,7 @@ Main()
 	//ECS.instance.Update();
 
 	Core.Initialize();
-	//Core.Start();
+	Core.Start();
 
 	//SDL.OnEvent(::int(userdata: *void, event: *SDL.Event) {
 	//	log "Event Callback: ", event;

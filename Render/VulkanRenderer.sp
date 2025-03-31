@@ -37,6 +37,10 @@ state VulkanRenderer
 	vkCommandPool: *VkCommandPool_T,
 	vkCommandBuffer: *VkCommandBuffer_T,
 
+	imageAvailableSemaphore: *VkSemaphore_T,
+	renderFinishedSemaphore: *VkSemaphore_T,
+	inFlightFence: *VkFence_T,
+
 	extensionNames: **byte,
 
 	physicalDevices: Allocator<*VkPhysicalDevice_T>,
@@ -140,8 +144,7 @@ InitializeVulkanRenderer(window: *SDL.Window)
 	InitializeFrameBuffers();
 	InitializeCommandPool();
 	InitializeCommandBuffer();
-
-	RecordCommandBuffer(vulkanRenderer.vkCommandBuffer, 0);
+	InitializeSyncObjects();
 
 	log "Device name: ", string(256, fixed vulkanRenderer.currentDeviceProperties.deviceName);
 }
@@ -549,12 +552,22 @@ InitializeRenderPass()
 	subpass.colorAttachmentCount = uint32(1);
 	subpass.pColorAttachments = colorAttachmentRef@;
 
+	dependency := VkSubpassDependency();
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = uint32(0);
+	dependency.srcStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = uint32(0);
+	dependency.dstStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
 	renderPassInfo := VkRenderPassCreateInfo();
 	renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	renderPassInfo.attachmentCount = uint32(1);
 	renderPassInfo.pAttachments = colorAttachment@;
 	renderPassInfo.subpassCount = uint32(1);
 	renderPassInfo.pSubpasses = subpass@;
+	renderPassInfo.dependencyCount = 1;
+	renderPassInfo.pDependencies = dependency@;
 
 	result := vkCreateRenderPass(vulkanRenderer.vkDevice, renderPassInfo@, null, vulkanRenderer.vkRenderPass@);
 	assert result == VkResult.VK_SUCCESS, "Error creating Vulkan render pass";
@@ -779,6 +792,39 @@ InitializeCommandBuffer()
 	assert result == VkResult.VK_SUCCESS, "Error creating Vulkan command buffer";
 }
 
+InitializeSyncObjects()
+{
+	semaphoreInfo := VkSemaphoreCreateInfo();
+	semaphoreInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	fenceInfo := VkFenceCreateInfo();
+	fenceInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = VkFenceCreateFlagBits.VK_FENCE_CREATE_SIGNALED_BIT;
+
+	imageResult := vkCreateSemaphore(
+		vulkanRenderer.vkDevice, 
+		semaphoreInfo@, 
+		null, 
+		vulkanRenderer.imageAvailableSemaphore@
+	);
+	renderResult := vkCreateSemaphore(
+		vulkanRenderer.vkDevice, 
+		semaphoreInfo@, 
+		null, 
+		vulkanRenderer.renderFinishedSemaphore@
+	);
+	inFlightResult := vkCreateFence(
+		vulkanRenderer.vkDevice, 
+		fenceInfo@, 
+		null, 
+		vulkanRenderer.inFlightFence@
+	);
+
+	assert imageResult == VkResult.VK_SUCCESS &&
+			renderResult == VkResult.VK_SUCCESS &&
+			inFlightResult == VkResult.VK_SUCCESS, "Error creating Vulkan synchronization objects";
+}
+
 RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageIndex: uint32)
 {
 	beginInfo := VkCommandBufferBeginInfo();
@@ -817,27 +863,102 @@ RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageIndex: uint32)
 		viewport.minDepth = float32(0.0);
 		viewport.maxDepth = float32(1.0);
 		vkCmdSetViewport(commandBuffer, uint32(0), uint32(1), viewport@);
-		log "Setting cmd viewport";
+
+		scissor := VkRect2D();
+        scissor.offset = {uint32(0), uint32(0)};
+        scissor.extent = vulkanRenderer.swapChainExtent;
+        vkCmdSetScissor(commandBuffer, uint32(0), uint32(1), scissor@);
+
+		vkCmdDraw(commandBuffer, uint32(3), uint32(1), uint32(0), uint32(0));
 	}
 
+	vkCmdEndRenderPass(commandBuffer);
+	endResult := vkEndCommandBuffer(commandBuffer);
+	assert endResult == VkResult.VK_SUCCESS, "Error recording Vulkan command buffer";
+}
+
+UINT64_MAX := uint64(-1);
+
+DrawFrame()
+{
+	vkWaitForFences(vulkanRenderer.vkDevice, uint32(1), vulkanRenderer.inFlightFence@, VkTrue, UINT64_MAX);
+	vkResetFences(vulkanRenderer.vkDevice, uint32(1), vulkanRenderer.inFlightFence@);
+
+	imageIndex := uint32(0);
+    vkAcquireNextImageKHR(
+		vulkanRenderer.vkDevice, 
+		vulkanRenderer.vkSwapChain, 
+		UINT64_MAX, 
+		vulkanRenderer.imageAvailableSemaphore, 
+		null, 
+		imageIndex@
+	);
+
+	vkResetCommandBuffer(vulkanRenderer.vkCommandBuffer, uint32(0));
+	RecordCommandBuffer(vulkanRenderer.vkCommandBuffer, imageIndex);
+
+	waitSemaphores := [vulkanRenderer.imageAvailableSemaphore,];
+	waitStages := [VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,];
+	signalSemaphores := [vulkanRenderer.renderFinishedSemaphore,];
+	swapChains := [vulkanRenderer.vkSwapChain,];
+
+	submitInfo := VkSubmitInfo();
+	submitInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = fixed waitSemaphores;
+	submitInfo.pWaitDstStageMask = fixed waitStages;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = vulkanRenderer.vkCommandBuffer@;
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = fixed signalSemaphores;
+
+	result := vkQueueSubmit(
+		vulkanRenderer.GraphicsQueue(), 
+		uint32(1), 
+		submitInfo@, 
+		vulkanRenderer.inFlightFence
+	);
+	assert result == VkResult.VK_SUCCESS, "Error submitting Vulkan draw command buffer";
+
+	presentInfo := VkPresentInfoKHR();
+	presentInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = fixed signalSemaphores;
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = fixed swapChains;
+	presentInfo.pImageIndices = imageIndex@;
+	presentInfo.pResults = null; // Optional
+
+	vkQueuePresentKHR(vulkanRenderer.PresentationQueue(), presentInfo@);
 }
 
 DestroyVulkanRenderer()
 {
+	vkDeviceWaitIdle(vulkanRenderer.vkDevice);
+
+	vkDestroySemaphore(vulkanRenderer.vkDevice, vulkanRenderer.imageAvailableSemaphore, null);
+    vkDestroySemaphore(vulkanRenderer.vkDevice, vulkanRenderer.renderFinishedSemaphore, null);
+    vkDestroyFence(vulkanRenderer.vkDevice, vulkanRenderer.inFlightFence, null);
+
 	vkDestroyCommandPool(vulkanRenderer.vkDevice, vulkanRenderer.vkCommandPool, null);
+
 	for (i .. vulkanRenderer.frameBufferCount)
 	{
 		vkDestroyFramebuffer(vulkanRenderer.vkDevice, vulkanRenderer.frameBuffers[i]~, null);
 	}
+
 	vkDestroyPipeline(vulkanRenderer.vkDevice, vulkanRenderer.vkPipeline, null);
-	vkDestroyRenderPass(vulkanRenderer.vkDevice, vulkanRenderer.vkRenderPass, null);
 	vkDestroyPipelineLayout(vulkanRenderer.vkDevice, vulkanRenderer.vkPipelineLayout, null);
+	vkDestroyRenderPass(vulkanRenderer.vkDevice, vulkanRenderer.vkRenderPass, null);
+
 	for (i .. vulkanRenderer.swapChainImageCount) 
 	{
 		vkDestroyImageView(vulkanRenderer.vkDevice, vulkanRenderer.swapChainImageViews[i]~, null);
 	}
+
 	vkDestroySwapchainKHR(vulkanRenderer.vkDevice, vulkanRenderer.vkSwapChain, null);
 	vkDestroyDevice(vulkanRenderer.vkDevice, null);
+
 	vkDestroySurfaceKHR(vulkanRenderer.vkInstance, vulkanRenderer.vkSurface, null);
 	vkDestroyInstance(vulkanRenderer.vkInstance, null);
 }

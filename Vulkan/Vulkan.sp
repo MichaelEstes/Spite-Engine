@@ -676,6 +676,8 @@ extern
     void vkCmdDrawMeshTasksIndirectCountEXT(commandBuffer: *VkCommandBuffer_T, buffer: *VkBuffer_T, offset: uint64, countBuffer: *VkBuffer_T, countBufferOffset: uint64, maxDrawCount: uint32, stride: uint32);
 }
 
+VK_SUBPASS_EXTERNAL := uint32(^0);
+
 enum VkResult: uint32
 {
         VK_SUCCESS = 0,

@@ -14,7 +14,7 @@ SDLEventEmitter := Event.Emitter();
 Initialize()
 {
 	InitializeTime();
-	//Fiber.InitalizeFibers();
+	Fiber.InitalizeFibers();
 
 	SDL.Init(SDL.InitFlags.VIDEO);
 	SDL.VulkanLoadLibrary(null);
@@ -48,6 +48,7 @@ MainLoop()
 		while (SDL.PollEvent(currEvent@)) HandleSDLEvent(currEvent);
 		
 		ECS.instance.Update();
+		VulkanRenderer.DrawFrame();
 	}
 
 	ECS.instance.Stop();
