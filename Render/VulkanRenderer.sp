@@ -75,7 +75,7 @@ InitializeVulkanInstance()
 	);
 }
 
-state VulkanRenderer
+state VulkanRenderer<framesInFlight = 2>
 {
 	vkInstance: *VulkanInstance,
 	
@@ -87,7 +87,7 @@ state VulkanRenderer
 	renderPass: *VkRenderPass_T,
 	pipeline: *VkPipeline_T,
 	commandPool: *VkCommandPool_T,
-	commandBuffer: *VkCommandBuffer_T,
+	commandBuffers: [framesInFlight]*VkCommandBuffer_T,
 
 	currentPhysicalDevice: *VkPhysicalDevice_T,
 	currentDeviceFeatures: VkPhysicalDeviceFeatures,
@@ -112,9 +112,9 @@ state VulkanRenderer
 
 	frameBuffers: Allocator<*VkFramebuffer_T>,
 
-	imageAvailableSemaphore: *VkSemaphore_T,
-	renderFinishedSemaphore: *VkSemaphore_T,
-	inFlightFence: *VkFence_T,
+	imageAvailableSemaphores: [framesInFlight]*VkSemaphore_T,
+	renderFinishedSemaphores: [framesInFlight]*VkSemaphore_T,
+	inFlightFences: [framesInFlight]*VkFence_T,
 
 	queueFamilyCount: uint32,
 	graphicsQueueCount: uint32,
@@ -124,6 +124,8 @@ state VulkanRenderer
 	swapChainImageCount: uint32,
 	swapChainImageViewCount: uint32,
 	frameBufferCount: uint32,
+
+	currentFrame: uint32
 }
 
 *VkQueue_T VulkanRenderer::GraphicsQueue() => this.graphicsQueues[0]~;
@@ -156,15 +158,17 @@ VulkanRenderer::DebugLogExtensions()
 	log "End instance ext";
 }
 
-VulkanRenderer CreateVulkanRenderer(window: *SDL.Window)
+VulkanRenderer<> CreateVulkanRenderer(window: *SDL.Window)
 {
-	vulkanRenderer := VulkanRenderer();
+	vulkanRenderer := VulkanRenderer<>();
 	vulkanRenderer.vkInstance = vulkanInstance@;
 
 	vulkanRenderer.window = window;
 
 	vulkanRenderer.InitializeSurface();
     vulkanRenderer.InitializeCurrentDevice();
+
+	log #typeof vulkanRenderer.commandBuffers
 
 	//vulkanRenderer.DebugLogExtensions();
 
@@ -785,10 +789,11 @@ VulkanRenderer::InitializeCommandBuffer()
 	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = this.commandPool;
 	allocInfo.level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = uint32(1);
+	allocInfo.commandBufferCount = uint32(2);
 
+	log this.commandBuffers;
 	CheckResult(
-		vkAllocateCommandBuffers(this.device, allocInfo@, this.commandBuffer@),
+		vkAllocateCommandBuffers(this.device, allocInfo@, this.commandBuffers[0]@),
 		"Error creating Vulkan command buffer"
 	);
 }
@@ -802,14 +807,18 @@ VulkanRenderer::InitializeSyncObjects()
 	fenceInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceInfo.flags = VkFenceCreateFlagBits.VK_FENCE_CREATE_SIGNALED_BIT;
 
-	imageResult := vkCreateSemaphore(this.device, semaphoreInfo@, null, this.imageAvailableSemaphore@);
-	renderResult := vkCreateSemaphore(this.device, semaphoreInfo@, null, this.renderFinishedSemaphore@);
-	inFlightResult := vkCreateFence(this.device, fenceInfo@, null, this.inFlightFence@);
-
 	errMsg := "Error creating Vulkan synchronization objects";
-	CheckResult(imageResult, errMsg);
-	CheckResult(renderResult, errMsg);
-	CheckResult(inFlightResult, errMsg);
+	for (i .. framesInFlight)
+	{
+		imageResult := vkCreateSemaphore(this.device, semaphoreInfo@, null, this.imageAvailableSemaphores[i]@);
+		renderResult := vkCreateSemaphore(this.device, semaphoreInfo@, null, this.renderFinishedSemaphores[i]@);
+		inFlightResult := vkCreateFence(this.device, fenceInfo@, null, this.inFlightFences[i]@);
+
+		CheckResult(imageResult, errMsg);
+		CheckResult(renderResult, errMsg);
+		CheckResult(inFlightResult, errMsg);
+	}
+
 }
 
 VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageIndex: uint32)
@@ -869,25 +878,25 @@ UINT64_MAX := uint64(-1);
 
 VulkanRenderer::DrawFrame()
 {
-	vkWaitForFences(this.device, uint32(1), this.inFlightFence@, VkTrue, UINT64_MAX);
-	vkResetFences(this.device, uint32(1), this.inFlightFence@);
+	vkWaitForFences(this.device, uint32(1), this.inFlightFences[this.currentFrame]@, VkTrue, UINT64_MAX);
+	vkResetFences(this.device, uint32(1), this.inFlightFences[this.currentFrame]@);
 
 	imageIndex := uint32(0);
     vkAcquireNextImageKHR(
 		this.device, 
 		this.swapChain, 
 		UINT64_MAX, 
-		this.imageAvailableSemaphore, 
+		this.imageAvailableSemaphores[this.currentFrame], 
 		null, 
 		imageIndex@
 	);
 
-	vkResetCommandBuffer(this.commandBuffer, uint32(0));
-	this.RecordCommandBuffer(this.commandBuffer, imageIndex);
+	vkResetCommandBuffer(this.commandBuffers[this.currentFrame], uint32(0));
+	this.RecordCommandBuffer(this.commandBuffers[this.currentFrame], imageIndex);
 
-	waitSemaphores := [this.imageAvailableSemaphore,];
+	waitSemaphores := [this.imageAvailableSemaphores[this.currentFrame],];
 	waitStages := [VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,];
-	signalSemaphores := [this.renderFinishedSemaphore,];
+	signalSemaphores := [this.renderFinishedSemaphores[this.currentFrame],];
 	swapChains := [this.swapChain,];
 
 	submitInfo := VkSubmitInfo();
@@ -896,12 +905,12 @@ VulkanRenderer::DrawFrame()
 	submitInfo.pWaitSemaphores = fixed waitSemaphores;
 	submitInfo.pWaitDstStageMask = fixed waitStages;
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = this.commandBuffer@;
+	submitInfo.pCommandBuffers = this.commandBuffers[this.currentFrame]@;
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = fixed signalSemaphores;
 
 	CheckResult(
-		vkQueueSubmit(this.GraphicsQueue(), uint32(1), submitInfo@, this.inFlightFence),
+		vkQueueSubmit(this.GraphicsQueue(), uint32(1), submitInfo@, this.inFlightFences[this.currentFrame]),
 		"Error submitting Vulkan draw command buffer"
 	);
 
@@ -915,15 +924,19 @@ VulkanRenderer::DrawFrame()
 	presentInfo.pResults = null; // Optional
 
 	vkQueuePresentKHR(this.PresentationQueue(), presentInfo@);
+	this.currentFrame = (this.currentFrame + 1) % framesInFlight;
 }
 
 VulkanRenderer::Destroy()
 {
 	vkDeviceWaitIdle(this.device);
 
-	vkDestroySemaphore(this.device, this.imageAvailableSemaphore, null);
-    vkDestroySemaphore(this.device, this.renderFinishedSemaphore, null);
-    vkDestroyFence(this.device, this.inFlightFence, null);
+	for (i .. framesInFlight)
+	{
+		vkDestroySemaphore(this.device, this.imageAvailableSemaphores[i], null);
+		vkDestroySemaphore(this.device, this.renderFinishedSemaphores[i], null);
+		vkDestroyFence(this.device, this.inFlightFences[i], null);
+	}
 
 	vkDestroyCommandPool(this.device, this.commandPool, null);
 
