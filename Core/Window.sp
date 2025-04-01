@@ -3,14 +3,15 @@ package Window
 import SDL
 import SparseSet
 
-mainWindow: *SDL.Window = null;
 windowMap := SparseSet<*SDL.Window>();
 
-*SDL.Window InitializeMainWindow()
+*SDL.Window CreateMainWindow()
 {
-	mainWindow := CreateWindow(null, 1000, 1000, 
-								SDL.WindowFlags.Vulkan | SDL.WindowFlags.Resizable);
-	return mainWindow;
+	return CreateWindow(
+		null, 
+		1000, 1000, 
+		SDL.WindowFlags.Vulkan | SDL.WindowFlags.Resizable
+	);
 }
 
 *SDL.Window CreateWindow(title: *byte, width: int32, height: int32, flags: uint)

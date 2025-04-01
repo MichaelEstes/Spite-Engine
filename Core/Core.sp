@@ -11,6 +11,7 @@ running := false;
 
 SDLEventEmitter := Event.Emitter();
 
+
 Initialize()
 {
 	InitializeTime();
@@ -18,9 +19,8 @@ Initialize()
 
 	SDL.Init(SDL.InitFlags.VIDEO);
 	SDL.VulkanLoadLibrary(null);
-	mainWindow := InitializeMainWindow();
 
-	VulkanRenderer.InitializeVulkanRenderer(mainWindow);
+	VulkanRenderer.InitializeVulkanInstance();
 
 	SDLEventEmitter.On(SDL.EventType.QUIT, ::(event: SDL.Event) {
 		running = false;
@@ -42,17 +42,20 @@ MainLoop()
 {
 	running = true;
 
+	mainWindow := Window.CreateMainWindow()
+	renderer := VulkanRenderer.CreateVulkanRenderer(mainWindow);
+
 	currEvent := SDL.Event();
 	while (running)
 	{
 		while (SDL.PollEvent(currEvent@)) HandleSDLEvent(currEvent);
 		
 		ECS.instance.Update();
-		VulkanRenderer.DrawFrame();
+		renderer.DrawFrame();
 	}
 
 	ECS.instance.Stop();
-	VulkanRenderer.DestroyVulkanRenderer();
+	renderer.Destroy();
 }
 
 HandleSDLEvent(event: SDL.Event)

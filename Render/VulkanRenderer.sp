@@ -24,26 +24,71 @@ validationCount := #compile uint32 => (#typeof validationLayers).FixedArrayCount
 requiredDeviceExtensions := ["VK_KHR_swapchain"[0],];
 requiredDeviceExtensionCount := #compile uint32 => (#typeof requiredDeviceExtensions).FixedArrayCount();
 
+CheckResult(result: VkResult, errorMsg: string)
+{
+	if (result != VkResult.VK_SUCCESS)
+	{
+		log errorMsg;
+	}
+}
+
+state VulkanInstance
+{
+	instance: *VkInstance_T,
+	extensionNames: **byte,
+	physicalDevices: Allocator<*VkPhysicalDevice_T>,
+
+	physicalDeviceCount: uint32,
+	extensionCount: uint32,
+}
+
+vulkanInstance := VulkanInstance();
+
+InitializeVulkanInstance()
+{
+	vulkanInstance.extensionNames = SDL.VulkanGetInstanceExtensions(vulkanInstance.extensionCount@);
+    instanceCreateInfo := {
+        VkStructureType.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, 
+        null,													
+        uint32(0),												
+        appInfo@,													
+        validationCount,												
+        fixed validationLayers,												
+        vulkanInstance.extensionCount,											
+        vulkanInstance.extensionNames,											
+    } as VkInstanceCreateInfo;
+
+	CheckResult(
+		vkCreateInstance(instanceCreateInfo@, null, vulkanInstance.instance@),
+		"Error creating Vulkan instance"
+	);
+
+	vkEnumeratePhysicalDevices(vulkanInstance.instance, vulkanInstance.physicalDeviceCount@, null);
+	vulkanInstance.physicalDevices.Alloc(vulkanInstance.physicalDeviceCount);
+    CheckResult(
+		vkEnumeratePhysicalDevices(
+			vulkanInstance.instance, 
+			vulkanInstance.physicalDeviceCount@, 
+			vulkanInstance.physicalDevices[0]
+		),
+		"Error finding device for Vulkan"
+	);
+}
+
 state VulkanRenderer
 {
+	vkInstance: *VulkanInstance,
+	
 	window: *SDL.Window,
-	vkInstance :*VkInstance_T,
-	vkDevice: *VkDevice_T,
-	vkSurface: *VkSurfaceKHR_T,
-	vkSwapChain: *VkSwapchainKHR_T,
-	vkPipelineLayout: *VkPipelineLayout_T,
-	vkRenderPass: *VkRenderPass_T,
-	vkPipeline: *VkPipeline_T,
-	vkCommandPool: *VkCommandPool_T,
-	vkCommandBuffer: *VkCommandBuffer_T,
+	device: *VkDevice_T,
+	surface: *VkSurfaceKHR_T,
+	swapChain: *VkSwapchainKHR_T,
+	pipelineLayout: *VkPipelineLayout_T,
+	renderPass: *VkRenderPass_T,
+	pipeline: *VkPipeline_T,
+	commandPool: *VkCommandPool_T,
+	commandBuffer: *VkCommandBuffer_T,
 
-	imageAvailableSemaphore: *VkSemaphore_T,
-	renderFinishedSemaphore: *VkSemaphore_T,
-	inFlightFence: *VkFence_T,
-
-	extensionNames: **byte,
-
-	physicalDevices: Allocator<*VkPhysicalDevice_T>,
 	currentPhysicalDevice: *VkPhysicalDevice_T,
 	currentDeviceFeatures: VkPhysicalDeviceFeatures,
 	currentDeviceProperties: VkPhysicalDeviceProperties,
@@ -67,8 +112,10 @@ state VulkanRenderer
 
 	frameBuffers: Allocator<*VkFramebuffer_T>,
 
-	extensionCount: uint32,
-	physicalDeviceCount: uint32,
+	imageAvailableSemaphore: *VkSemaphore_T,
+	renderFinishedSemaphore: *VkSemaphore_T,
+	inFlightFence: *VkFence_T,
+
 	queueFamilyCount: uint32,
 	graphicsQueueCount: uint32,
 	presentationQueueCount: uint32,
@@ -82,16 +129,14 @@ state VulkanRenderer
 *VkQueue_T VulkanRenderer::GraphicsQueue() => this.graphicsQueues[0]~;
 *VkQueue_T VulkanRenderer::PresentationQueue() => this.presentationQueues[0]~;
 
-vulkanRenderer := VulkanRenderer();
-
-DebugLogExtensions()
+VulkanRenderer::DebugLogExtensions()
 {
 	extCount := uint32(0);
-	vkEnumerateDeviceExtensionProperties(vulkanRenderer.currentPhysicalDevice, null, extCount@, null);
+	vkEnumerateDeviceExtensionProperties(this.currentPhysicalDevice, null, extCount@, null);
 	log "Device ext count: ", extCount;
 	extProps := Allocator<VkExtensionProperties>();
 	extProps.Alloc(extCount);
-	vkEnumerateDeviceExtensionProperties(vulkanRenderer.currentPhysicalDevice, null, extCount@, extProps[0]);
+	vkEnumerateDeviceExtensionProperties(this.currentPhysicalDevice, null, extCount@, extProps[0]);
 	for (i .. extCount)
 	{
 		puts(fixed extProps[i].extensionName);
@@ -111,153 +156,128 @@ DebugLogExtensions()
 	log "End instance ext";
 }
 
-InitializeVulkanRenderer(window: *SDL.Window)
+VulkanRenderer CreateVulkanRenderer(window: *SDL.Window)
 {
+	vulkanRenderer := VulkanRenderer();
+	vulkanRenderer.vkInstance = vulkanInstance@;
+
 	vulkanRenderer.window = window;
-	vulkanRenderer.extensionNames = SDL.VulkanGetInstanceExtensions(vulkanRenderer.extensionCount@);
-    instanceCreateInfo := {
-        VkStructureType.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, 
-        null,													
-        uint32(0),												
-        appInfo@,													
-        validationCount,												
-        fixed validationLayers,												
-        vulkanRenderer.extensionCount,											
-        vulkanRenderer.extensionNames,											
-    } as VkInstanceCreateInfo;
 
-    createResult := vkCreateInstance(instanceCreateInfo@, null, vulkanRenderer.vkInstance@);
-	assert createResult == VkResult.VK_SUCCESS, "Error creating Vulkan instance";
+	vulkanRenderer.InitializeSurface();
+    vulkanRenderer.InitializeCurrentDevice();
 
-	InitializeSurface();
-    InitializeCurrentDevice();
+	//vulkanRenderer.DebugLogExtensions();
 
-	//DebugLogExtensions();
-
-	InitializeQueues();
-	BuildQueueFamilyIndices();
-	InitializeLogicalDevice();
-	InitializeSwapchain();
-	InitializeImageViews();
-	InitializeRenderPass();
-	InitializePipeline();
-	InitializeFrameBuffers();
-	InitializeCommandPool();
-	InitializeCommandBuffer();
-	InitializeSyncObjects();
+	vulkanRenderer.InitializeQueues();
+	vulkanRenderer.BuildQueueFamilyIndices();
+	vulkanRenderer.InitializeLogicalDevice();
+	vulkanRenderer.InitializeSwapchain();
+	vulkanRenderer.InitializeImageViews();
+	vulkanRenderer.InitializeRenderPass();
+	vulkanRenderer.InitializePipeline();
+	vulkanRenderer.InitializeFrameBuffers();
+	vulkanRenderer.InitializeCommandPool();
+	vulkanRenderer.InitializeCommandBuffer();
+	vulkanRenderer.InitializeSyncObjects();
 
 	log "Device name: ", string(256, fixed vulkanRenderer.currentDeviceProperties.deviceName);
+	return vulkanRenderer;
 }
 
-InitializeSurface()
+VulkanRenderer::InitializeSurface()
 {
-	surfaceResult := SDL.VulkanCreateSurface(
-		vulkanRenderer.window, 
-		vulkanRenderer.vkInstance, 
-		null, 
-		vulkanRenderer.vkSurface@
-	);
-	assert surfaceResult, "Error creating Vulkan surface";
-}
-
-InitializeCurrentDevice()
-{
-	vkEnumeratePhysicalDevices(vulkanRenderer.vkInstance, vulkanRenderer.physicalDeviceCount@, null);
-	vulkanRenderer.physicalDevices.Alloc(vulkanRenderer.physicalDeviceCount);
-    deviceResult := vkEnumeratePhysicalDevices(
-		vulkanRenderer.vkInstance, 
-		vulkanRenderer.physicalDeviceCount@, 
-		vulkanRenderer.physicalDevices[0]
-	);
-    assert deviceResult == VkResult.VK_SUCCESS, "Error finding device for Vulkan";
-
-	vulkanRenderer.currentPhysicalDevice = vulkanRenderer.physicalDevices[0]~;
-	vkGetPhysicalDeviceFeatures(vulkanRenderer.currentPhysicalDevice, vulkanRenderer.currentDeviceFeatures@);
-	vkGetPhysicalDeviceProperties(vulkanRenderer.currentPhysicalDevice, vulkanRenderer.currentDeviceProperties@);
-}
-
-InitializeQueues()
-{
-	vkGetPhysicalDeviceQueueFamilyProperties(
-		vulkanRenderer.currentPhysicalDevice, 
-		vulkanRenderer.queueFamilyCount@, 
-		null
-	);
-	vulkanRenderer.queueFamilies.Alloc(vulkanRenderer.queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(
-		vulkanRenderer.currentPhysicalDevice, 
-		vulkanRenderer.queueFamilyCount@, 
-		vulkanRenderer.queueFamilies[0]
-	);
-}
-
-BuildQueueFamilyIndices()
-{
-	for (i .. vulkanRenderer.queueFamilyCount)
+	if (!SDL.VulkanCreateSurface(this.window, this.vkInstance.instance, null, this.surface@))
 	{
-		queueFamily := vulkanRenderer.queueFamilies[i];
+		puts(SDL.GetError());
+		log "Error creating Vulkan surface";
+	}
+}
+
+VulkanRenderer::InitializeCurrentDevice()
+{
+	this.currentPhysicalDevice = this.vkInstance.physicalDevices[0]~;
+	vkGetPhysicalDeviceFeatures(this.currentPhysicalDevice, this.currentDeviceFeatures@);
+	vkGetPhysicalDeviceProperties(this.currentPhysicalDevice, this.currentDeviceProperties@);
+}
+
+VulkanRenderer::InitializeQueues()
+{
+	vkGetPhysicalDeviceQueueFamilyProperties(this.currentPhysicalDevice, this.queueFamilyCount@, null);
+	this.queueFamilies.Alloc(this.queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(
+		this.currentPhysicalDevice, 
+		this.queueFamilyCount@, 
+		this.queueFamilies[0]
+	);
+}
+
+VulkanRenderer::BuildQueueFamilyIndices()
+{
+	for (i .. this.queueFamilyCount)
+	{
+		queueFamily := this.queueFamilies[i];
 		if (queueFamily.queueFlags & VkQueueFlagBits.VK_QUEUE_GRAPHICS_BIT) 
 		{
-			vulkanRenderer.graphicsQueueCount += 1;
+			this.graphicsQueueCount += 1;
 		}
 
 		presentationSupport := uint32(0);
 		vkGetPhysicalDeviceSurfaceSupportKHR(
-			vulkanRenderer.currentPhysicalDevice, 
+			this.currentPhysicalDevice, 
 			i, 
-			vulkanRenderer.vkSurface, 
+			this.surface, 
 			presentationSupport@
 		);
 		if (presentationSupport)
 		{
-			vulkanRenderer.presentationQueueCount += 1;
+			this.presentationQueueCount += 1;
 		}
 
     }
 
-	vulkanRenderer.graphicsQueueIndices.Alloc(vulkanRenderer.graphicsQueueCount);
-	vulkanRenderer.presentationQueueIndices.Alloc(vulkanRenderer.presentationQueueCount)
+	this.graphicsQueueIndices.Alloc(this.graphicsQueueCount);
+	this.presentationQueueIndices.Alloc(this.presentationQueueCount)
 	graphicsIndex := 0;
 	presentationIndex := 0;
-	for (i .. vulkanRenderer.queueFamilyCount)
+	for (i .. this.queueFamilyCount)
 	{
-		queueFamily := vulkanRenderer.queueFamilies[i];
+		queueFamily := this.queueFamilies[i];
 		if (queueFamily.queueFlags & VkQueueFlagBits.VK_QUEUE_GRAPHICS_BIT) 
 		{
-			vulkanRenderer.graphicsQueueIndices[graphicsIndex]~ = i;
+			this.graphicsQueueIndices[graphicsIndex]~ = i;
 			graphicsIndex += 1;
 		}
 
 		presentationSupport := uint32(0);
 		vkGetPhysicalDeviceSurfaceSupportKHR(
-			vulkanRenderer.currentPhysicalDevice, 
+			this.currentPhysicalDevice, 
 			i, 
-			vulkanRenderer.vkSurface, 
+			this.surface, 
 			presentationSupport@
 		);
 		if (presentationSupport)
 		{
-			vulkanRenderer.presentationQueueIndices[presentationIndex]~ = i;
+			this.presentationQueueIndices[presentationIndex]~ = i;
 			presentationIndex += 1;
 		}
     }
 }
 
-{queues: Allocator<uint32>, count: uint32} GetUniqueQueues()
+{queues: Allocator<uint32>, count: uint32} VulkanRenderer::GetUniqueQueues()
 {
 	queues := Allocator<uint32>();
-	queues.Alloc(vulkanRenderer.graphicsQueueCount + vulkanRenderer.presentationQueueCount);
+	queues.Alloc(this.graphicsQueueCount + this.presentationQueueCount);
 
 	count := uint32(0);
-	for (i .. vulkanRenderer.presentationQueueCount)
+	for (i .. this.presentationQueueCount)
 	{
-		queues[i]~ = vulkanRenderer.presentationQueueIndices[i]~;
+		queues[i]~ = this.presentationQueueIndices[i]~;
 		count += 1;
 	}
 
-	for (i .. vulkanRenderer.graphicsQueueCount)
+	for (i .. this.graphicsQueueCount)
 	{
-		queue := vulkanRenderer.graphicsQueueIndices[i]~;
+		queue := this.graphicsQueueIndices[i]~;
 		unique := true;
 		for (j .. count)
 		{
@@ -278,11 +298,11 @@ BuildQueueFamilyIndices()
 	return {queues, count};
 }
 
-InitializeLogicalDevice()
+VulkanRenderer::InitializeLogicalDevice()
 {
 	queuePriority := float32(1.0);
 
-	uniqueQueues := GetUniqueQueues();
+	uniqueQueues := this.GetUniqueQueues();
 	defer uniqueQueues.queues.Dealloc(uniqueQueues.count);
 
 	queueCreateInfos := Allocator<VkDeviceQueueCreateInfo>();
@@ -306,36 +326,33 @@ InitializeLogicalDevice()
 	deviceCreateInfo.pQueueCreateInfos = queueCreateInfos[0];
 	deviceCreateInfo.enabledExtensionCount = requiredDeviceExtensionCount;
 	deviceCreateInfo.ppEnabledExtensionNames = fixed requiredDeviceExtensions;
-	deviceCreateInfo.pEnabledFeatures = vulkanRenderer.currentDeviceFeatures@;
+	deviceCreateInfo.pEnabledFeatures = this.currentDeviceFeatures@;
 
-	createDeviceResult := vkCreateDevice(
-		vulkanRenderer.currentPhysicalDevice, 
-		deviceCreateInfo@, 
-		null, 
-		vulkanRenderer.vkDevice@
+	CheckResult(
+		vkCreateDevice(this.currentPhysicalDevice, deviceCreateInfo@, null, this.device@),
+		"Error creating a logical Vulkan device"
 	);
-	assert createDeviceResult == VkResult.VK_SUCCESS, "Error creating a logical Vulkan device";
 
-	GetDeviceQueues(
-		vulkanRenderer.graphicsQueueCount,
-		vulkanRenderer.graphicsQueueIndices,
-		vulkanRenderer.graphicsQueues@
+	this.GetDeviceQueues(
+		this.graphicsQueueCount,
+		this.graphicsQueueIndices,
+		this.graphicsQueues@
 	)
 
-	GetDeviceQueues(
-		vulkanRenderer.presentationQueueCount,
-		vulkanRenderer.presentationQueueIndices,
-		vulkanRenderer.presentationQueues@
+	this.GetDeviceQueues(
+		this.presentationQueueCount,
+		this.presentationQueueIndices,
+		this.presentationQueues@
 	)
 }
 
-GetDeviceQueues(count: uint32, indices: Allocator<uint32>, queues: *Allocator<*VkQueue_T>)
+VulkanRenderer::GetDeviceQueues(count: uint32, indices: Allocator<uint32>, queues: *Allocator<*VkQueue_T>)
 {
 	queues.Alloc(count);
 	for (i .. count)
 	{
 		vkGetDeviceQueue(
-			vulkanRenderer.vkDevice,
+			this.device,
 			indices[i]~,
 			0,
 			queues~[i]
@@ -343,63 +360,65 @@ GetDeviceQueues(count: uint32, indices: Allocator<uint32>, queues: *Allocator<*V
 	}
 }
 
-InitializeSwapchain()
+VulkanRenderer::InitializeSwapchain()
 {
-	result := vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-		vulkanRenderer.currentPhysicalDevice, 
-		vulkanRenderer.vkSurface,
-		vulkanRenderer.surfaceCapabilities@
+	CheckResult(
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+			this.currentPhysicalDevice, 
+			this.surface, 
+			this.surfaceCapabilities@
+		),
+		"Error getting device surface capabilities"
 	);
-	assert result == VkResult.VK_SUCCESS, "Error getting device surface capabilities";
 
 	vkGetPhysicalDeviceSurfaceFormatsKHR(
-		vulkanRenderer.currentPhysicalDevice, 
-		vulkanRenderer.vkSurface,
-		vulkanRenderer.surfaceFormatCount@, 
+		this.currentPhysicalDevice, 
+		this.surface,
+		this.surfaceFormatCount@, 
 		null
 	);
-	if (vulkanRenderer.surfaceFormatCount)
+	if (this.surfaceFormatCount)
 	{
-		vulkanRenderer.surfaceFormats.Alloc(vulkanRenderer.surfaceFormatCount);
+		this.surfaceFormats.Alloc(this.surfaceFormatCount);
 		vkGetPhysicalDeviceSurfaceFormatsKHR(
-			vulkanRenderer.currentPhysicalDevice, 
-			vulkanRenderer.vkSurface,
-			vulkanRenderer.surfaceFormatCount@, 
-			vulkanRenderer.surfaceFormats[0]
+			this.currentPhysicalDevice, 
+			this.surface,
+			this.surfaceFormatCount@, 
+			this.surfaceFormats[0]
 		);
 	}
 
 	vkGetPhysicalDeviceSurfacePresentModesKHR(
-		vulkanRenderer.currentPhysicalDevice, 
-		vulkanRenderer.vkSurface,
-		vulkanRenderer.presentModeCount@, 
+		this.currentPhysicalDevice, 
+		this.surface,
+		this.presentModeCount@, 
 		null
 	);
-	if (vulkanRenderer.presentModeCount)
+	if (this.presentModeCount)
 	{
-		vulkanRenderer.presentModes.Alloc(vulkanRenderer.presentModeCount);
+		this.presentModes.Alloc(this.presentModeCount);
 		vkGetPhysicalDeviceSurfacePresentModesKHR(
-			vulkanRenderer.currentPhysicalDevice, 
-			vulkanRenderer.vkSurface,
-			vulkanRenderer.presentModeCount@, 
-			vulkanRenderer.presentModes[0]
+			this.currentPhysicalDevice, 
+			this.surface,
+			this.presentModeCount@, 
+			this.presentModes[0]
 		);
 	}
 
-	selectedFormat := SelectSwapSurfaceFormat();
-	selectedPresentMode := SelectSwapPresentMode();
-	selectedExtent := SelectSwapExtent();
+	selectedFormat := this.SelectSwapSurfaceFormat();
+	selectedPresentMode := this.SelectSwapPresentMode();
+	selectedExtent := this.SelectSwapExtent();
 
-	imageCount: uint32 = vulkanRenderer.surfaceCapabilities.minImageCount + 1;
-	if (vulkanRenderer.surfaceCapabilities.maxImageCount > 0 && 
-		imageCount > vulkanRenderer.surfaceCapabilities.maxImageCount) 
+	imageCount: uint32 = this.surfaceCapabilities.minImageCount + 1;
+	if (this.surfaceCapabilities.maxImageCount > 0 && 
+		imageCount > this.surfaceCapabilities.maxImageCount) 
 	{
-		imageCount = vulkanRenderer.surfaceCapabilities.maxImageCount;
+		imageCount = this.surfaceCapabilities.maxImageCount;
 	}
 
 	swapchainCreateInfo := VkSwapchainCreateInfoKHR();
 	swapchainCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-	swapchainCreateInfo.surface = vulkanRenderer.vkSurface;
+	swapchainCreateInfo.surface = this.surface;
 	swapchainCreateInfo.minImageCount = imageCount;
 	swapchainCreateInfo.imageFormat = selectedFormat.format;
 	swapchainCreateInfo.imageColorSpace = selectedFormat.colorSpace;
@@ -407,8 +426,8 @@ InitializeSwapchain()
 	swapchainCreateInfo.imageArrayLayers = 1;
 	swapchainCreateInfo.imageUsage = VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-	queueIndices := [vulkanRenderer.graphicsQueueIndices[0]~, vulkanRenderer.presentationQueueIndices[0]~];
-	if (vulkanRenderer.GraphicsQueue() != vulkanRenderer.PresentationQueue())
+	queueIndices := [this.graphicsQueueIndices[0]~, this.presentationQueueIndices[0]~];
+	if (this.GraphicsQueue() != this.PresentationQueue())
 	{
 		swapchainCreateInfo.imageSharingMode = VkSharingMode.VK_SHARING_MODE_CONCURRENT;
 		swapchainCreateInfo.queueFamilyIndexCount = 2
@@ -421,56 +440,53 @@ InitializeSwapchain()
 		swapchainCreateInfo.pQueueFamilyIndices = null;
 	}
 
-	swapchainCreateInfo.preTransform = vulkanRenderer.surfaceCapabilities.currentTransform;
+	swapchainCreateInfo.preTransform = this.surfaceCapabilities.currentTransform;
 	swapchainCreateInfo.compositeAlpha = VkCompositeAlphaFlagBitsKHR.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchainCreateInfo.presentMode = selectedPresentMode;
 	swapchainCreateInfo.clipped = uint32(1);
-	swapchainCreateInfo.oldSwapchain = vulkanRenderer.vkSwapChain;
+	swapchainCreateInfo.oldSwapchain = this.swapChain;
 
-	swapChainResult := vkCreateSwapchainKHR(
-		vulkanRenderer.vkDevice,
-		swapchainCreateInfo@,
-		null,
-		vulkanRenderer.vkSwapChain@
+	CheckResult(
+		vkCreateSwapchainKHR(this.device, swapchainCreateInfo@, null, this.swapChain@),
+		"Error creating Vulkan swap chain"
 	)
-	assert swapChainResult == VkResult.VK_SUCCESS, "Error creating Vulkan swap chain";
 
 	vkGetSwapchainImagesKHR(
-		vulkanRenderer.vkDevice,
-		vulkanRenderer.vkSwapChain,
-		vulkanRenderer.swapChainImageCount@,
+		this.device,
+		this.swapChain,
+		this.swapChainImageCount@,
 		null
 	);
-	vulkanRenderer.swapChainImages.Alloc(vulkanRenderer.swapChainImageCount);
+	this.swapChainImages.Alloc(this.swapChainImageCount);
 	vkGetSwapchainImagesKHR(
-		vulkanRenderer.vkDevice,
-		vulkanRenderer.vkSwapChain,
-		vulkanRenderer.swapChainImageCount@,
-		vulkanRenderer.swapChainImages[0]
+		this.device,
+		this.swapChain,
+		this.swapChainImageCount@,
+		this.swapChainImages[0]
 	);
 
-	vulkanRenderer.swapChainImageFormat = selectedFormat.format;
-	vulkanRenderer.swapChainExtent = selectedExtent;
+	this.swapChainImageFormat = selectedFormat.format;
+	this.swapChainExtent = selectedExtent;
 }
 
-*VkSurfaceFormatKHR SelectSwapSurfaceFormat()
+*VkSurfaceFormatKHR VulkanRenderer::SelectSwapSurfaceFormat()
 {
-	for (i .. vulkanRenderer.surfaceFormatCount)
+	for (i .. this.surfaceFormatCount)
 	{
-		surfaceFormat := vulkanRenderer.surfaceFormats[i];
+		surfaceFormat := this.surfaceFormats[i];
 		if (surfaceFormat.format == VkFormat.VK_FORMAT_B8G8R8A8_SRGB &&
 			surfaceFormat.colorSpace == VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 			return surfaceFormat;
 	}
 
-	return vulkanRenderer.surfaceFormats[0];
+	return this.surfaceFormats[0];
 }
 
-VkPresentModeKHR SelectSwapPresentMode()
+VkPresentModeKHR VulkanRenderer::SelectSwapPresentMode()
 {
-	for (i .. vulkanRenderer.presentModeCount)
+	for (i .. this.presentModeCount)
 	{
-		presentMode := vulkanRenderer.presentModes[i]~;
+		presentMode := this.presentModes[i]~;
 		if (presentMode == VkPresentModeKHR.VK_PRESENT_MODE_MAILBOX_KHR)
 			return presentMode;
 	}
@@ -478,9 +494,9 @@ VkPresentModeKHR SelectSwapPresentMode()
 	return VkPresentModeKHR.VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D SelectSwapExtent()
+VkExtent2D VulkanRenderer::SelectSwapExtent()
 {
-	capabilities := vulkanRenderer.surfaceCapabilities;
+	capabilities := this.surfaceCapabilities;
 	if(capabilities.currentExtent.width != uint32(-1))
 		return capabilities.currentExtent;
 	else
@@ -488,7 +504,7 @@ VkExtent2D SelectSwapExtent()
 		width := uint32(0);
 		height := uint32(0);
 		SDL.GetWindowSizeInPixels(
-			vulkanRenderer.window,
+			this.window,
 			width@,
 			height@
 		);
@@ -500,17 +516,17 @@ VkExtent2D SelectSwapExtent()
 	}
 }
 
-InitializeImageViews()
+VulkanRenderer::InitializeImageViews()
 {
-	vulkanRenderer.swapChainImageViews.Alloc(vulkanRenderer.swapChainImageCount);
+	this.swapChainImageViews.Alloc(this.swapChainImageCount);
 
-	for (i .. vulkanRenderer.swapChainImageCount)
+	for (i .. this.swapChainImageCount)
 	{
 		imageViewCreateInfo := VkImageViewCreateInfo();
 		imageViewCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		imageViewCreateInfo.image = vulkanRenderer.swapChainImages[i]~;
+		imageViewCreateInfo.image = this.swapChainImages[i]~;
 		imageViewCreateInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
-		imageViewCreateInfo.format = vulkanRenderer.swapChainImageFormat;
+		imageViewCreateInfo.format = this.swapChainImageFormat;
 		imageViewCreateInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
 		imageViewCreateInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
 		imageViewCreateInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -521,20 +537,17 @@ InitializeImageViews()
 		imageViewCreateInfo.subresourceRange.baseArrayLayer = uint32(0);
 		imageViewCreateInfo.subresourceRange.layerCount = uint32(1);
 
-		imageViewResult := vkCreateImageView(
-			vulkanRenderer.vkDevice,
-			imageViewCreateInfo@,
-			null,
-			vulkanRenderer.swapChainImageViews[i]
-		)
-		assert imageViewResult == VkResult.VK_SUCCESS, "Error creating Vulkan image view";
+		CheckResult(
+			vkCreateImageView(this.device, imageViewCreateInfo@, null, this.swapChainImageViews[i]),
+			"Error creating Vulkan image view"
+		);
 	}
 }
 
-InitializeRenderPass()
+VulkanRenderer::InitializeRenderPass()
 {
 	colorAttachment := VkAttachmentDescription();
-    colorAttachment.format = vulkanRenderer.swapChainImageFormat;
+    colorAttachment.format = this.swapChainImageFormat;
     colorAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
 	colorAttachment.loadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR;
 	colorAttachment.storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_STORE;
@@ -569,17 +582,19 @@ InitializeRenderPass()
 	renderPassInfo.dependencyCount = 1;
 	renderPassInfo.pDependencies = dependency@;
 
-	result := vkCreateRenderPass(vulkanRenderer.vkDevice, renderPassInfo@, null, vulkanRenderer.vkRenderPass@);
-	assert result == VkResult.VK_SUCCESS, "Error creating Vulkan render pass";
+	CheckResult(
+		vkCreateRenderPass(this.device, renderPassInfo@, null, this.renderPass@),
+		"Error creating Vulkan render pass"
+	);
 }
 
-InitializePipeline()
+VulkanRenderer::InitializePipeline()
 {
 	vertShader := ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Shaders\\vert.spv");
 	fragShader := ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Shaders\\frag.spv");
 
-	vertShaderModule := CreateShaderModule(vertShader);
-	fragShaderModule := CreateShaderModule(fragShader);
+	vertShaderModule := this.CreateShaderModule(vertShader);
+	fragShaderModule := this.CreateShaderModule(fragShader);
 
 	vertShaderStageInfo := VkPipelineShaderStageCreateInfo();
 	vertShaderStageInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -610,14 +625,14 @@ InitializePipeline()
 	viewport := VkViewport();
 	viewport.x = float32(0.0);
 	viewport.y = float32(0.0);
-	viewport.width = vulkanRenderer.swapChainExtent.width as float32;
-	viewport.height = vulkanRenderer.swapChainExtent.height as float32;
+	viewport.width = this.swapChainExtent.width as float32;
+	viewport.height = this.swapChainExtent.height as float32;
 	viewport.minDepth = float32(0.0);
 	viewport.maxDepth = float32(1.0);
 
 	scissor := VkRect2D();
 	scissor.offset = {int32(0), int32(0)};
-	scissor.extent = vulkanRenderer.swapChainExtent;
+	scissor.extent = this.swapChainExtent;
 
 	viewportState := VkPipelineViewportStateCreateInfo();
 	viewportState.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -678,13 +693,10 @@ InitializePipeline()
 	pipelineLayoutInfo.pushConstantRangeCount = uint32(0); // Optional
 	pipelineLayoutInfo.pPushConstantRanges = null; // Optional
 
-	result := vkCreatePipelineLayout(
-		vulkanRenderer.vkDevice, 
-		pipelineLayoutInfo@, 
-		null,
-		vulkanRenderer.vkPipelineLayout@
+	CheckResult(
+		vkCreatePipelineLayout(this.device, pipelineLayoutInfo@, null, this.pipelineLayout@),
+		"Error creating Vulkan pipeline layout"
 	);
-	assert result == VkResult.VK_SUCCESS, "Error creating Vulkan pipeline layout";
 
 	dynamicStates := [VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT, VkDynamicState.VK_DYNAMIC_STATE_SCISSOR];
 	dynamicState := VkPipelineDynamicStateCreateInfo();
@@ -704,24 +716,19 @@ InitializePipeline()
 	pipelineInfo.pDepthStencilState = null; // Optional
 	pipelineInfo.pColorBlendState = colorBlending@;
 	pipelineInfo.pDynamicState = dynamicState@;
-	pipelineInfo.layout = vulkanRenderer.vkPipelineLayout;
-	pipelineInfo.renderPass = vulkanRenderer.vkRenderPass;
+	pipelineInfo.layout = this.pipelineLayout;
+	pipelineInfo.renderPass = this.renderPass;
 	pipelineInfo.subpass = uint32(0);
 	pipelineInfo.basePipelineHandle = null; // Optional
 	pipelineInfo.basePipelineIndex = int32(-1); // Optional
 
-	pipelineResult := vkCreateGraphicsPipelines(
-		vulkanRenderer.vkDevice, 
-		null, 
-		uint32(1), 
-		pipelineInfo@, 
-		null, 
-		vulkanRenderer.vkPipeline@
+	CheckResult(
+		vkCreateGraphicsPipelines(this.device, null, uint32(1), pipelineInfo@, null, this.pipeline@),
+		"Error creating Vulkan pipeline"
 	);
-	assert pipelineResult == VkResult.VK_SUCCESS, "Error creating Vulkan pipeline";
 }
 
-*VkShaderModule_T CreateShaderModule(byteCode: string)
+*VkShaderModule_T VulkanRenderer::CreateShaderModule(byteCode: string)
 {
 	shaderCreateInfo := VkShaderModuleCreateInfo();
 	shaderCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -729,70 +736,64 @@ InitializePipeline()
 	shaderCreateInfo.pCode = byteCode[0] as *uint32;
 
 	shaderModule := null as *VkShaderModule_T;
-	result := vkCreateShaderModule(vulkanRenderer.vkDevice, shaderCreateInfo@, null, shaderModule@);
-	assert result == VkResult.VK_SUCCESS, "Error creating Vulkan shader module";
+	CheckResult(
+		vkCreateShaderModule(this.device, shaderCreateInfo@, null, shaderModule@),
+		"Error creating Vulkan shader module"
+	);
 	return shaderModule;
 }
 
-InitializeFrameBuffers()
+VulkanRenderer::InitializeFrameBuffers()
 {
-	vulkanRenderer.frameBufferCount = vulkanRenderer.swapChainImageCount;
-	vulkanRenderer.frameBuffers.Alloc(vulkanRenderer.frameBufferCount);
+	this.frameBufferCount = this.swapChainImageCount;
+	this.frameBuffers.Alloc(this.frameBufferCount);
 
-	for (i .. vulkanRenderer.frameBufferCount)
+	for (i .. this.frameBufferCount)
 	{
 		framebufferInfo := VkFramebufferCreateInfo();
 		framebufferInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		framebufferInfo.renderPass = vulkanRenderer.vkRenderPass;
+		framebufferInfo.renderPass = this.renderPass;
 		framebufferInfo.attachmentCount = uint32(1);
-		framebufferInfo.pAttachments = vulkanRenderer.swapChainImageViews[i];
-		framebufferInfo.width = vulkanRenderer.swapChainExtent.width;
-		framebufferInfo.height = vulkanRenderer.swapChainExtent.height;
+		framebufferInfo.pAttachments = this.swapChainImageViews[i];
+		framebufferInfo.width = this.swapChainExtent.width;
+		framebufferInfo.height = this.swapChainExtent.height;
 		framebufferInfo.layers = uint32(1);
 
-		result := vkCreateFramebuffer(
-			vulkanRenderer.vkDevice,
-			framebufferInfo@,
-			null,
-			vulkanRenderer.frameBuffers[i]
+		CheckResult(
+			vkCreateFramebuffer(this.device, framebufferInfo@, null, this.frameBuffers[i]),
+			"Error creating Vulkan frame buffer"
 		);
-		assert result == VkResult.VK_SUCCESS, "Error creating Vulkan frame buffer";
 	}
 }
 
-InitializeCommandPool()
+VulkanRenderer::InitializeCommandPool()
 {
 	poolInfo := VkCommandPoolCreateInfo();
 	poolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	poolInfo.flags = VkCommandPoolCreateFlagBits.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	poolInfo.queueFamilyIndex = vulkanRenderer.graphicsQueueIndices[0]~;
+	poolInfo.queueFamilyIndex = this.graphicsQueueIndices[0]~;
 
-	result := vkCreateCommandPool(
-		vulkanRenderer.vkDevice,
-		poolInfo@,
-		null,
-		vulkanRenderer.vkCommandPool@
+	CheckResult(
+		vkCreateCommandPool(this.device, poolInfo@, null, this.commandPool@),
+		"Error creating Vulkan command pool"
 	);
-	assert result == VkResult.VK_SUCCESS, "Error creating Vulkan command pool";
 }
 
-InitializeCommandBuffer()
+VulkanRenderer::InitializeCommandBuffer()
 {
 	allocInfo := VkCommandBufferAllocateInfo();
 	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = vulkanRenderer.vkCommandPool;
+	allocInfo.commandPool = this.commandPool;
 	allocInfo.level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = uint32(1);
 
-	result := vkAllocateCommandBuffers(
-		vulkanRenderer.vkDevice,
-		allocInfo@,
-		vulkanRenderer.vkCommandBuffer@
+	CheckResult(
+		vkAllocateCommandBuffers(this.device, allocInfo@, this.commandBuffer@),
+		"Error creating Vulkan command buffer"
 	);
-	assert result == VkResult.VK_SUCCESS, "Error creating Vulkan command buffer";
 }
 
-InitializeSyncObjects()
+VulkanRenderer::InitializeSyncObjects()
 {
 	semaphoreInfo := VkSemaphoreCreateInfo();
 	semaphoreInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -801,46 +802,34 @@ InitializeSyncObjects()
 	fenceInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceInfo.flags = VkFenceCreateFlagBits.VK_FENCE_CREATE_SIGNALED_BIT;
 
-	imageResult := vkCreateSemaphore(
-		vulkanRenderer.vkDevice, 
-		semaphoreInfo@, 
-		null, 
-		vulkanRenderer.imageAvailableSemaphore@
-	);
-	renderResult := vkCreateSemaphore(
-		vulkanRenderer.vkDevice, 
-		semaphoreInfo@, 
-		null, 
-		vulkanRenderer.renderFinishedSemaphore@
-	);
-	inFlightResult := vkCreateFence(
-		vulkanRenderer.vkDevice, 
-		fenceInfo@, 
-		null, 
-		vulkanRenderer.inFlightFence@
-	);
+	imageResult := vkCreateSemaphore(this.device, semaphoreInfo@, null, this.imageAvailableSemaphore@);
+	renderResult := vkCreateSemaphore(this.device, semaphoreInfo@, null, this.renderFinishedSemaphore@);
+	inFlightResult := vkCreateFence(this.device, fenceInfo@, null, this.inFlightFence@);
 
-	assert imageResult == VkResult.VK_SUCCESS &&
-			renderResult == VkResult.VK_SUCCESS &&
-			inFlightResult == VkResult.VK_SUCCESS, "Error creating Vulkan synchronization objects";
+	errMsg := "Error creating Vulkan synchronization objects";
+	CheckResult(imageResult, errMsg);
+	CheckResult(renderResult, errMsg);
+	CheckResult(inFlightResult, errMsg);
 }
 
-RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageIndex: uint32)
+VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageIndex: uint32)
 {
 	beginInfo := VkCommandBufferBeginInfo();
 	beginInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = uint32(0); // Optional
 	beginInfo.pInheritanceInfo = null; // Optional
 
-	result := vkBeginCommandBuffer(commandBuffer, beginInfo@);
-	assert result == VkResult.VK_SUCCESS, "Error beginning Vulkan command buffer recording";
+	CheckResult(
+		vkBeginCommandBuffer(commandBuffer, beginInfo@), 
+		"Error beginning Vulkan command buffer recording"
+	);
 
 	renderPassInfo := VkRenderPassBeginInfo();
 	renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	renderPassInfo.renderPass = vulkanRenderer.vkRenderPass;
-	renderPassInfo.framebuffer = vulkanRenderer.frameBuffers[imageIndex]~;
+	renderPassInfo.renderPass = this.renderPass;
+	renderPassInfo.framebuffer = this.frameBuffers[imageIndex]~;
 	renderPassInfo.renderArea.offset = {uint32(0), uint32(0)};
-	renderPassInfo.renderArea.extent = vulkanRenderer.swapChainExtent;
+	renderPassInfo.renderArea.extent = this.swapChainExtent;
 
 	clearColor := [float32(0.0), float32(0.0), float32(0.0), float32(0.0)]
 	renderPassInfo.clearValueCount = uint32(1);
@@ -852,55 +841,54 @@ RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageIndex: uint32)
 		vkCmdBindPipeline(
 			commandBuffer, 
 			VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, 
-			vulkanRenderer.vkPipeline
+			this.pipeline
 		);
 
 		viewport := VkViewport();
 		viewport.x = float32(0.0);
 		viewport.y = float32(0.0);
-		viewport.width = vulkanRenderer.swapChainExtent.width as float32;
-		viewport.height = vulkanRenderer.swapChainExtent.height as float32;
+		viewport.width = this.swapChainExtent.width as float32;
+		viewport.height = this.swapChainExtent.height as float32;
 		viewport.minDepth = float32(0.0);
 		viewport.maxDepth = float32(1.0);
 		vkCmdSetViewport(commandBuffer, uint32(0), uint32(1), viewport@);
 
 		scissor := VkRect2D();
         scissor.offset = {uint32(0), uint32(0)};
-        scissor.extent = vulkanRenderer.swapChainExtent;
+        scissor.extent = this.swapChainExtent;
         vkCmdSetScissor(commandBuffer, uint32(0), uint32(1), scissor@);
 
 		vkCmdDraw(commandBuffer, uint32(3), uint32(1), uint32(0), uint32(0));
 	}
 
 	vkCmdEndRenderPass(commandBuffer);
-	endResult := vkEndCommandBuffer(commandBuffer);
-	assert endResult == VkResult.VK_SUCCESS, "Error recording Vulkan command buffer";
+	CheckResult(vkEndCommandBuffer(commandBuffer), "Error recording Vulkan command buffer");
 }
 
 UINT64_MAX := uint64(-1);
 
-DrawFrame()
+VulkanRenderer::DrawFrame()
 {
-	vkWaitForFences(vulkanRenderer.vkDevice, uint32(1), vulkanRenderer.inFlightFence@, VkTrue, UINT64_MAX);
-	vkResetFences(vulkanRenderer.vkDevice, uint32(1), vulkanRenderer.inFlightFence@);
+	vkWaitForFences(this.device, uint32(1), this.inFlightFence@, VkTrue, UINT64_MAX);
+	vkResetFences(this.device, uint32(1), this.inFlightFence@);
 
 	imageIndex := uint32(0);
     vkAcquireNextImageKHR(
-		vulkanRenderer.vkDevice, 
-		vulkanRenderer.vkSwapChain, 
+		this.device, 
+		this.swapChain, 
 		UINT64_MAX, 
-		vulkanRenderer.imageAvailableSemaphore, 
+		this.imageAvailableSemaphore, 
 		null, 
 		imageIndex@
 	);
 
-	vkResetCommandBuffer(vulkanRenderer.vkCommandBuffer, uint32(0));
-	RecordCommandBuffer(vulkanRenderer.vkCommandBuffer, imageIndex);
+	vkResetCommandBuffer(this.commandBuffer, uint32(0));
+	this.RecordCommandBuffer(this.commandBuffer, imageIndex);
 
-	waitSemaphores := [vulkanRenderer.imageAvailableSemaphore,];
+	waitSemaphores := [this.imageAvailableSemaphore,];
 	waitStages := [VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,];
-	signalSemaphores := [vulkanRenderer.renderFinishedSemaphore,];
-	swapChains := [vulkanRenderer.vkSwapChain,];
+	signalSemaphores := [this.renderFinishedSemaphore,];
+	swapChains := [this.swapChain,];
 
 	submitInfo := VkSubmitInfo();
 	submitInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -908,17 +896,14 @@ DrawFrame()
 	submitInfo.pWaitSemaphores = fixed waitSemaphores;
 	submitInfo.pWaitDstStageMask = fixed waitStages;
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = vulkanRenderer.vkCommandBuffer@;
+	submitInfo.pCommandBuffers = this.commandBuffer@;
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = fixed signalSemaphores;
 
-	result := vkQueueSubmit(
-		vulkanRenderer.GraphicsQueue(), 
-		uint32(1), 
-		submitInfo@, 
-		vulkanRenderer.inFlightFence
+	CheckResult(
+		vkQueueSubmit(this.GraphicsQueue(), uint32(1), submitInfo@, this.inFlightFence),
+		"Error submitting Vulkan draw command buffer"
 	);
-	assert result == VkResult.VK_SUCCESS, "Error submitting Vulkan draw command buffer";
 
 	presentInfo := VkPresentInfoKHR();
 	presentInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -929,36 +914,36 @@ DrawFrame()
 	presentInfo.pImageIndices = imageIndex@;
 	presentInfo.pResults = null; // Optional
 
-	vkQueuePresentKHR(vulkanRenderer.PresentationQueue(), presentInfo@);
+	vkQueuePresentKHR(this.PresentationQueue(), presentInfo@);
 }
 
-DestroyVulkanRenderer()
+VulkanRenderer::Destroy()
 {
-	vkDeviceWaitIdle(vulkanRenderer.vkDevice);
+	vkDeviceWaitIdle(this.device);
 
-	vkDestroySemaphore(vulkanRenderer.vkDevice, vulkanRenderer.imageAvailableSemaphore, null);
-    vkDestroySemaphore(vulkanRenderer.vkDevice, vulkanRenderer.renderFinishedSemaphore, null);
-    vkDestroyFence(vulkanRenderer.vkDevice, vulkanRenderer.inFlightFence, null);
+	vkDestroySemaphore(this.device, this.imageAvailableSemaphore, null);
+    vkDestroySemaphore(this.device, this.renderFinishedSemaphore, null);
+    vkDestroyFence(this.device, this.inFlightFence, null);
 
-	vkDestroyCommandPool(vulkanRenderer.vkDevice, vulkanRenderer.vkCommandPool, null);
+	vkDestroyCommandPool(this.device, this.commandPool, null);
 
-	for (i .. vulkanRenderer.frameBufferCount)
+	for (i .. this.frameBufferCount)
 	{
-		vkDestroyFramebuffer(vulkanRenderer.vkDevice, vulkanRenderer.frameBuffers[i]~, null);
+		vkDestroyFramebuffer(this.device, this.frameBuffers[i]~, null);
 	}
 
-	vkDestroyPipeline(vulkanRenderer.vkDevice, vulkanRenderer.vkPipeline, null);
-	vkDestroyPipelineLayout(vulkanRenderer.vkDevice, vulkanRenderer.vkPipelineLayout, null);
-	vkDestroyRenderPass(vulkanRenderer.vkDevice, vulkanRenderer.vkRenderPass, null);
+	vkDestroyPipeline(this.device, this.pipeline, null);
+	vkDestroyPipelineLayout(this.device, this.pipelineLayout, null);
+	vkDestroyRenderPass(this.device, this.renderPass, null);
 
-	for (i .. vulkanRenderer.swapChainImageCount) 
+	for (i .. this.swapChainImageCount) 
 	{
-		vkDestroyImageView(vulkanRenderer.vkDevice, vulkanRenderer.swapChainImageViews[i]~, null);
+		vkDestroyImageView(this.device, this.swapChainImageViews[i]~, null);
 	}
 
-	vkDestroySwapchainKHR(vulkanRenderer.vkDevice, vulkanRenderer.vkSwapChain, null);
-	vkDestroyDevice(vulkanRenderer.vkDevice, null);
+	vkDestroySwapchainKHR(this.device, this.swapChain, null);
+	vkDestroyDevice(this.device, null);
 
-	vkDestroySurfaceKHR(vulkanRenderer.vkInstance, vulkanRenderer.vkSurface, null);
-	vkDestroyInstance(vulkanRenderer.vkInstance, null);
+	vkDestroySurfaceKHR(this.vkInstance.instance, this.surface, null);
+	vkDestroyInstance(this.vkInstance.instance, null);
 }

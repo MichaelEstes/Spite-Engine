@@ -90,7 +90,7 @@ uint CreateFiberThread(index: uint)
 
 RunMainFiber()
 {
-	log "Starting main fiber thread: ", GetCurrentThreadID();
+	//log "Starting main fiber thread: ", GetCurrentThreadID();
 	while (true)
 	{
 		if (fibers.jobsMain.count)
@@ -125,7 +125,7 @@ Job GetNextJob(index: uint)
 
 RunFiber(index: uint)
 {
-	log "Starting fiber thread", index;
+	//log "Starting fiber thread", index;
 	while (true)
 	{
 		job := GetNextJob(index);
