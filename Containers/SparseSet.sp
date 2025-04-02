@@ -4,7 +4,7 @@ import ValueIterator
 
 int32 DefaultResizeFactor(capacity: int32) => (capacity + 1) * 2;
 
-state SparseSet<Value, ResizeFactor = DefaultResizeFactor, InitialCapacity = 16, InitialSparseCapacity = 128>
+state SparseSet<Value, InitialCapacity = 16, InitialSparseCapacity = 32, ResizeFactor = DefaultResizeFactor>
 {
 	count: uint32,
 	capacity: uint32,
@@ -100,6 +100,12 @@ SparseSet::Insert(key: uint32, value: Value)
 	this.count += 1;
 	this.sparseArr[key]~ = this.count;
 }
+
+//*Value SparseSet::Emplace(key: uint32)
+//{
+//	this.Insert(key, Value());
+//	return this.Get(key);
+//}
 
 bool SparseSet::Has(key: uint32)
 {

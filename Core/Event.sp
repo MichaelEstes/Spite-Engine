@@ -3,6 +3,8 @@ package Event
 import SDL
 import SparseSet
 
+SDLEventEmitter := Event.Emitter();
+
 state Emitter
 {
 	callbacks := SparseSet<[]::(any)>(),

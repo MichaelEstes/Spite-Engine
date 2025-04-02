@@ -9,9 +9,6 @@ import VulkanRenderer
 
 running := false;
 
-SDLEventEmitter := Event.Emitter();
-
-
 Initialize()
 {
 	InitializeTime();

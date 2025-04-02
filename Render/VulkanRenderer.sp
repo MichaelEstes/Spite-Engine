@@ -4,6 +4,8 @@ import OS
 import Math
 import Vulkan
 import SDL
+import SparseSet
+import Event
 
 VkFalse := uint32(0);
 VkTrue := uint32(1);
@@ -43,6 +45,7 @@ state VulkanInstance
 }
 
 vulkanInstance := VulkanInstance();
+renderersByWindow := Map<uint32, VulkanRenderer<>>();
 
 InitializeVulkanInstance()
 {
@@ -73,9 +76,15 @@ InitializeVulkanInstance()
 		),
 		"Error finding device for Vulkan"
 	);
+
+	SDLEventEmitter.On(SDL.EventType.WINDOW_RESIZED, ::(event: SDL.Event) {
+		windowID := event.data.window.windowID;
+		renderer := renderersByWindow.Find(windowID);
+		renderer.RecreateSwapchain();
+	});
 }
 
-state VulkanRenderer<framesInFlight = 2>
+state VulkanRenderer<FramesInFlight = 2>
 {
 	vkInstance: *VulkanInstance,
 	
@@ -87,7 +96,7 @@ state VulkanRenderer<framesInFlight = 2>
 	renderPass: *VkRenderPass_T,
 	pipeline: *VkPipeline_T,
 	commandPool: *VkCommandPool_T,
-	commandBuffers: [framesInFlight]*VkCommandBuffer_T,
+	commandBuffers: [FramesInFlight]*VkCommandBuffer_T,
 
 	currentPhysicalDevice: *VkPhysicalDevice_T,
 	currentDeviceFeatures: VkPhysicalDeviceFeatures,
@@ -112,9 +121,9 @@ state VulkanRenderer<framesInFlight = 2>
 
 	frameBuffers: Allocator<*VkFramebuffer_T>,
 
-	imageAvailableSemaphores: [framesInFlight]*VkSemaphore_T,
-	renderFinishedSemaphores: [framesInFlight]*VkSemaphore_T,
-	inFlightFences: [framesInFlight]*VkFence_T,
+	imageAvailableSemaphores: [FramesInFlight]*VkSemaphore_T,
+	renderFinishedSemaphores: [FramesInFlight]*VkSemaphore_T,
+	inFlightFences: [FramesInFlight]*VkFence_T,
 
 	queueFamilyCount: uint32,
 	graphicsQueueCount: uint32,
@@ -158,17 +167,15 @@ VulkanRenderer::DebugLogExtensions()
 	log "End instance ext";
 }
 
-VulkanRenderer<> CreateVulkanRenderer(window: *SDL.Window)
+*VulkanRenderer<> CreateVulkanRenderer(window: *SDL.Window)
 {
-	vulkanRenderer := VulkanRenderer<>();
+	vulkanRenderer := renderersByWindow.Emplace(window.id);
 	vulkanRenderer.vkInstance = vulkanInstance@;
 
 	vulkanRenderer.window = window;
 
 	vulkanRenderer.InitializeSurface();
     vulkanRenderer.InitializeCurrentDevice();
-
-	log #typeof vulkanRenderer.commandBuffers
 
 	//vulkanRenderer.DebugLogExtensions();
 
@@ -448,7 +455,7 @@ VulkanRenderer::InitializeSwapchain()
 	swapchainCreateInfo.compositeAlpha = VkCompositeAlphaFlagBitsKHR.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchainCreateInfo.presentMode = selectedPresentMode;
 	swapchainCreateInfo.clipped = uint32(1);
-	swapchainCreateInfo.oldSwapchain = this.swapChain;
+	swapchainCreateInfo.oldSwapchain = null;
 
 	CheckResult(
 		vkCreateSwapchainKHR(this.device, swapchainCreateInfo@, null, this.swapChain@),
@@ -808,7 +815,7 @@ VulkanRenderer::InitializeSyncObjects()
 	fenceInfo.flags = VkFenceCreateFlagBits.VK_FENCE_CREATE_SIGNALED_BIT;
 
 	errMsg := "Error creating Vulkan synchronization objects";
-	for (i .. framesInFlight)
+	for (i .. FramesInFlight)
 	{
 		imageResult := vkCreateSemaphore(this.device, semaphoreInfo@, null, this.imageAvailableSemaphores[i]@);
 		renderResult := vkCreateSemaphore(this.device, semaphoreInfo@, null, this.renderFinishedSemaphores[i]@);
@@ -879,10 +886,9 @@ UINT64_MAX := uint64(-1);
 VulkanRenderer::DrawFrame()
 {
 	vkWaitForFences(this.device, uint32(1), this.inFlightFences[this.currentFrame]@, VkTrue, UINT64_MAX);
-	vkResetFences(this.device, uint32(1), this.inFlightFences[this.currentFrame]@);
 
 	imageIndex := uint32(0);
-    vkAcquireNextImageKHR(
+    imageResult := vkAcquireNextImageKHR(
 		this.device, 
 		this.swapChain, 
 		UINT64_MAX, 
@@ -890,6 +896,13 @@ VulkanRenderer::DrawFrame()
 		null, 
 		imageIndex@
 	);
+	if (imageResult == VkResult.VK_ERROR_OUT_OF_DATE_KHR) 
+	{
+		this.RecreateSwapchain();
+		return;
+	}
+
+	vkResetFences(this.device, uint32(1), this.inFlightFences[this.currentFrame]@);
 
 	vkResetCommandBuffer(this.commandBuffers[this.currentFrame], uint32(0));
 	this.RecordCommandBuffer(this.commandBuffers[this.currentFrame], imageIndex);
@@ -923,15 +936,51 @@ VulkanRenderer::DrawFrame()
 	presentInfo.pImageIndices = imageIndex@;
 	presentInfo.pResults = null; // Optional
 
-	vkQueuePresentKHR(this.PresentationQueue(), presentInfo@);
-	this.currentFrame = (this.currentFrame + 1) % framesInFlight;
+	presentResult := vkQueuePresentKHR(this.PresentationQueue(), presentInfo@);
+	if (presentResult == VkResult.VK_ERROR_OUT_OF_DATE_KHR || presentResult == VkResult.VK_SUBOPTIMAL_KHR)
+	{
+		this.RecreateSwapchain();
+	}
+	this.currentFrame = (this.currentFrame + 1) % FramesInFlight;
+}
+
+VulkanRenderer::RecreateSwapchain()
+{
+	vkDeviceWaitIdle(this.device);
+
+	this.DestroySwapchain();
+
+	this.InitializeSwapchain();
+	this.InitializeImageViews();
+	this.InitializeFrameBuffers();
+}
+
+VulkanRenderer::DestroySwapchain()
+{
+	for (i .. this.frameBufferCount)
+	{
+		vkDestroyFramebuffer(this.device, this.frameBuffers[i]~, null);
+	}
+
+	for (i .. this.swapChainImageCount) 
+	{
+		vkDestroyImageView(this.device, this.swapChainImageViews[i]~, null);
+	}
+
+	vkDestroySwapchainKHR(this.device, this.swapChain, null);
 }
 
 VulkanRenderer::Destroy()
 {
 	vkDeviceWaitIdle(this.device);
 
-	for (i .. framesInFlight)
+	this.DestroySwapchain();
+
+	vkDestroyPipeline(this.device, this.pipeline, null);
+	vkDestroyPipelineLayout(this.device, this.pipelineLayout, null);
+	vkDestroyRenderPass(this.device, this.renderPass, null);
+
+	for (i .. FramesInFlight)
 	{
 		vkDestroySemaphore(this.device, this.imageAvailableSemaphores[i], null);
 		vkDestroySemaphore(this.device, this.renderFinishedSemaphores[i], null);
@@ -940,21 +989,6 @@ VulkanRenderer::Destroy()
 
 	vkDestroyCommandPool(this.device, this.commandPool, null);
 
-	for (i .. this.frameBufferCount)
-	{
-		vkDestroyFramebuffer(this.device, this.frameBuffers[i]~, null);
-	}
-
-	vkDestroyPipeline(this.device, this.pipeline, null);
-	vkDestroyPipelineLayout(this.device, this.pipelineLayout, null);
-	vkDestroyRenderPass(this.device, this.renderPass, null);
-
-	for (i .. this.swapChainImageCount) 
-	{
-		vkDestroyImageView(this.device, this.swapChainImageViews[i]~, null);
-	}
-
-	vkDestroySwapchainKHR(this.device, this.swapChain, null);
 	vkDestroyDevice(this.device, null);
 
 	vkDestroySurfaceKHR(this.vkInstance.instance, this.surface, null);
