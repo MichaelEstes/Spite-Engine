@@ -101,11 +101,11 @@ SparseSet::Insert(key: uint32, value: Value)
 	this.sparseArr[key]~ = this.count;
 }
 
-//*Value SparseSet::Emplace(key: uint32)
-//{
-//	this.Insert(key, Value());
-//	return this.Get(key);
-//}
+*Value SparseSet::Emplace(key: uint32)
+{
+	this.Insert(key, Value());
+	return this.Get(key);
+}
 
 bool SparseSet::Has(key: uint32)
 {

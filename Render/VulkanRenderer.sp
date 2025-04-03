@@ -6,6 +6,7 @@ import Vulkan
 import SDL
 import SparseSet
 import Event
+import Vertex
 
 VkFalse := uint32(0);
 VkTrue := uint32(1);
@@ -45,7 +46,7 @@ state VulkanInstance
 }
 
 vulkanInstance := VulkanInstance();
-renderersByWindow := Map<uint32, VulkanRenderer<>>();
+renderersByWindow := SparseSet<VulkanRenderer<>>();
 
 InitializeVulkanInstance()
 {
@@ -79,9 +80,19 @@ InitializeVulkanInstance()
 
 	SDLEventEmitter.On(SDL.EventType.WINDOW_RESIZED, ::(event: SDL.Event) {
 		windowID := event.data.window.windowID;
-		renderer := renderersByWindow.Find(windowID);
+		renderer := renderersByWindow.Get(windowID);
 		renderer.RecreateSwapchain();
 	});
+}
+
+Render()
+{
+	for (renderer in renderersByWindow.Values()) renderer.DrawFrame();
+}
+
+Destroy()
+{
+	for (renderer in renderersByWindow.Values()) renderer.Destroy();
 }
 
 state VulkanRenderer<FramesInFlight = 2>
@@ -134,7 +145,7 @@ state VulkanRenderer<FramesInFlight = 2>
 	swapChainImageViewCount: uint32,
 	frameBufferCount: uint32,
 
-	currentFrame: uint32
+	currentFrame: uint32,
 }
 
 *VkQueue_T VulkanRenderer::GraphicsQueue() => this.graphicsQueues[0]~;
@@ -798,7 +809,6 @@ VulkanRenderer::InitializeCommandBuffer()
 	allocInfo.level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = uint32(2);
 
-	log this.commandBuffers;
 	CheckResult(
 		vkAllocateCommandBuffers(this.device, allocInfo@, this.commandBuffers[0]@),
 		"Error creating Vulkan command buffer"
