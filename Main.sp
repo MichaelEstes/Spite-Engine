@@ -2,16 +2,6 @@ package Main
 
 import Transform
 import Core
-import SDL
-
-import OS
-import JSON
-
-import Thread
-import SystemInfo
-import Fiber
-
-import ParseVulkan
 
 state Test
 {
@@ -74,13 +64,7 @@ Main()
 	//scene.RemoveEntity(Entity(5));
 	//scene.RemoveComponent<Transform>(Entity(6));
 	//scene.RemoveComponent<Test>(Entity(7));
-	//ECS.instance.Update();
 
 	Core.Initialize();
 	Core.Start();
-
-	//SDL.OnEvent(::int(userdata: *void, event: *SDL.Event) {
-	//	log "Event Callback: ", event;
-	//	return 1;
-	//}, null)
 }

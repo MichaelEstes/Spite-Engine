@@ -108,8 +108,11 @@ state VulkanRenderer<FramesInFlight = 2>
 	pipeline: *VkPipeline_T,
 	commandPool: *VkCommandPool_T,
 	commandBuffers: [FramesInFlight]*VkCommandBuffer_T,
+	vertexBuffer: *VkBuffer_T,
+	vertexBufferMemory: *VkDeviceMemory_T,
 
-	currentPhysicalDevice: *VkPhysicalDevice_T,
+
+	physicalDevice: *VkPhysicalDevice_T,
 	currentDeviceFeatures: VkPhysicalDeviceFeatures,
 	currentDeviceProperties: VkPhysicalDeviceProperties,
 
@@ -154,11 +157,11 @@ state VulkanRenderer<FramesInFlight = 2>
 VulkanRenderer::DebugLogExtensions()
 {
 	extCount := uint32(0);
-	vkEnumerateDeviceExtensionProperties(this.currentPhysicalDevice, null, extCount@, null);
+	vkEnumerateDeviceExtensionProperties(this.physicalDevice, null, extCount@, null);
 	log "Device ext count: ", extCount;
 	extProps := Allocator<VkExtensionProperties>();
 	extProps.Alloc(extCount);
-	vkEnumerateDeviceExtensionProperties(this.currentPhysicalDevice, null, extCount@, extProps[0]);
+	vkEnumerateDeviceExtensionProperties(this.physicalDevice, null, extCount@, extProps[0]);
 	for (i .. extCount)
 	{
 		puts(fixed extProps[i].extensionName);
@@ -199,6 +202,7 @@ VulkanRenderer::DebugLogExtensions()
 	vulkanRenderer.InitializePipeline();
 	vulkanRenderer.InitializeFrameBuffers();
 	vulkanRenderer.InitializeCommandPool();
+	vulkanRenderer.InitializeVertexBuffer();
 	vulkanRenderer.InitializeCommandBuffer();
 	vulkanRenderer.InitializeSyncObjects();
 
@@ -217,17 +221,17 @@ VulkanRenderer::InitializeSurface()
 
 VulkanRenderer::InitializeCurrentDevice()
 {
-	this.currentPhysicalDevice = this.vkInstance.physicalDevices[0]~;
-	vkGetPhysicalDeviceFeatures(this.currentPhysicalDevice, this.currentDeviceFeatures@);
-	vkGetPhysicalDeviceProperties(this.currentPhysicalDevice, this.currentDeviceProperties@);
+	this.physicalDevice = this.vkInstance.physicalDevices[0]~;
+	vkGetPhysicalDeviceFeatures(this.physicalDevice, this.currentDeviceFeatures@);
+	vkGetPhysicalDeviceProperties(this.physicalDevice, this.currentDeviceProperties@);
 }
 
 VulkanRenderer::InitializeQueues()
 {
-	vkGetPhysicalDeviceQueueFamilyProperties(this.currentPhysicalDevice, this.queueFamilyCount@, null);
+	vkGetPhysicalDeviceQueueFamilyProperties(this.physicalDevice, this.queueFamilyCount@, null);
 	this.queueFamilies.Alloc(this.queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(
-		this.currentPhysicalDevice, 
+		this.physicalDevice, 
 		this.queueFamilyCount@, 
 		this.queueFamilies[0]
 	);
@@ -245,7 +249,7 @@ VulkanRenderer::BuildQueueFamilyIndices()
 
 		presentationSupport := uint32(0);
 		vkGetPhysicalDeviceSurfaceSupportKHR(
-			this.currentPhysicalDevice, 
+			this.physicalDevice, 
 			i, 
 			this.surface, 
 			presentationSupport@
@@ -272,7 +276,7 @@ VulkanRenderer::BuildQueueFamilyIndices()
 
 		presentationSupport := uint32(0);
 		vkGetPhysicalDeviceSurfaceSupportKHR(
-			this.currentPhysicalDevice, 
+			this.physicalDevice, 
 			i, 
 			this.surface, 
 			presentationSupport@
@@ -351,7 +355,7 @@ VulkanRenderer::InitializeLogicalDevice()
 	deviceCreateInfo.pEnabledFeatures = this.currentDeviceFeatures@;
 
 	CheckResult(
-		vkCreateDevice(this.currentPhysicalDevice, deviceCreateInfo@, null, this.device@),
+		vkCreateDevice(this.physicalDevice, deviceCreateInfo@, null, this.device@),
 		"Error creating a logical Vulkan device"
 	);
 
@@ -386,7 +390,7 @@ VulkanRenderer::InitializeSwapchain()
 {
 	CheckResult(
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-			this.currentPhysicalDevice, 
+			this.physicalDevice, 
 			this.surface, 
 			this.surfaceCapabilities@
 		),
@@ -394,7 +398,7 @@ VulkanRenderer::InitializeSwapchain()
 	);
 
 	vkGetPhysicalDeviceSurfaceFormatsKHR(
-		this.currentPhysicalDevice, 
+		this.physicalDevice, 
 		this.surface,
 		this.surfaceFormatCount@, 
 		null
@@ -403,7 +407,7 @@ VulkanRenderer::InitializeSwapchain()
 	{
 		this.surfaceFormats.Alloc(this.surfaceFormatCount);
 		vkGetPhysicalDeviceSurfaceFormatsKHR(
-			this.currentPhysicalDevice, 
+			this.physicalDevice, 
 			this.surface,
 			this.surfaceFormatCount@, 
 			this.surfaceFormats[0]
@@ -411,7 +415,7 @@ VulkanRenderer::InitializeSwapchain()
 	}
 
 	vkGetPhysicalDeviceSurfacePresentModesKHR(
-		this.currentPhysicalDevice, 
+		this.physicalDevice, 
 		this.surface,
 		this.presentModeCount@, 
 		null
@@ -420,7 +424,7 @@ VulkanRenderer::InitializeSwapchain()
 	{
 		this.presentModes.Alloc(this.presentModeCount);
 		vkGetPhysicalDeviceSurfacePresentModesKHR(
-			this.currentPhysicalDevice, 
+			this.physicalDevice, 
 			this.surface,
 			this.presentModeCount@, 
 			this.presentModes[0]
@@ -632,12 +636,15 @@ VulkanRenderer::InitializePipeline()
 
 	shaderStages := [vertShaderStageInfo, fragShaderStageInfo];
 
+	bindingDescription := Vertex2BindingDescription();
+	attributeDescriptions := Vertex2AttributeDescriptions();
+
 	vertexInputInfo := VkPipelineVertexInputStateCreateInfo();
 	vertexInputInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = uint32(0);
-	vertexInputInfo.pVertexBindingDescriptions = null;
-	vertexInputInfo.vertexAttributeDescriptionCount = uint32(0);
-	vertexInputInfo.pVertexAttributeDescriptions = null;
+	vertexInputInfo.vertexBindingDescriptionCount = uint32(1);
+	vertexInputInfo.vertexAttributeDescriptionCount = attributeDescriptions.count;
+	vertexInputInfo.pVertexBindingDescriptions = bindingDescription@;
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions[0];
 
 	inputAssembly := VkPipelineInputAssemblyStateCreateInfo();
 	inputAssembly.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -801,6 +808,69 @@ VulkanRenderer::InitializeCommandPool()
 	);
 }
 
+vertices := [
+    {{float32(0.0), float32(-0.5)} as Vec2, {float32(1.0), float32(1.0), float32(1.0)} as Vec3} as Vertex2,
+    {{float32(0.5), float32(0.5)} as Vec2, {float32(0.0), float32(1.0), float32(0.0)} as Vec3} as Vertex2,
+    {{float32(-0.5), float32(0.5)} as Vec2, {float32(0.0), float32(0.0), float32(1.0)} as Vec3} as Vertex2,
+];
+
+
+VulkanRenderer::InitializeVertexBuffer()
+{
+	bufferInfo := VkBufferCreateInfo();
+	bufferInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = #sizeof(vertices[0]) * 3;
+	bufferInfo.usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	bufferInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+
+	CheckResult(
+		vkCreateBuffer(this.device, bufferInfo@, null, this.vertexBuffer@),
+		"Error creating Vulkan command pool"
+	);
+
+	memRequirements := VkMemoryRequirements();
+	vkGetBufferMemoryRequirements(this.device, this.vertexBuffer, memRequirements@);
+
+	allocInfo := VkMemoryAllocateInfo();
+	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = this.FindMemoryType(
+		memRequirements.memoryTypeBits, 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	);
+
+	CheckResult(
+		vkAllocateMemory(this.device, allocInfo@, null, this.vertexBufferMemory@),
+		"Error allocating Vulkan vertex buffer memory"
+	);
+
+	vkBindBufferMemory(this.device, this.vertexBuffer, this.vertexBufferMemory, 0);
+
+	buf := null;
+	vkMapMemory(this.device, this.vertexBufferMemory, 0, bufferInfo.size, 0, buf@);
+	copy_bytes(buf, fixed vertices, bufferInfo.size);
+	vkUnmapMemory(this.device, this.vertexBufferMemory);
+}
+
+uint32 VulkanRenderer::FindMemoryType(typeFilter: uint32, properties: uint32) 
+{
+	memProperties := VkPhysicalDeviceMemoryProperties();
+	vkGetPhysicalDeviceMemoryProperties(this.physicalDevice, memProperties@);
+
+	for (i .. memProperties.memoryTypeCount)
+	{
+		if (typeFilter & (1 << i) && 
+			(memProperties.memoryTypes[i].propertyFlags & properties) == properties) 
+		{
+			return i;
+		}
+	}
+
+	log "Error finding Vulkan memory type";
+	return -1;
+}
+
 VulkanRenderer::InitializeCommandBuffer()
 {
 	allocInfo := VkCommandBufferAllocateInfo();
@@ -869,6 +939,10 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 			VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, 
 			this.pipeline
 		);
+
+		vertexBuffers := [this.vertexBuffer,];
+		offsets:= [uint64(0),];
+		vkCmdBindVertexBuffers(commandBuffer, uint32(0), uint32(1), fixed vertexBuffers, fixed offsets);
 
 		viewport := VkViewport();
 		viewport.x = float32(0.0);
@@ -985,6 +1059,9 @@ VulkanRenderer::Destroy()
 	vkDeviceWaitIdle(this.device);
 
 	this.DestroySwapchain();
+
+	vkDestroyBuffer(this.device, this.vertexBuffer, null);
+	vkFreeMemory(this.device, this.vertexBufferMemory, null);
 
 	vkDestroyPipeline(this.device, this.pipeline, null);
 	vkDestroyPipelineLayout(this.device, this.pipelineLayout, null);
