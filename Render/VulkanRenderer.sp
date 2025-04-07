@@ -27,62 +27,15 @@ validationCount := #compile uint32 => (#typeof validationLayers).FixedArrayCount
 requiredDeviceExtensions := ["VK_KHR_swapchain"[0],];
 requiredDeviceExtensionCount := #compile uint32 => (#typeof requiredDeviceExtensions).FixedArrayCount();
 
+vulkanInstance := VulkanInstance();
+renderersByWindow := SparseSet<VulkanRenderer<>>();
+
 CheckResult(result: VkResult, errorMsg: string)
 {
 	if (result != VkResult.VK_SUCCESS)
 	{
 		log errorMsg;
 	}
-}
-
-state VulkanInstance
-{
-	instance: *VkInstance_T,
-	extensionNames: **byte,
-	physicalDevices: Allocator<*VkPhysicalDevice_T>,
-
-	physicalDeviceCount: uint32,
-	extensionCount: uint32,
-}
-
-vulkanInstance := VulkanInstance();
-renderersByWindow := SparseSet<VulkanRenderer<>>();
-
-InitializeVulkanInstance()
-{
-	vulkanInstance.extensionNames = SDL.VulkanGetInstanceExtensions(vulkanInstance.extensionCount@);
-    instanceCreateInfo := {
-        VkStructureType.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, 
-        null,													
-        uint32(0),												
-        appInfo@,													
-        validationCount,												
-        fixed validationLayers,												
-        vulkanInstance.extensionCount,											
-        vulkanInstance.extensionNames,											
-    } as VkInstanceCreateInfo;
-
-	CheckResult(
-		vkCreateInstance(instanceCreateInfo@, null, vulkanInstance.instance@),
-		"Error creating Vulkan instance"
-	);
-
-	vkEnumeratePhysicalDevices(vulkanInstance.instance, vulkanInstance.physicalDeviceCount@, null);
-	vulkanInstance.physicalDevices.Alloc(vulkanInstance.physicalDeviceCount);
-    CheckResult(
-		vkEnumeratePhysicalDevices(
-			vulkanInstance.instance, 
-			vulkanInstance.physicalDeviceCount@, 
-			vulkanInstance.physicalDevices[0]
-		),
-		"Error finding device for Vulkan"
-	);
-
-	SDLEventEmitter.On(SDL.EventType.WINDOW_RESIZED, ::(event: SDL.Event) {
-		windowID := event.data.window.windowID;
-		renderer := renderersByWindow.Get(windowID);
-		renderer.RecreateSwapchain();
-	});
 }
 
 Render()
@@ -106,11 +59,13 @@ state VulkanRenderer<FramesInFlight = 2>
 	pipelineLayout: *VkPipelineLayout_T,
 	renderPass: *VkRenderPass_T,
 	pipeline: *VkPipeline_T,
-	commandPool: *VkCommandPool_T,
+	graphicsCommandPool: *VkCommandPool_T,
+	transferCommandPool: *VkCommandPool_T,
 	commandBuffers: [FramesInFlight]*VkCommandBuffer_T,
 	vertexBuffer: *VkBuffer_T,
 	vertexBufferMemory: *VkDeviceMemory_T,
-
+	indexBuffer: *VkBuffer_T,
+	indexBufferMemory: *VkDeviceMemory_T,
 
 	physicalDevice: *VkPhysicalDevice_T,
 	currentDeviceFeatures: VkPhysicalDeviceFeatures,
@@ -122,6 +77,7 @@ state VulkanRenderer<FramesInFlight = 2>
 
 	graphicsQueues: Allocator<*VkQueue_T>,
 	presentationQueues: Allocator<*VkQueue_T>,
+	transferQueue: *VkQueue_T,
 
 	surfaceCapabilities: VkSurfaceCapabilitiesKHR,
 	surfaceFormats: Allocator<VkSurfaceFormatKHR>,
@@ -142,6 +98,7 @@ state VulkanRenderer<FramesInFlight = 2>
 	queueFamilyCount: uint32,
 	graphicsQueueCount: uint32,
 	presentationQueueCount: uint32,
+	transferQueueIndex: uint32,
 	surfaceFormatCount: uint32,
 	presentModeCount: uint32,
 	swapChainImageCount: uint32,
@@ -203,6 +160,7 @@ VulkanRenderer::DebugLogExtensions()
 	vulkanRenderer.InitializeFrameBuffers();
 	vulkanRenderer.InitializeCommandPool();
 	vulkanRenderer.InitializeVertexBuffer();
+	vulkanRenderer.InitializeIndexBuffer();
 	vulkanRenderer.InitializeCommandBuffer();
 	vulkanRenderer.InitializeSyncObjects();
 
@@ -265,6 +223,7 @@ VulkanRenderer::BuildQueueFamilyIndices()
 	this.presentationQueueIndices.Alloc(this.presentationQueueCount)
 	graphicsIndex := 0;
 	presentationIndex := 0;
+	transferIndex := -1;
 	for (i .. this.queueFamilyCount)
 	{
 		queueFamily := this.queueFamilies[i];
@@ -272,6 +231,14 @@ VulkanRenderer::BuildQueueFamilyIndices()
 		{
 			this.graphicsQueueIndices[graphicsIndex]~ = i;
 			graphicsIndex += 1;
+			if (transferIndex == -1)
+			{
+				transferIndex = i;
+			}
+		}
+		else if (queueFamily.queueFlags & VkQueueFlagBits.VK_QUEUE_TRANSFER_BIT)
+		{
+			transferIndex = i;
 		}
 
 		presentationSupport := uint32(0);
@@ -287,27 +254,28 @@ VulkanRenderer::BuildQueueFamilyIndices()
 			presentationIndex += 1;
 		}
     }
+	this.transferQueueIndex = transferIndex;
 }
 
 {queues: Allocator<uint32>, count: uint32} VulkanRenderer::GetUniqueQueues()
 {
-	queues := Allocator<uint32>();
-	queues.Alloc(this.graphicsQueueCount + this.presentationQueueCount);
+	queuesIndices := Allocator<uint32>();
+	queuesIndices.Alloc(this.graphicsQueueCount + this.presentationQueueCount + 1);
 
 	count := uint32(0);
 	for (i .. this.presentationQueueCount)
 	{
-		queues[i]~ = this.presentationQueueIndices[i]~;
+		queuesIndices[i]~ = this.presentationQueueIndices[i]~;
 		count += 1;
 	}
 
 	for (i .. this.graphicsQueueCount)
 	{
-		queue := this.graphicsQueueIndices[i]~;
+		queueIndex := this.graphicsQueueIndices[i]~;
 		unique := true;
 		for (j .. count)
 		{
-			if (queue == queues[j]~)
+			if (queueIndex == queuesIndices[j]~)
 			{
 				unique = false;
 				break;
@@ -316,12 +284,29 @@ VulkanRenderer::BuildQueueFamilyIndices()
 
 		if (unique)
 		{
-			queues[count]~ = queue;
+			queuesIndices[count]~ = queueIndex;
 			count += 1;
 		}
 	}
 
-	return {queues, count};
+	hasUniqueTransferQueue := true;
+	for (i .. count)
+	{
+		queueIndex := queuesIndices[i]~;
+		if (queueIndex == this.transferQueueIndex)
+		{
+			hasUniqueTransferQueue = false;
+			break;
+		}
+	}
+
+	if (hasUniqueTransferQueue)
+	{
+		queuesIndices[count]~ = this.transferQueueIndex;
+		count += 1;
+	}
+
+	return {queuesIndices, count};
 }
 
 VulkanRenderer::InitializeLogicalDevice()
@@ -363,13 +348,15 @@ VulkanRenderer::InitializeLogicalDevice()
 		this.graphicsQueueCount,
 		this.graphicsQueueIndices,
 		this.graphicsQueues@
-	)
+	);
 
 	this.GetDeviceQueues(
 		this.presentationQueueCount,
 		this.presentationQueueIndices,
 		this.presentationQueues@
-	)
+	);
+
+	vkGetDeviceQueue(this.device, this.transferQueueIndex, 0, this.transferQueue@);
 }
 
 VulkanRenderer::GetDeviceQueues(count: uint32, indices: Allocator<uint32>, queues: *Allocator<*VkQueue_T>)
@@ -803,33 +790,46 @@ VulkanRenderer::InitializeCommandPool()
 	poolInfo.queueFamilyIndex = this.graphicsQueueIndices[0]~;
 
 	CheckResult(
-		vkCreateCommandPool(this.device, poolInfo@, null, this.commandPool@),
-		"Error creating Vulkan command pool"
+		vkCreateCommandPool(this.device, poolInfo@, null, this.graphicsCommandPool@),
+		"Error creating Vulkan graphics command pool"
+	);
+
+	poolInfo.queueFamilyIndex = this.transferQueueIndex;
+	CheckResult(
+		vkCreateCommandPool(this.device, poolInfo@, null, this.transferCommandPool@),
+		"Error creating Vulkan transfer command pool"
 	);
 }
 
 vertices := [
-    {{float32(0.0), float32(-0.5)} as Vec2, {float32(1.0), float32(1.0), float32(1.0)} as Vec3} as Vertex2,
-    {{float32(0.5), float32(0.5)} as Vec2, {float32(0.0), float32(1.0), float32(0.0)} as Vec3} as Vertex2,
-    {{float32(-0.5), float32(0.5)} as Vec2, {float32(0.0), float32(0.0), float32(1.0)} as Vec3} as Vertex2,
+    {{float32(-0.5), float32(-0.5)} as Vec2, {float32(1.0), float32(0.0), float32(0.0)} as Vec3} as Vertex2,
+    {{float32(0.5), float32(-0.5)} as Vec2, {float32(0.0), float32(1.0), float32(0.0)} as Vec3} as Vertex2,
+    {{float32(0.5), float32(0.5)} as Vec2, {float32(0.0), float32(0.0), float32(1.0)} as Vec3} as Vertex2,
+	{{float32(-0.5), float32(0.5)} as Vec2, {float32(1.0), float32(1.0), float32(1.0)} as Vec3} as Vertex2,
 ];
+vertexCount := #compile uint32 => (#typeof vertices).FixedArrayCount();
+
+indices := [uint16(0), uint16(1), uint16(2), uint16(2), uint16(3), uint16(0)];
+indexCount := #compile uint32 => (#typeof indices).FixedArrayCount();
 
 
-VulkanRenderer::InitializeVertexBuffer()
+VulkanRenderer::CreateBuffer(size: uint64, usage: uint32, properties: uint32, buffer: **VkBuffer_T, bufferMemory: **VkDeviceMemory_T)
 {
 	bufferInfo := VkBufferCreateInfo();
 	bufferInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = #sizeof(vertices[0]) * 3;
-	bufferInfo.usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	bufferInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+	bufferInfo.size = size;
+	bufferInfo.usage = usage;
+	bufferInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_CONCURRENT;
+	bufferInfo.queueFamilyIndexCount = 2;
+	bufferInfo.pQueueFamilyIndices = fixed [this.graphicsQueueIndices[0]~, this.transferQueueIndex];
 
 	CheckResult(
-		vkCreateBuffer(this.device, bufferInfo@, null, this.vertexBuffer@),
+		vkCreateBuffer(this.device, bufferInfo@, null, buffer),
 		"Error creating Vulkan command pool"
 	);
 
 	memRequirements := VkMemoryRequirements();
-	vkGetBufferMemoryRequirements(this.device, this.vertexBuffer, memRequirements@);
+	vkGetBufferMemoryRequirements(this.device, buffer~, memRequirements@);
 
 	allocInfo := VkMemoryAllocateInfo();
 	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -841,16 +841,111 @@ VulkanRenderer::InitializeVertexBuffer()
 	);
 
 	CheckResult(
-		vkAllocateMemory(this.device, allocInfo@, null, this.vertexBufferMemory@),
+		vkAllocateMemory(this.device, allocInfo@, null, bufferMemory),
 		"Error allocating Vulkan vertex buffer memory"
 	);
 
-	vkBindBufferMemory(this.device, this.vertexBuffer, this.vertexBufferMemory, 0);
+	vkBindBufferMemory(this.device, buffer~, bufferMemory~, 0);
+}
+
+VulkanRenderer::CopyBuffer(srcBuffer: *VkBuffer_T, dstBuffer: *VkBuffer_T, size: uint64)
+{
+	allocInfo := VkCommandBufferAllocateInfo();
+    allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = this.transferCommandPool;
+    allocInfo.commandBufferCount = 1;
+
+	commandBuffer: *VkCommandBuffer_T = null;
+    vkAllocateCommandBuffers(this.device, allocInfo@, commandBuffer@);
+
+	beginInfo := VkCommandBufferBeginInfo();
+	beginInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VkCommandBufferUsageFlagBits.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	
+	vkBeginCommandBuffer(commandBuffer, beginInfo@);
+	{
+		copyRegion := VkBufferCopy();
+		copyRegion.srcOffset = 0; // Optional
+		copyRegion.dstOffset = 0; // Optional
+		copyRegion.size = size;
+		vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, copyRegion@);
+	}
+	vkEndCommandBuffer(commandBuffer);
+
+	submitInfo := VkSubmitInfo();
+	submitInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = commandBuffer@;
+	
+	vkQueueSubmit(this.transferQueue, 1, submitInfo@, null);
+	vkQueueWaitIdle(this.transferQueue);
+
+	vkFreeCommandBuffers(this.device, this.transferCommandPool, 1, commandBuffer@);
+}
+
+VulkanRenderer::InitializeVertexBuffer()
+{
+	bufferSize := #sizeof(vertices[0]) * vertexCount;
+
+	stagingBuffer: *VkBuffer_T = null;
+	stagingBufferMemory: *VkDeviceMemory_T = null;
+	this.CreateBuffer(
+		bufferSize, 
+		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		stagingBuffer@, 
+		stagingBufferMemory@
+	);
 
 	buf := null;
-	vkMapMemory(this.device, this.vertexBufferMemory, 0, bufferInfo.size, 0, buf@);
-	copy_bytes(buf, fixed vertices, bufferInfo.size);
-	vkUnmapMemory(this.device, this.vertexBufferMemory);
+	vkMapMemory(this.device, stagingBufferMemory, 0, bufferSize, 0, buf@);
+	copy_bytes(buf, fixed vertices, bufferSize);
+	vkUnmapMemory(this.device, stagingBufferMemory);
+
+	this.CreateBuffer(
+		bufferSize, 
+		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
+		this.vertexBuffer@, 
+		this.vertexBufferMemory@
+	);
+
+	this.CopyBuffer(stagingBuffer, this.vertexBuffer, bufferSize);
+	vkDestroyBuffer(this.device, stagingBuffer, null);
+    vkFreeMemory(this.device, stagingBufferMemory, null);
+}
+
+VulkanRenderer::InitializeIndexBuffer()
+{
+	bufferSize := #sizeof(indices[0]) * indexCount;
+
+	stagingBuffer: *VkBuffer_T = null;
+	stagingBufferMemory: *VkDeviceMemory_T = null;
+	this.CreateBuffer(
+		bufferSize, 
+		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		stagingBuffer@, 
+		stagingBufferMemory@
+	);
+
+	buf := null;
+	vkMapMemory(this.device, stagingBufferMemory, 0, bufferSize, 0, buf@);
+	copy_bytes(buf, fixed indices, bufferSize);
+	vkUnmapMemory(this.device, stagingBufferMemory);
+
+	this.CreateBuffer(
+		bufferSize, 
+		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
+		this.indexBuffer@, 
+		this.indexBufferMemory@
+	);
+
+	this.CopyBuffer(stagingBuffer, this.indexBuffer, bufferSize);
+	vkDestroyBuffer(this.device, stagingBuffer, null);
+    vkFreeMemory(this.device, stagingBufferMemory, null);
 }
 
 uint32 VulkanRenderer::FindMemoryType(typeFilter: uint32, properties: uint32) 
@@ -875,7 +970,7 @@ VulkanRenderer::InitializeCommandBuffer()
 {
 	allocInfo := VkCommandBufferAllocateInfo();
 	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = this.commandPool;
+	allocInfo.commandPool = this.graphicsCommandPool;
 	allocInfo.level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = uint32(2);
 
@@ -905,7 +1000,6 @@ VulkanRenderer::InitializeSyncObjects()
 		CheckResult(renderResult, errMsg);
 		CheckResult(inFlightResult, errMsg);
 	}
-
 }
 
 VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageIndex: uint32)
@@ -943,6 +1037,7 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 		vertexBuffers := [this.vertexBuffer,];
 		offsets:= [uint64(0),];
 		vkCmdBindVertexBuffers(commandBuffer, uint32(0), uint32(1), fixed vertexBuffers, fixed offsets);
+		vkCmdBindIndexBuffer(commandBuffer, this.indexBuffer, 0, VkIndexType.VK_INDEX_TYPE_UINT16);
 
 		viewport := VkViewport();
 		viewport.x = float32(0.0);
@@ -958,7 +1053,7 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
         scissor.extent = this.swapChainExtent;
         vkCmdSetScissor(commandBuffer, uint32(0), uint32(1), scissor@);
 
-		vkCmdDraw(commandBuffer, uint32(3), uint32(1), uint32(0), uint32(0));
+		vkCmdDrawIndexed(commandBuffer, indexCount, uint32(1), uint32(0), uint32(0), uint32(0));
 	}
 
 	vkCmdEndRenderPass(commandBuffer);
@@ -1060,6 +1155,9 @@ VulkanRenderer::Destroy()
 
 	this.DestroySwapchain();
 
+	vkDestroyBuffer(this.device, this.indexBuffer, null);
+	vkFreeMemory(this.device, this.indexBufferMemory, null);
+
 	vkDestroyBuffer(this.device, this.vertexBuffer, null);
 	vkFreeMemory(this.device, this.vertexBufferMemory, null);
 
@@ -1074,7 +1172,8 @@ VulkanRenderer::Destroy()
 		vkDestroyFence(this.device, this.inFlightFences[i], null);
 	}
 
-	vkDestroyCommandPool(this.device, this.commandPool, null);
+	vkDestroyCommandPool(this.device, this.graphicsCommandPool, null);
+	vkDestroyCommandPool(this.device, this.transferCommandPool, null);
 
 	vkDestroyDevice(this.device, null);
 
