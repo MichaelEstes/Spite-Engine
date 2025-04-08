@@ -8,6 +8,7 @@ import SparseSet
 import Event
 import Vertex
 
+UINT64_MAX := uint64(-1);
 VkFalse := uint32(0);
 VkTrue := uint32(1);
 
@@ -56,6 +57,7 @@ state VulkanRenderer<FramesInFlight = 2>
 	device: *VkDevice_T,
 	surface: *VkSurfaceKHR_T,
 	swapChain: *VkSwapchainKHR_T,
+	descriptorSetLayout: *VkDescriptorSetLayout_T,
 	pipelineLayout: *VkPipelineLayout_T,
 	renderPass: *VkRenderPass_T,
 	pipeline: *VkPipeline_T,
@@ -156,6 +158,7 @@ VulkanRenderer::DebugLogExtensions()
 	vulkanRenderer.InitializeSwapchain();
 	vulkanRenderer.InitializeImageViews();
 	vulkanRenderer.InitializeRenderPass();
+	vulkanRenderer.InitializeDescriptorSetLayout();
 	vulkanRenderer.InitializePipeline();
 	vulkanRenderer.InitializeFrameBuffers();
 	vulkanRenderer.InitializeCommandPool();
@@ -601,6 +604,26 @@ VulkanRenderer::InitializeRenderPass()
 	);
 }
 
+VulkanRenderer::InitializeDescriptorSetLayout()
+{
+	uboLayoutBinding := VkDescriptorSetLayoutBinding();
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+	uboLayoutBinding.stageFlags = VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT;
+	uboLayoutBinding.pImmutableSamplers = null; // Optional
+
+	layoutInfo := VkDescriptorSetLayoutCreateInfo();
+	layoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = 1;
+	layoutInfo.pBindings = uboLayoutBinding@;
+	
+	CheckResult(
+		vkCreateDescriptorSetLayout(this.device, layoutInfo@, null, this.descriptorSetLayout@),
+		"Error creating Vulkan descriptor set layout"
+	);
+}
+
 VulkanRenderer::InitializePipeline()
 {
 	vertShader := ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Shaders\\vert.spv");
@@ -704,8 +727,8 @@ VulkanRenderer::InitializePipeline()
 
 	pipelineLayoutInfo := VkPipelineLayoutCreateInfo();
 	pipelineLayoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = uint32(0); // Optional
-	pipelineLayoutInfo.pSetLayouts = null; // Optional
+	pipelineLayoutInfo.setLayoutCount = uint32(1);
+	pipelineLayoutInfo.pSetLayouts = this.descriptorSetLayout@;
 	pipelineLayoutInfo.pushConstantRangeCount = uint32(0); // Optional
 	pipelineLayoutInfo.pPushConstantRanges = null; // Optional
 
@@ -801,15 +824,15 @@ VulkanRenderer::InitializeCommandPool()
 	);
 }
 
-vertices := [
-    {{float32(-0.5), float32(-0.5)} as Vec2, {float32(1.0), float32(0.0), float32(0.0)} as Vec3} as Vertex2,
-    {{float32(0.5), float32(-0.5)} as Vec2, {float32(0.0), float32(1.0), float32(0.0)} as Vec3} as Vertex2,
-    {{float32(0.5), float32(0.5)} as Vec2, {float32(0.0), float32(0.0), float32(1.0)} as Vec3} as Vertex2,
-	{{float32(-0.5), float32(0.5)} as Vec2, {float32(1.0), float32(1.0), float32(1.0)} as Vec3} as Vertex2,
+vertices := Vertex2:[
+    {{float32(-0.5), float32(-0.5)} as Vec2, {float32(1.0), float32(0.0), float32(0.0)} as Vec3},
+    {{float32(0.5), float32(-0.5)} as Vec2, {float32(0.0), float32(1.0), float32(0.0)} as Vec3},
+    {{float32(0.5), float32(0.5)} as Vec2, {float32(0.0), float32(0.0), float32(1.0)} as Vec3},
+	{{float32(-0.5), float32(0.5)} as Vec2, {float32(1.0), float32(1.0), float32(1.0)} as Vec3},
 ];
 vertexCount := #compile uint32 => (#typeof vertices).FixedArrayCount();
 
-indices := [uint16(0), uint16(1), uint16(2), uint16(2), uint16(3), uint16(0)];
+indices := uint16:[0, 1, 2, 2, 3, 0];
 indexCount := #compile uint32 => (#typeof indices).FixedArrayCount();
 
 
@@ -1060,8 +1083,6 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 	CheckResult(vkEndCommandBuffer(commandBuffer), "Error recording Vulkan command buffer");
 }
 
-UINT64_MAX := uint64(-1);
-
 VulkanRenderer::DrawFrame()
 {
 	vkWaitForFences(this.device, uint32(1), this.inFlightFences[this.currentFrame]@, VkTrue, UINT64_MAX);
@@ -1161,6 +1182,7 @@ VulkanRenderer::Destroy()
 	vkDestroyBuffer(this.device, this.vertexBuffer, null);
 	vkFreeMemory(this.device, this.vertexBufferMemory, null);
 
+	vkDestroyDescriptorSetLayout(this.device, this.descriptorSetLayout, null);
 	vkDestroyPipeline(this.device, this.pipeline, null);
 	vkDestroyPipelineLayout(this.device, this.pipelineLayout, null);
 	vkDestroyRenderPass(this.device, this.renderPass, null);
