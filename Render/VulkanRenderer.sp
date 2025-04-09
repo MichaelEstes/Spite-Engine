@@ -7,6 +7,8 @@ import SDL
 import SparseSet
 import Event
 import Vertex
+import UniformBufferObject
+import Time
 
 UINT64_MAX := uint64(-1);
 VkFalse := uint32(0);
@@ -68,6 +70,10 @@ state VulkanRenderer<FramesInFlight = 2>
 	vertexBufferMemory: *VkDeviceMemory_T,
 	indexBuffer: *VkBuffer_T,
 	indexBufferMemory: *VkDeviceMemory_T,
+
+	uniformBuffers: [FramesInFlight]*VkBuffer_T,
+	uniformBuffersMemory: [FramesInFlight]*VkDeviceMemory_T,
+	uniformBuffersMapped: [FramesInFlight]*void,
 
 	physicalDevice: *VkPhysicalDevice_T,
 	currentDeviceFeatures: VkPhysicalDeviceFeatures,
@@ -164,6 +170,7 @@ VulkanRenderer::DebugLogExtensions()
 	vulkanRenderer.InitializeCommandPool();
 	vulkanRenderer.InitializeVertexBuffer();
 	vulkanRenderer.InitializeIndexBuffer();
+	vulkanRenderer.InitializeUniformBuffers();
 	vulkanRenderer.InitializeCommandBuffer();
 	vulkanRenderer.InitializeSyncObjects();
 
@@ -971,6 +978,24 @@ VulkanRenderer::InitializeIndexBuffer()
     vkFreeMemory(this.device, stagingBufferMemory, null);
 }
 
+VulkanRenderer::InitializeUniformBuffers()
+{
+	bufferSize := #sizeof UniformBufferObject;
+
+	for (i .. FramesInFlight)
+	{
+		this.CreateBuffer(
+			bufferSize, 
+			VkBufferUsageFlagBits.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+			VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+			this.uniformBuffers[i]@, 
+			this.uniformBuffersMemory[i]@
+		);
+
+		vkMapMemory(this.device, this.uniformBuffersMemory[i], 0, bufferSize, 0, this.uniformBuffersMapped[i]@);
+	}
+}
+
 uint32 VulkanRenderer::FindMemoryType(typeFilter: uint32, properties: uint32) 
 {
 	memProperties := VkPhysicalDeviceMemoryProperties();
@@ -998,7 +1023,7 @@ VulkanRenderer::InitializeCommandBuffer()
 	allocInfo.commandBufferCount = uint32(2);
 
 	CheckResult(
-		vkAllocateCommandBuffers(this.device, allocInfo@, this.commandBuffers[0]@),
+		vkAllocateCommandBuffers(this.device, allocInfo@, fixed this.commandBuffers),
 		"Error creating Vulkan command buffer"
 	);
 }
@@ -1114,12 +1139,12 @@ VulkanRenderer::DrawFrame()
 
 	submitInfo := VkSubmitInfo();
 	submitInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.waitSemaphoreCount = uint32(1);
 	submitInfo.pWaitSemaphores = fixed waitSemaphores;
 	submitInfo.pWaitDstStageMask = fixed waitStages;
-	submitInfo.commandBufferCount = 1;
+	submitInfo.commandBufferCount = uint32(1);
 	submitInfo.pCommandBuffers = this.commandBuffers[this.currentFrame]@;
-	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.signalSemaphoreCount = uint32(1);
 	submitInfo.pSignalSemaphores = fixed signalSemaphores;
 
 	CheckResult(
@@ -1129,9 +1154,9 @@ VulkanRenderer::DrawFrame()
 
 	presentInfo := VkPresentInfoKHR();
 	presentInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.waitSemaphoreCount = uint32(1);
 	presentInfo.pWaitSemaphores = fixed signalSemaphores;
-	presentInfo.swapchainCount = 1;
+	presentInfo.swapchainCount = uint32(1);
 	presentInfo.pSwapchains = fixed swapChains;
 	presentInfo.pImageIndices = imageIndex@;
 	presentInfo.pResults = null; // Optional
@@ -1142,6 +1167,11 @@ VulkanRenderer::DrawFrame()
 		this.RecreateSwapchain();
 	}
 	this.currentFrame = (this.currentFrame + 1) % FramesInFlight;
+}
+
+VulkanRenderer::UpdateUniformBuffer(currentFrame: uint32) 
+{
+	time := Time.TicksSinceStart();
 }
 
 VulkanRenderer::RecreateSwapchain()
@@ -1181,6 +1211,12 @@ VulkanRenderer::Destroy()
 
 	vkDestroyBuffer(this.device, this.vertexBuffer, null);
 	vkFreeMemory(this.device, this.vertexBufferMemory, null);
+
+	for (i .. FramesInFlight)
+	{
+		vkDestroyBuffer(this.device, this.uniformBuffers[i], null);
+        vkFreeMemory(this.device, this.uniformBuffersMemory[i], null);
+	}
 
 	vkDestroyDescriptorSetLayout(this.device, this.descriptorSetLayout, null);
 	vkDestroyPipeline(this.device, this.pipeline, null);

@@ -13,7 +13,8 @@ Array::(initialCapacity: uint32)
 	this.capacity = initialCapacity;
 }
 
-Array::delete {
+Array::delete 
+{
 	this.mem.Dealloc(this.count);
 }
 
