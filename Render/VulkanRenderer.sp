@@ -1127,6 +1127,8 @@ VulkanRenderer::DrawFrame()
 		return;
 	}
 
+	this.UpdateUniformBuffer(this.currentFrame);
+
 	vkResetFences(this.device, uint32(1), this.inFlightFences[this.currentFrame]@);
 
 	vkResetCommandBuffer(this.commandBuffers[this.currentFrame], uint32(0));
@@ -1171,7 +1173,20 @@ VulkanRenderer::DrawFrame()
 
 VulkanRenderer::UpdateUniformBuffer(currentFrame: uint32) 
 {
-	time := Time.TicksSinceStart();
+	time := Time.TicksSinceStart() / 10000.0;
+
+	ubo := UniformBufferObject();
+	ubo.model.Rotate(time * Math.Deg2Rad(90.0), Vec3(0.0, 0.0, 1.0) as Norm<Vec3>);
+	ubo.view.LookAt(Vec3(2.0, 2.0, 2.0), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 1.0));
+	ubo.projection.Perspective(
+		Math.Deg2Rad(45.0), 
+		this.swapChainExtent.width / this.swapChainExtent.height as float32, 
+		0.1, 
+		10.0
+	);
+	ubo.projection[1][1] *= -1;
+
+	copy_bytes(this.uniformBuffersMapped[currentFrame], ubo@, (#sizeof ubo));
 }
 
 VulkanRenderer::RecreateSwapchain()
