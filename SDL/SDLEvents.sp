@@ -2,7 +2,7 @@ package SDL
 
 extern
 {
-	#link windows "./SDL3";
+	#link windows "./extern/SDL3";
 
 	bool SDL_PollEvent(event: *Event);
     void SDL_AddEventWatch(filter: ::int(*void, *Event), userdata: *void);

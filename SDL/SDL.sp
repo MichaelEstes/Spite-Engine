@@ -2,7 +2,7 @@ package SDL
 
 extern
 {
-	#link windows "./SDL3";
+	#link windows "./extern/SDL3";
 
 	*Window SDL_CreateWindow(title: *byte, w: int32, h: int32, flags: uint64);
 	void SDL_DestroyWindow(window: *Window);
@@ -10,6 +10,9 @@ extern
 	void SDL_Quit();
 	bool SDL_GetWindowSizeInPixels(window: *Window, width: *int32, height: *int32);
 	*byte SDL_GetError();
+
+    *Surface SDL_ConvertSurface(surface: *Surface, format: PixelFormat);
+    void SDL_DestroySurface(surface: *Surface);
 }
 
 enum InitFlags
@@ -222,3 +225,6 @@ Quit() => SDL_Quit();
 *Window CreateWindow(title: *byte, w: int32, h: int32, flags: uint) => SDL_CreateWindow(title, w, h, flags);
 void DestroyWindow(window: *Window) => SDL_DestroyWindow(window);
 bool GetWindowSizeInPixels(window: *Window, width: *int32, height: *int32) => SDL_GetWindowSizeInPixels(window, width, height);
+
+*Surface ConvertSurface(surface: *Surface, format: PixelFormat) => SDL_ConvertSurface(surface, format);
+DestroySurface(surface: *Surface) => SDL_DestroySurface(surface);

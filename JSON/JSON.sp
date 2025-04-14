@@ -353,6 +353,8 @@ bool IsDigit(char: byte)
 	}
 
 	strCopy := ZeroedAllocator<byte>().Alloc(count + 1);
+	defer delete strCopy;
+
 	copy_bytes(strCopy, start, count);
 	if (isFloat)
 	{
@@ -362,7 +364,6 @@ bool IsDigit(char: byte)
 	{
 		numValue.value.number.value.i = StringToInt(string(count, strCopy[0]));
 	}
-	delete strCopy;
 
 	return numValue;
 }

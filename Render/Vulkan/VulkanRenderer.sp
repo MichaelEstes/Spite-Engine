@@ -4,6 +4,7 @@ import OS
 import Math
 import Vulkan
 import SDL
+import Image
 import SparseSet
 import Event
 import Vertex
@@ -70,6 +71,9 @@ state VulkanRenderer<FramesInFlight = 2>
 	vertexBufferMemory: *VkDeviceMemory_T,
 	indexBuffer: *VkBuffer_T,
 	indexBufferMemory: *VkDeviceMemory_T,
+
+	textureImage: *VkImage_T,
+	textureImageMemory: *VkDeviceMemory_T,
 
 	uniformBuffers: [FramesInFlight]*VkBuffer_T,
 	uniformBuffersMemory: [FramesInFlight]*VkDeviceMemory_T,
@@ -171,6 +175,7 @@ VulkanRenderer::DebugLogExtensions()
 	vulkanRenderer.InitializePipeline();
 	vulkanRenderer.InitializeFrameBuffers();
 	vulkanRenderer.InitializeCommandPool();
+	vulkanRenderer.InitializeTextureImage();
 	vulkanRenderer.InitializeVertexBuffer();
 	vulkanRenderer.InitializeIndexBuffer();
 	vulkanRenderer.InitializeUniformBuffers();
@@ -836,6 +841,95 @@ VulkanRenderer::InitializeCommandPool()
 	);
 }
 
+VulkanRenderer::CreateImage(width: uint32, height: uint32, format: VkFormat, tiling: VkImageTiling,
+							usage: uint32, properties: uint32, image: **VkImage_T, imageMemory: **VkDeviceMemory_T)
+{
+	imageInfo := VkImageCreateInfo();
+    imageInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VkImageType.VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;
+    imageInfo.tiling = tiling;
+    imageInfo.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = usage;
+    imageInfo.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+
+	CheckResult(
+		vkCreateImage(this.device, imageInfo@, null, image)
+		"Error creating Vulkan image"
+	);
+
+	memRequirements := VkMemoryRequirements();
+    vkGetImageMemoryRequirements(this.device, image~, memRequirements@);
+
+	allocInfo := VkMemoryAllocateInfo();
+    allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = this.FindMemoryType(memRequirements.memoryTypeBits, properties);
+
+	CheckResult(
+		vkAllocateMemory(this.device, allocInfo@, null, imageMemory)
+		"Error allocating Vulkan image memory"
+	);
+
+	vkBindImageMemory(this.device, image~, imageMemory~, 0);
+}
+
+VulkanRenderer::InitializeTextureImage()
+{
+	imageSurface := Image.LoadTextureImage("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Resource\\test.jpg");
+	if (!imageSurface)
+	{
+		log "Error loading texture image";
+		return;
+	}
+	defer SDL.DestroySurface(imageSurface);
+
+	width := imageSurface.w;
+	height := imageSurface.h;
+	pixels := imageSurface.pixels;
+	imageSize: uint32 = width * height * 4;
+
+	stagingBuffer: *VkBuffer_T = null;
+	stagingBufferMemory: *VkDeviceMemory_T = null;
+
+	this.CreateBuffer(
+		imageSize, 
+		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer@, 
+		stagingBufferMemory@
+	);
+
+	data := null;
+	vkMapMemory(this.device, stagingBufferMemory, 0, imageSize, 0, data@);
+    copy_bytes(data, pixels, imageSize);
+	vkUnmapMemory(this.device, stagingBufferMemory);
+	
+	this.CreateImage(
+		width, 
+		height, 
+		VkFormat.VK_FORMAT_R8G8B8A8_SRGB, 
+		VkImageTiling.VK_IMAGE_TILING_OPTIMAL, 
+		VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
+		this.textureImage@, 
+		this.textureImageMemory@
+	);
+
+	this.TransitionImageLayout(this.textureImage, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	this.CopyBufferToImage(stagingBuffer, this.textureImage, width, height);
+	this.TransitionImageLayout(this.textureImage, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+	vkDestroyBuffer(this.device, stagingBuffer, null);
+    vkFreeMemory(this.device, stagingBufferMemory, null);
+}
+
 vertices := Vertex2:[
     {{float32(-0.5), float32(-0.5)} as Vec2, {float32(1.0), float32(0.0), float32(0.0)} as Vec3},
     {{float32(0.5), float32(-0.5)} as Vec2, {float32(0.0), float32(1.0), float32(0.0)} as Vec3},
@@ -883,7 +977,7 @@ VulkanRenderer::CreateBuffer(size: uint64, usage: uint32, properties: uint32, bu
 	vkBindBufferMemory(this.device, buffer~, bufferMemory~, 0);
 }
 
-VulkanRenderer::CopyBuffer(srcBuffer: *VkBuffer_T, dstBuffer: *VkBuffer_T, size: uint64)
+*VkCommandBuffer_T VulkanRenderer::BeginSingleTimeCommands()
 {
 	allocInfo := VkCommandBufferAllocateInfo();
     allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -899,13 +993,12 @@ VulkanRenderer::CopyBuffer(srcBuffer: *VkBuffer_T, dstBuffer: *VkBuffer_T, size:
 	beginInfo.flags = VkCommandBufferUsageFlagBits.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	
 	vkBeginCommandBuffer(commandBuffer, beginInfo@);
-	{
-		copyRegion := VkBufferCopy();
-		copyRegion.srcOffset = 0; // Optional
-		copyRegion.dstOffset = 0; // Optional
-		copyRegion.size = size;
-		vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, copyRegion@);
-	}
+
+	return commandBuffer;
+}
+
+VulkanRenderer::EndSingleTimeCommands(commandBuffer: *VkCommandBuffer_T)
+{
 	vkEndCommandBuffer(commandBuffer);
 
 	submitInfo := VkSubmitInfo();
@@ -917,6 +1010,85 @@ VulkanRenderer::CopyBuffer(srcBuffer: *VkBuffer_T, dstBuffer: *VkBuffer_T, size:
 	vkQueueWaitIdle(this.transferQueue);
 
 	vkFreeCommandBuffers(this.device, this.transferCommandPool, 1, commandBuffer@);
+}
+
+VulkanRenderer::CopyBuffer(srcBuffer: *VkBuffer_T, dstBuffer: *VkBuffer_T, size: uint64)
+{
+	commandBuffer := this.BeginSingleTimeCommands();
+	{
+		copyRegion := VkBufferCopy();
+		copyRegion.srcOffset = 0; // Optional
+		copyRegion.dstOffset = 0; // Optional
+		copyRegion.size = size;
+		vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, copyRegion@);
+	}
+	this.EndSingleTimeCommands(commandBuffer);
+}
+
+VulkanRenderer::TransitionImageLayout(image: *VkImage_T, format: VkFormat, oldLayout: VkImageLayout, newLayout: VkImageLayout)
+{
+	commandBuffer := this.BeginSingleTimeCommands();
+	{
+		barrier := VkImageMemoryBarrier();
+		barrier.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.oldLayout = oldLayout;
+		barrier.newLayout = newLayout;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.image = image;
+		barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+
+		vkCmdPipelineBarrier(
+            commandBuffer,
+            0, 
+			0,
+            0,
+            0, 
+			null,
+            0, 
+			null,
+            1, 
+			barrier@
+        );
+	}
+	this.EndSingleTimeCommands(commandBuffer);
+}
+
+VulkanRenderer::CopyBufferToImage(buffer: *VkBuffer_T, image: *VkImage_T, width: uint32, height: uint32)
+{
+	commandBuffer := this.BeginSingleTimeCommands();
+	{
+		region := VkBufferImageCopy();
+		region.bufferOffset = 0;
+		region.bufferRowLength = 0;
+		region.bufferImageHeight = 0;
+
+		region.imageSubresource.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+		region.imageSubresource.mipLevel = 0;
+		region.imageSubresource.baseArrayLayer = 0;
+		region.imageSubresource.layerCount = 1;
+
+		region.imageOffset = {int32(0), int32(0), int32(0)};
+		region.imageExtent = {
+		    uint32(width),
+		    uint32(height),
+		    uint32(1)
+		};
+
+		vkCmdCopyBufferToImage(
+			commandBuffer,
+			buffer,
+			image,
+			VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			1,
+			region@
+		);
+	}
+	this.EndSingleTimeCommands(commandBuffer);
 }
 
 VulkanRenderer::InitializeVertexBuffer()
