@@ -74,6 +74,8 @@ state VulkanRenderer<FramesInFlight = 2>
 
 	textureImage: *VkImage_T,
 	textureImageMemory: *VkDeviceMemory_T,
+	textureImageView: *VkImageView_T,
+	textureSampler: *VkSampler_T,
 
 	uniformBuffers: [FramesInFlight]*VkBuffer_T,
 	uniformBuffersMemory: [FramesInFlight]*VkDeviceMemory_T,
@@ -176,6 +178,8 @@ VulkanRenderer::DebugLogExtensions()
 	vulkanRenderer.InitializeFrameBuffers();
 	vulkanRenderer.InitializeCommandPool();
 	vulkanRenderer.InitializeTextureImage();
+	vulkanRenderer.InitializeTextureImageView();
+	vulkanRenderer.InitializeTextureSampler();
 	vulkanRenderer.InitializeVertexBuffer();
 	vulkanRenderer.InitializeIndexBuffer();
 	vulkanRenderer.InitializeUniformBuffers();
@@ -351,13 +355,16 @@ VulkanRenderer::InitializeLogicalDevice()
 		queueCreateInfos[i]~ = queueCreateInfo;
 	}
 
+	deviceFeatures := VkPhysicalDeviceFeatures();
+	deviceFeatures.samplerAnisotropy = VkTrue;
+
 	deviceCreateInfo := VkDeviceCreateInfo();
 	deviceCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	deviceCreateInfo.queueCreateInfoCount = uniqueQueues.count;
 	deviceCreateInfo.pQueueCreateInfos = queueCreateInfos[0];
 	deviceCreateInfo.enabledExtensionCount = requiredDeviceExtensionCount;
 	deviceCreateInfo.ppEnabledExtensionNames = fixed requiredDeviceExtensions;
-	deviceCreateInfo.pEnabledFeatures = this.currentDeviceFeatures@;
+	deviceCreateInfo.pEnabledFeatures = deviceFeatures@;
 
 	CheckResult(
 		vkCreateDevice(this.physicalDevice, deviceCreateInfo@, null, this.device@),
@@ -630,10 +637,18 @@ VulkanRenderer::InitializeDescriptorSetLayout()
 	uboLayoutBinding.stageFlags = VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT;
 	uboLayoutBinding.pImmutableSamplers = null; // Optional
 
+	samplerLayoutBinding := VkDescriptorSetLayoutBinding();
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = null;
+    samplerLayoutBinding.stageFlags = VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	bindings := [uboLayoutBinding, samplerLayoutBinding];
 	layoutInfo := VkDescriptorSetLayoutCreateInfo();
 	layoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = 1;
-	layoutInfo.pBindings = uboLayoutBinding@;
+	layoutInfo.bindingCount = 2;
+	layoutInfo.pBindings = fixed bindings;
 	
 	CheckResult(
 		vkCreateDescriptorSetLayout(this.device, layoutInfo@, null, this.descriptorSetLayout@),
@@ -860,7 +875,7 @@ VulkanRenderer::CreateImage(width: uint32, height: uint32, format: VkFormat, til
     imageInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
 
 	CheckResult(
-		vkCreateImage(this.device, imageInfo@, null, image)
+		vkCreateImage(this.device, imageInfo@, null, image),
 		"Error creating Vulkan image"
 	);
 
@@ -873,7 +888,7 @@ VulkanRenderer::CreateImage(width: uint32, height: uint32, format: VkFormat, til
     allocInfo.memoryTypeIndex = this.FindMemoryType(memRequirements.memoryTypeBits, properties);
 
 	CheckResult(
-		vkAllocateMemory(this.device, allocInfo@, null, imageMemory)
+		vkAllocateMemory(this.device, allocInfo@, null, imageMemory),
 		"Error allocating Vulkan image memory"
 	);
 
@@ -890,8 +905,8 @@ VulkanRenderer::InitializeTextureImage()
 	}
 	defer SDL.DestroySurface(imageSurface);
 
-	width := imageSurface.w;
-	height := imageSurface.h;
+	width := imageSurface.w as uint32;
+	height := imageSurface.h as uint32;
 	pixels := imageSurface.pixels;
 	imageSize: uint32 = width * height * 4;
 
@@ -930,11 +945,61 @@ VulkanRenderer::InitializeTextureImage()
     vkFreeMemory(this.device, stagingBufferMemory, null);
 }
 
+VulkanRenderer::InitializeTextureImageView()
+{
+	viewInfo := VkImageViewCreateInfo();
+	viewInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image = this.textureImage;
+	viewInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = VkFormat.VK_FORMAT_R8G8B8A8_SRGB;
+	viewInfo.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = 1;
+
+	CheckResult(
+		vkCreateImageView(this.device, viewInfo@, null, this.textureImageView@),
+		"Error allocating Vulkan image memory"
+	);
+}
+
+VulkanRenderer::InitializeTextureSampler()
+{
+	samplerInfo := VkSamplerCreateInfo();
+	samplerInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VkFilter.VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VkFilter.VK_FILTER_LINEAR;
+
+	samplerInfo.addressModeU = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+	samplerInfo.anisotropyEnable = VkTrue;
+	samplerInfo.maxAnisotropy = this.currentDeviceProperties.limits.maxSamplerAnisotropy;
+
+	samplerInfo.borderColor = VkBorderColor.VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VkFalse;
+
+	samplerInfo.compareEnable = VkFalse;
+	samplerInfo.compareOp = VkCompareOp.VK_COMPARE_OP_ALWAYS;
+
+	samplerInfo.mipmapMode = VkSamplerMipmapMode.VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0;
+	samplerInfo.minLod = 0.0;
+	samplerInfo.maxLod = 0.0;
+
+	CheckResult(
+		vkCreateSampler(this.device, samplerInfo@, null, this.textureSampler@),
+		"Error creating Vulkan texture sampler"
+	);
+}
+
 vertices := Vertex2:[
-    {{float32(-0.5), float32(-0.5)} as Vec2, {float32(1.0), float32(0.0), float32(0.0)} as Vec3},
-    {{float32(0.5), float32(-0.5)} as Vec2, {float32(0.0), float32(1.0), float32(0.0)} as Vec3},
-    {{float32(0.5), float32(0.5)} as Vec2, {float32(0.0), float32(0.0), float32(1.0)} as Vec3},
-	{{float32(-0.5), float32(0.5)} as Vec2, {float32(1.0), float32(1.0), float32(1.0)} as Vec3},
+    {{float32(-0.5), float32(-0.5)} as Vec2, {float32(1.0), float32(0.0), float32(0.0)} as Vec3, {float32(1.0), float32(0.0)} as Vec2},
+    {{float32(0.5), float32(-0.5)} as Vec2,  {float32(0.0), float32(1.0), float32(0.0)} as Vec3, {float32(0.0), float32(0.0)} as Vec2},
+    {{float32(0.5), float32(0.5)} as Vec2,   {float32(0.0), float32(0.0), float32(1.0)} as Vec3, {float32(0.0), float32(1.0)} as Vec2},
+	{{float32(-0.5), float32(0.5)} as Vec2,  {float32(1.0), float32(1.0), float32(1.0)} as Vec3, {float32(1.0), float32(1.0)} as Vec2},
 ];
 vertexCount := #compile uint32 => (#typeof vertices).FixedArrayCount();
 
@@ -1042,10 +1107,35 @@ VulkanRenderer::TransitionImageLayout(image: *VkImage_T, format: VkFormat, oldLa
 		barrier.subresourceRange.baseArrayLayer = 0;
 		barrier.subresourceRange.layerCount = 1;
 
+		sourceStage := uint32(0);
+		destinationStage := uint32(0);
+		if (oldLayout == VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED && 
+			newLayout == VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
+		{
+			barrier.srcAccessMask = 0;
+			barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
+
+			sourceStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			destinationStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT;
+		} 
+		else if (oldLayout == VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && 
+				 newLayout == VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) 
+		{
+		    barrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
+		    barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT;
+		
+		    sourceStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT;
+		    destinationStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		} 
+		else 
+		{
+		    log "Unsupported layout transition"
+		}
+
 		vkCmdPipelineBarrier(
             commandBuffer,
-            0, 
-			0,
+            sourceStage, 
+			destinationStage,
             0,
             0, 
 			null,
@@ -1175,14 +1265,17 @@ VulkanRenderer::InitializeUniformBuffers()
 
 VulkanRenderer::InitializeDescriptorPool()
 {
-	poolSize := VkDescriptorPoolSize();
-	poolSize.type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSize.descriptorCount = FramesInFlight;
+	poolSizes := [VkDescriptorPoolSize(), VkDescriptorPoolSize()];
+	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[0].descriptorCount = FramesInFlight;
+
+	poolSizes[1].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[1].descriptorCount = FramesInFlight;
 
 	poolInfo := VkDescriptorPoolCreateInfo();
 	poolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = 1;
-	poolInfo.pPoolSizes = poolSize@;
+	poolInfo.poolSizeCount = 2;
+	poolInfo.pPoolSizes = fixed poolSizes;
 	poolInfo.maxSets = FramesInFlight;
 
 	CheckResult(
@@ -1214,18 +1307,33 @@ VulkanRenderer::InitializeDescriptorSets()
 		bufferInfo.offset = 0;
 		bufferInfo.range = #sizeof UniformBufferObject;
 
-		descriptorWrite := VkWriteDescriptorSet();
-		descriptorWrite.sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite.dstSet = this.descriptorSets[i];
-		descriptorWrite.dstBinding = 0;
-		descriptorWrite.dstArrayElement = 0;
-		descriptorWrite.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite.descriptorCount = 1;
-		descriptorWrite.pBufferInfo = bufferInfo@;
-		descriptorWrite.pImageInfo = null; // Optional
-		descriptorWrite.pTexelBufferView = null; // Optional
+		imageInfo := VkDescriptorImageInfo();
+        imageInfo.imageLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = this.textureImageView;
+        imageInfo.sampler = this.textureSampler;
 
-		vkUpdateDescriptorSets(this.device, 1, descriptorWrite@, 0, null);
+		descriptorWrites := [VkWriteDescriptorSet(), VkWriteDescriptorSet()];
+
+		descriptorWrites[0].sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[0].dstSet = this.descriptorSets[i];
+		descriptorWrites[0].dstBinding = 0;
+		descriptorWrites[0].dstArrayElement = 0;
+		descriptorWrites[0].descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[0].descriptorCount = 1;
+		descriptorWrites[0].pBufferInfo = bufferInfo@;
+		descriptorWrites[0].pImageInfo = null; // Optional
+		descriptorWrites[0].pTexelBufferView = null; // Optional
+
+		descriptorWrites[1].sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = this.descriptorSets[i];
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].pImageInfo = imageInfo@;
+
+
+		vkUpdateDescriptorSets(this.device, 2, fixed descriptorWrites, 0, null);
     }
 }
 
@@ -1475,6 +1583,13 @@ VulkanRenderer::Destroy()
 	}
 
 	vkDestroyDescriptorPool(this.device, this.descriptorPool, null);
+
+	vkDestroySampler(this.device, this.textureSampler, null);
+	vkDestroyImageView(this.device, this.textureImageView, null);
+
+	vkDestroyImage(this.device, this.textureImage, null);
+    vkFreeMemory(this.device, this.textureImageMemory, null);
+
 	vkDestroyDescriptorSetLayout(this.device, this.descriptorSetLayout, null);
 
 	vkDestroyBuffer(this.device, this.indexBuffer, null);

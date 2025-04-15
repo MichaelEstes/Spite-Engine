@@ -7,7 +7,8 @@ import Array
 state Vertex2
 {
 	pos: Vec2,
-	color: Vec3
+	color: Vec3,
+	texCoord: Vec2
 }
 
 VkVertexInputBindingDescription Vertex2BindingDescription()
@@ -22,7 +23,8 @@ VkVertexInputBindingDescription Vertex2BindingDescription()
 
 Array<VkVertexInputAttributeDescription> Vertex2AttributeDescriptions()
 {
-	attributeDescriptions := Array<VkVertexInputAttributeDescription>(2);
+	attributeDescriptions := Array<VkVertexInputAttributeDescription>(3);
+	attributeDescriptions.Add(VkVertexInputAttributeDescription());
 	attributeDescriptions.Add(VkVertexInputAttributeDescription());
 	attributeDescriptions.Add(VkVertexInputAttributeDescription());
 	
@@ -35,6 +37,11 @@ Array<VkVertexInputAttributeDescription> Vertex2AttributeDescriptions()
 	attributeDescriptions[1].location = 1;
 	attributeDescriptions[1].format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
 	attributeDescriptions[1].offset = #offsetof(Vertex2, color);
+
+	attributeDescriptions[2].binding = 0;
+    attributeDescriptions[2].location = 2;
+    attributeDescriptions[2].format = VkFormat.VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions[2].offset = #offsetof(Vertex2, texCoord);
 
 	return attributeDescriptions;
 }
