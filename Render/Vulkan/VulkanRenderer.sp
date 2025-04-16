@@ -678,8 +678,8 @@ VulkanRenderer::InitializePipeline()
 
 	shaderStages := [vertShaderStageInfo, fragShaderStageInfo];
 
-	bindingDescription := Vertex2BindingDescription();
-	attributeDescriptions := Vertex2AttributeDescriptions();
+	bindingDescription := Vertex3BindingDescription();
+	attributeDescriptions := Vertex3AttributeDescriptions();
 
 	vertexInputInfo := VkPipelineVertexInputStateCreateInfo();
 	vertexInputInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -995,15 +995,23 @@ VulkanRenderer::InitializeTextureSampler()
 	);
 }
 
-vertices := Vertex2:[
-    {{float32(-0.5), float32(-0.5)} as Vec2, {float32(1.0), float32(0.0), float32(0.0)} as Vec3, {float32(1.0), float32(0.0)} as Vec2},
-    {{float32(0.5), float32(-0.5)} as Vec2,  {float32(0.0), float32(1.0), float32(0.0)} as Vec3, {float32(0.0), float32(0.0)} as Vec2},
-    {{float32(0.5), float32(0.5)} as Vec2,   {float32(0.0), float32(0.0), float32(1.0)} as Vec3, {float32(0.0), float32(1.0)} as Vec2},
-	{{float32(-0.5), float32(0.5)} as Vec2,  {float32(1.0), float32(1.0), float32(1.0)} as Vec3, {float32(1.0), float32(1.0)} as Vec2},
+vertices := Vertex3:[
+    {{float32(-0.5), float32(-0.5), float32(0.0)}, {float32(1.0), float32(0.0), float32(0.0)}, {float32(1.0), float32(0.0)}},
+    {{float32(0.5), float32(-0.5), float32(0.0)},  {float32(0.0), float32(1.0), float32(0.0)}, {float32(0.0), float32(0.0)}},
+    {{float32(0.5), float32(0.5), float32(0.0)},   {float32(0.0), float32(0.0), float32(1.0)}, {float32(0.0), float32(1.0)}},
+	{{float32(-0.5), float32(0.5), float32(0.0)},  {float32(1.0), float32(1.0), float32(1.0)}, {float32(1.0), float32(1.0)}},
+
+	{{float32(-0.5), float32(-0.5), float32(-0.5)}, {float32(1.0), float32(0.0), float32(0.0)}, {float32(1.0), float32(0.0)}},
+    {{float32(0.5), float32(-0.5), float32(-0.5)},  {float32(0.0), float32(1.0), float32(0.0)}, {float32(0.0), float32(0.0)}},
+    {{float32(0.5), float32(0.5), float32(-0.5)},   {float32(0.0), float32(0.0), float32(1.0)}, {float32(0.0), float32(1.0)}},
+	{{float32(-0.5), float32(0.5), float32(-0.5)},  {float32(1.0), float32(1.0), float32(1.0)}, {float32(1.0), float32(1.0)}},
 ];
 vertexCount := #compile uint32 => (#typeof vertices).FixedArrayCount();
 
-indices := uint16:[0, 1, 2, 2, 3, 0];
+indices := uint16:[
+	0, 1, 2, 2, 3, 0,
+	4, 5, 6, 6, 7, 4
+];
 indexCount := #compile uint32 => (#typeof indices).FixedArrayCount();
 
 
@@ -1164,8 +1172,8 @@ VulkanRenderer::CopyBufferToImage(buffer: *VkBuffer_T, image: *VkImage_T, width:
 
 		region.imageOffset = {int32(0), int32(0), int32(0)};
 		region.imageExtent = {
-		    uint32(width),
-		    uint32(height),
+		    width,
+		    height,
 		    uint32(1)
 		};
 
