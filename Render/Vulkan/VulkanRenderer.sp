@@ -10,6 +10,7 @@ import Event
 import Vertex
 import UniformBufferObject
 import Time
+import FixedArray
 
 UINT64_MAX := uint64(-1);
 VkFalse := uint32(0);
@@ -76,6 +77,10 @@ state VulkanRenderer<FramesInFlight = 2>
 	textureImageMemory: *VkDeviceMemory_T,
 	textureImageView: *VkImageView_T,
 	textureSampler: *VkSampler_T,
+
+	depthImage: *VkImage_T,
+	depthImageMemory: *VkDeviceMemory_T,
+	depthImageView: *VkImageView_T,
 
 	uniformBuffers: [FramesInFlight]*VkBuffer_T,
 	uniformBuffersMemory: [FramesInFlight]*VkDeviceMemory_T,
@@ -177,6 +182,7 @@ VulkanRenderer::DebugLogExtensions()
 	vulkanRenderer.InitializePipeline();
 	vulkanRenderer.InitializeFrameBuffers();
 	vulkanRenderer.InitializeCommandPool();
+	vulkanRenderer.InitializeDepthResources();
 	vulkanRenderer.InitializeTextureImage();
 	vulkanRenderer.InitializeTextureImageView();
 	vulkanRenderer.InitializeTextureSampler();
@@ -680,6 +686,7 @@ VulkanRenderer::InitializePipeline()
 
 	bindingDescription := Vertex3BindingDescription();
 	attributeDescriptions := Vertex3AttributeDescriptions();
+	defer delete attributeDescriptions;
 
 	vertexInputInfo := VkPipelineVertexInputStateCreateInfo();
 	vertexInputInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -854,6 +861,53 @@ VulkanRenderer::InitializeCommandPool()
 		vkCreateCommandPool(this.device, poolInfo@, null, this.transferCommandPool@),
 		"Error creating Vulkan transfer command pool"
 	);
+}
+
+VkFormat VulkanRenderer::FindSupportedFormat(candidates: []VkFormat, tiling: VkImageTiling, features: uint32)
+{
+	for (format in candidates)
+	{
+		props := VkFormatProperties();
+		vkGetPhysicalDeviceFormatProperties(this.physicalDevice, format, props@);
+		if (tiling == VkImageTiling.VK_IMAGE_TILING_LINEAR && 
+			(props.linearTilingFeatures & features) == features) 
+		{
+            return format;
+        } 
+		else if (tiling == VkImageTiling.VK_IMAGE_TILING_OPTIMAL && 
+					(props.optimalTilingFeatures & features) == features) 
+		{
+            return format;
+        }
+	}
+
+	return -1
+}
+
+VkFormat VulkanRenderer::FindDepthFormat()
+{
+	return this.FindSupportedFormat(
+		[VkFormat.VK_FORMAT_D32_SFLOAT, VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT, VkFormat.VK_FORMAT_D24_UNORM_S8_UINT],
+		VkImageTiling.VK_IMAGE_TILING_OPTIMAL,
+		VkFormatFeatureFlagBits.VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+	);
+}
+
+VulkanRenderer::InitializeDepthResources()
+{
+	depthFormat := this.FindDepthFormat();
+
+	this.CreateImage(
+		this.swapChainExtent.width, 
+		this.swapChainExtent.height, 
+		depthFormat, 
+		VkImageTiling.VK_IMAGE_TILING_OPTIMAL, 
+		VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
+		this.depthImage@, 
+		this.depthImageMemory@
+	);
+    this.depthImageView = this.CreateImageView(this.depthImage, depthFormat, VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 VulkanRenderer::CreateImage(width: uint32, height: uint32, format: VkFormat, tiling: VkImageTiling,

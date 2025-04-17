@@ -23,6 +23,22 @@ Array::delete
 	return this.mem[index];
 }
 
+Iterator Array::operator::in()
+{
+	return {null, -1};
+}
+
+bool Array::next(it: Iterator)
+{
+	it.index += 1;
+	return it.index < this.count;
+}
+
+ref Type Array::current(it: Iterator)
+{
+	return this.mem[it.index];	
+}
+
 // Returns the index of the item added
 int Array::Add(item: Type)
 {
