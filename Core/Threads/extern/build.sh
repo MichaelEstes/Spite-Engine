@@ -1,0 +1,1 @@
+gcc -shared -o atomicFFI.so -fPIC atomicFFI.c

@@ -3,6 +3,7 @@ package SDL
 extern
 {
 	#link windows "./extern/SDL3";
+    #link linux "./extern/libSDL3";
 
 	*Window SDL_CreateWindow(title: *byte, w: int32, h: int32, flags: uint64);
 	void SDL_DestroyWindow(window: *Window);

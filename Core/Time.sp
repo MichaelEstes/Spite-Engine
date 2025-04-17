@@ -8,6 +8,21 @@ extern
 	bool QueryPerformanceCounter(performanceCount: *int64);
 }
 
+extern
+{
+	#link linux "libc";
+
+	int32 clock_gettime(clk_id: int32, timespec: *TimeSpec);
+	int32 clock_getres(clk_id: int32, timespec: *TimeSpec);
+}
+
+CLOCK_MONOTONIC := int32(1);
+state TimeSpec
+{
+    tv_sec: int64,   // seconds
+    tv_nsec: int64   // nanoseconds
+}
+
 frequency: int64 = 0;
 startTime: int64 = 0;
 
@@ -19,7 +34,11 @@ InitializeTimeWindows()
 
 InitializeTimeLinux()
 {
-	
+	frequency = 1000000000;
+    
+    spec := TimeSpec();
+    clock_gettime(CLOCK_MONOTONIC, spec@);
+    startTime = (spec.tv_sec * frequency) + spec.tv_nsec;
 }
 
 InitializeTime()
@@ -43,7 +62,9 @@ int64 TicksWindows()
 
 int64 TicksLinux()
 {
-	return int64(0);
+	spec := TimeSpec();
+    clock_gettime(CLOCK_MONOTONIC, spec@);
+    return (spec.tv_sec * frequency) + spec.tv_nsec;
 }
 
 int64 Ticks()

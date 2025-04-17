@@ -17,6 +17,20 @@ extern
 	uint32 GetCurrentThreadId();
 }
 
+extern
+{
+	#link linux "libpthread";
+
+	int32 pthread_create(
+		thread: *uint32, 
+		attr: *void, 
+		start_routine: ::uint32(*void), 
+		arg: *void
+	);
+	int32 pthread_join(thread: uint32, value_ptr: **void)
+	uint32 pthread_self();
+}
+
 state WinSecurityAttributes
 {
 	nLength: uint32,
@@ -31,7 +45,10 @@ uint CreateThreadWin(func: ::uint32(*void), data: *void, id: *uint32)
 
 uint CreateThreadLinux(func: ::uint32(*void), data: *void, id: *uint32)
 {
-	return 0;
+	threadId := uint32(0);
+	ret := pthread_create(threadId@, null, func, data);
+	if (id) id~ = threadId;
+	return ret;
 }
 
 uint Create(func: ::uint32(*any), data: *any = null, id: *uint32 = null) 
@@ -45,25 +62,25 @@ uint Create(func: ::uint32(*any), data: *any = null, id: *uint32 = null)
 	return create(func, data, id);
 }
 
-uint32 WaitThreadWin(thread: *void)
+uint32 WaitThreadWin(thread: uint)
 {
-	return WaitForSingleObject(thread, uint32(-1));
+	return WaitForSingleObject(thread as *void, uint32(-1));
 }
 
-uint32 WaitThreadLinux(thread: *void)
+uint32 WaitThreadLinux(thread: uint)
 {
-	return 0;
+	return pthread_join(thread, null);
 }
 
 uint32 Wait(thread: uint) 
 {
-	wait := #compile ::uint32(*void) 
+	wait := #compile ::uint32(uint) 
 	{
 		if(targetOs == OS_Kind.Windows) return WaitThreadWin;
 		else return WaitThreadLinux;
 	}
 
-	return wait(thread as *void);
+	return wait(thread);
 }
 
 uint32 GetCurrentThreadIDWin()
@@ -73,7 +90,7 @@ uint32 GetCurrentThreadIDWin()
 
 uint32 GetCurrentThreadIDLinux()
 {
-	return 0;
+	return pthread_self();
 }
 
 uint32 GetCurrentThreadID()

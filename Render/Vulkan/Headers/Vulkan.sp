@@ -3,8 +3,9 @@ package Vulkan
 extern
 {
     #link windows "vulkan-1";
+    #link linux "libvulkan.so.1";
 
-	VkResult vkCreateInstance(pCreateInfo: *VkInstanceCreateInfo, pAllocator: *VkAllocationCallbacks, pInstance: **VkInstance_T);
+    VkResult vkCreateInstance(pCreateInfo: *VkInstanceCreateInfo, pAllocator: *VkAllocationCallbacks, pInstance: **VkInstance_T);
     void vkDestroyInstance(instance: *VkInstance_T, pAllocator: *VkAllocationCallbacks);
     VkResult vkEnumeratePhysicalDevices(instance: *VkInstance_T, pPhysicalDeviceCount: *uint32, pPhysicalDevices: **VkPhysicalDevice_T);
     void vkGetPhysicalDeviceFeatures(physicalDevice: *VkPhysicalDevice_T, pFeatures: *VkPhysicalDeviceFeatures);

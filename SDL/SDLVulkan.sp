@@ -5,6 +5,7 @@ import Vulkan
 extern
 {
 	#link windows "./extern/SDL3";
+    #link linux "./extern/libSDL3";
 
 	bool SDL_Vulkan_LoadLibrary(path: *byte);
 	**byte SDL_Vulkan_GetInstanceExtensions(count: *uint32);
