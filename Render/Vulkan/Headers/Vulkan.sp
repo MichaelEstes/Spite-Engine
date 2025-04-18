@@ -6834,7 +6834,7 @@ state VkClearAttachment
 {
         aspectMask: uint32,
         colorAttachment: uint32,
-        clearValue: ?{color: ?{_float32: [4]float32, _int32: [4]int32, _uint32: [4]uint32}, depthStencil: VkClearDepthStencilValue}
+        clearValue: VkClearValue
 }
 
 state VkClearRect
@@ -6878,7 +6878,7 @@ state VkRenderPassBeginInfo
         framebuffer: *VkFramebuffer_T,
         renderArea: VkRect2D,
         clearValueCount: uint32,
-        pClearValues: *?{color: ?{_float32: [4]float32, _int32: [4]int32, _uint32: [4]uint32}, depthStencil: VkClearDepthStencilValue}
+        pClearValues: *VkClearValue
 }
 
 state VkSamplerYcbcrConversion_T
@@ -8490,6 +8490,18 @@ state VkPhysicalDeviceTextureCompressionASTCHDRFeatures
         textureCompressionASTC_HDR: uint32
 }
 
+state VkClearValue
+{
+    value: ?{
+        color: ?{
+            _float32: [4]float32, 
+            _int32: [4]int32, 
+            _uint32: [4]uint32
+        }, 
+        depthStencil: VkClearDepthStencilValue
+    } 
+}
+
 state VkRenderingAttachmentInfo
 {
         sType: VkStructureType,
@@ -8501,7 +8513,7 @@ state VkRenderingAttachmentInfo
         resolveImageLayout: VkImageLayout,
         loadOp: VkAttachmentLoadOp,
         storeOp: VkAttachmentStoreOp,
-        clearValue: ?{color: ?{_float32: [4]float32, _int32: [4]int32, _uint32: [4]uint32}, depthStencil: VkClearDepthStencilValue}
+        clearValue: VkClearValue
 }
 
 state VkRenderingInfo

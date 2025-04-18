@@ -180,9 +180,9 @@ VulkanRenderer::DebugLogExtensions()
 	vulkanRenderer.InitializeRenderPass();
 	vulkanRenderer.InitializeDescriptorSetLayout();
 	vulkanRenderer.InitializePipeline();
-	vulkanRenderer.InitializeFrameBuffers();
 	vulkanRenderer.InitializeCommandPool();
 	vulkanRenderer.InitializeDepthResources();
+	vulkanRenderer.InitializeFrameBuffers();
 	vulkanRenderer.InitializeTextureImage();
 	vulkanRenderer.InitializeTextureImageView();
 	vulkanRenderer.InitializeTextureSampler();
@@ -562,30 +562,42 @@ VkExtent2D VulkanRenderer::SelectSwapExtent()
 	}
 }
 
+*VkImageView_T VulkanRenderer::CreateImageView(image: *VkImage_T, format: VkFormat, aspectFlags: uint32)
+{
+	imageViewCreateInfo := VkImageViewCreateInfo();
+	imageViewCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageViewCreateInfo.image = image;
+	imageViewCreateInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
+	imageViewCreateInfo.format = format;
+	imageViewCreateInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.a = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.subresourceRange.aspectMask = aspectFlags;
+	imageViewCreateInfo.subresourceRange.baseMipLevel = uint32(0);
+	imageViewCreateInfo.subresourceRange.levelCount = uint32(1);
+	imageViewCreateInfo.subresourceRange.baseArrayLayer = uint32(0);
+	imageViewCreateInfo.subresourceRange.layerCount = uint32(1);
+
+	imageView: *VkImageView_T = null;
+	CheckResult(
+		vkCreateImageView(this.device, imageViewCreateInfo@, null, imageView@),
+		"Error creating Vulkan image view"
+	);
+
+	return imageView;
+}
+
 VulkanRenderer::InitializeImageViews()
 {
 	this.swapChainImageViews.Alloc(this.swapChainImageCount);
 
 	for (i .. this.swapChainImageCount)
 	{
-		imageViewCreateInfo := VkImageViewCreateInfo();
-		imageViewCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		imageViewCreateInfo.image = this.swapChainImages[i]~;
-		imageViewCreateInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
-		imageViewCreateInfo.format = this.swapChainImageFormat;
-		imageViewCreateInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-		imageViewCreateInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-		imageViewCreateInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-		imageViewCreateInfo.components.a = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-		imageViewCreateInfo.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-		imageViewCreateInfo.subresourceRange.baseMipLevel = uint32(0);
-		imageViewCreateInfo.subresourceRange.levelCount = uint32(1);
-		imageViewCreateInfo.subresourceRange.baseArrayLayer = uint32(0);
-		imageViewCreateInfo.subresourceRange.layerCount = uint32(1);
-
-		CheckResult(
-			vkCreateImageView(this.device, imageViewCreateInfo@, null, this.swapChainImageViews[i]),
-			"Error creating Vulkan image view"
+		this.swapChainImageViews[i]~ = this.CreateImageView(
+			this.swapChainImages[i]~, 
+			this.swapChainImageFormat,
+			VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT
 		);
 	}
 }
@@ -606,23 +618,42 @@ VulkanRenderer::InitializeRenderPass()
 	colorAttachmentRef.attachment = uint32(0);
 	colorAttachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+	depthAttachment := VkAttachmentDescription();
+	depthAttachment.format = this.FindDepthFormat();
+	depthAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
+	depthAttachment.loadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depthAttachment.storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachment.stencilLoadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	depthAttachment.stencilStoreOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachment.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+	depthAttachment.finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	depthAttachmentRef := VkAttachmentReference();
+	depthAttachmentRef.attachment = 1;
+	depthAttachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
 	subpass := VkSubpassDescription();
 	subpass.pipelineBindPoint = VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = uint32(1);
 	subpass.pColorAttachments = colorAttachmentRef@;
+	subpass.pDepthStencilAttachment = depthAttachmentRef@;
 
 	dependency := VkSubpassDependency();
 	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
 	dependency.dstSubpass = uint32(0);
-	dependency.srcStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | 
+							  VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 	dependency.srcAccessMask = uint32(0);
-	dependency.dstStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.dstAccessMask = VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependency.dstStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | 
+							  VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependency.dstAccessMask = VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | 
+							   VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
+	attachments := [colorAttachment, depthAttachment];
 	renderPassInfo := VkRenderPassCreateInfo();
 	renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.attachmentCount = uint32(1);
-	renderPassInfo.pAttachments = colorAttachment@;
+	renderPassInfo.attachmentCount = uint32(2);
+	renderPassInfo.pAttachments = fixed attachments;
 	renderPassInfo.subpassCount = uint32(1);
 	renderPassInfo.pSubpasses = subpass@;
 	renderPassInfo.dependencyCount = 1;
@@ -724,7 +755,7 @@ VulkanRenderer::InitializePipeline()
 	rasterizer.rasterizerDiscardEnable = VkFalse;
 	rasterizer.polygonMode = VkPolygonMode.VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = float32(1.0);
-	rasterizer.cullMode = VkCullModeFlagBits.VK_CULL_MODE_BACK_BIT;
+	rasterizer.cullMode = VkCullModeFlagBits.VK_CULL_MODE_NONE;
 	rasterizer.frontFace = VkFrontFace.VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizer.depthBiasEnable = VkFalse;
 	rasterizer.depthBiasConstantFactor = float32(0.0); 
@@ -738,7 +769,20 @@ VulkanRenderer::InitializePipeline()
 	multisampling.minSampleShading = float32(1.0); 
 	multisampling.pSampleMask = null; 
 	multisampling.alphaToCoverageEnable = VkFalse; 
-	multisampling.alphaToOneEnable = VkFalse; 
+	multisampling.alphaToOneEnable = VkFalse;
+
+	depthStencil := VkPipelineDepthStencilStateCreateInfo();
+    depthStencil.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VkTrue;
+    depthStencil.depthWriteEnable = VkTrue;
+    depthStencil.depthCompareOp = VkCompareOp.VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VkFalse;
+    depthStencil.stencilTestEnable = VkFalse;
+	depthStencil.minDepthBounds = float32(0.0); // Optional
+	depthStencil.maxDepthBounds = float32(1.0); // Optional
+	depthStencil.front = VkStencilOpState(); // Optional
+	depthStencil.back = VkStencilOpState();  // Optional
+
 
 	colorBlendAttachment := VkPipelineColorBlendAttachmentState();
 	colorBlendAttachment.colorWriteMask = VkColorComponentFlagBits.VK_COLOR_COMPONENT_R_BIT | 
@@ -791,7 +835,7 @@ VulkanRenderer::InitializePipeline()
 	pipelineInfo.pViewportState = viewportState@;
 	pipelineInfo.pRasterizationState = rasterizer@;
 	pipelineInfo.pMultisampleState = multisampling@;
-	pipelineInfo.pDepthStencilState = null; // Optional
+	pipelineInfo.pDepthStencilState = depthStencil@;
 	pipelineInfo.pColorBlendState = colorBlending@;
 	pipelineInfo.pDynamicState = dynamicState@;
 	pipelineInfo.layout = this.pipelineLayout;
@@ -828,11 +872,13 @@ VulkanRenderer::InitializeFrameBuffers()
 
 	for (i .. this.frameBufferCount)
 	{
+		attachments := [this.swapChainImageViews[i]~, this.depthImageView];
+
 		framebufferInfo := VkFramebufferCreateInfo();
 		framebufferInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		framebufferInfo.renderPass = this.renderPass;
-		framebufferInfo.attachmentCount = uint32(1);
-		framebufferInfo.pAttachments = this.swapChainImageViews[i];
+		framebufferInfo.attachmentCount = uint32(2);
+		framebufferInfo.pAttachments = fixed attachments;
 		framebufferInfo.width = this.swapChainExtent.width;
 		framebufferInfo.height = this.swapChainExtent.height;
 		framebufferInfo.layers = uint32(1);
@@ -893,6 +939,10 @@ VkFormat VulkanRenderer::FindDepthFormat()
 	);
 }
 
+bool VulkanRenderer::HasStencilComponent(format: VkFormat) {
+    return format == VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT || format == VkFormat.VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
 VulkanRenderer::InitializeDepthResources()
 {
 	depthFormat := this.FindDepthFormat();
@@ -908,6 +958,13 @@ VulkanRenderer::InitializeDepthResources()
 		this.depthImageMemory@
 	);
     this.depthImageView = this.CreateImageView(this.depthImage, depthFormat, VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT);
+
+	this.TransitionImageLayout(
+		this.depthImage, 
+		depthFormat,
+		VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, 
+		VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	);
 }
 
 VulkanRenderer::CreateImage(width: uint32, height: uint32, format: VkFormat, tiling: VkImageTiling,
@@ -1001,20 +1058,10 @@ VulkanRenderer::InitializeTextureImage()
 
 VulkanRenderer::InitializeTextureImageView()
 {
-	viewInfo := VkImageViewCreateInfo();
-	viewInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	viewInfo.image = this.textureImage;
-	viewInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
-	viewInfo.format = VkFormat.VK_FORMAT_R8G8B8A8_SRGB;
-	viewInfo.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-	viewInfo.subresourceRange.baseMipLevel = 0;
-	viewInfo.subresourceRange.levelCount = 1;
-	viewInfo.subresourceRange.baseArrayLayer = 0;
-	viewInfo.subresourceRange.layerCount = 1;
-
-	CheckResult(
-		vkCreateImageView(this.device, viewInfo@, null, this.textureImageView@),
-		"Error allocating Vulkan image memory"
+	this.textureImageView = this.CreateImageView(
+		this.textureImage,
+		VkFormat.VK_FORMAT_R8G8B8A8_SRGB,
+		VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT
 	);
 }
 
@@ -1171,6 +1218,21 @@ VulkanRenderer::TransitionImageLayout(image: *VkImage_T, format: VkFormat, oldLa
 
 		sourceStage := uint32(0);
 		destinationStage := uint32(0);
+
+		if (newLayout == VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) 
+		{
+			barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT;
+
+			if (this.HasStencilComponent(format)) 
+			{
+			    barrier.subresourceRange.aspectMask |= VkImageAspectFlagBits.VK_IMAGE_ASPECT_STENCIL_BIT;
+			}
+		} 
+		else 
+		{
+			barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+		}
+
 		if (oldLayout == VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED && 
 			newLayout == VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
 		{
@@ -1188,7 +1250,17 @@ VulkanRenderer::TransitionImageLayout(image: *VkImage_T, format: VkFormat, oldLa
 		
 		    sourceStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT;
 		    destinationStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		} 
+		}
+		else if (oldLayout == VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED && 
+				 newLayout == VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+		{
+		    barrier.srcAccessMask = 0;
+			barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | 
+									VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+			sourceStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			destinationStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		}
 		else 
 		{
 		    log "Unsupported layout transition"
@@ -1472,9 +1544,13 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 	renderPassInfo.renderArea.offset = {uint32(0), uint32(0)};
 	renderPassInfo.renderArea.extent = this.swapChainExtent;
 
-	clearColor := [float32(0.0), float32(0.0), float32(0.0), float32(0.0)]
-	renderPassInfo.clearValueCount = uint32(1);
-	renderPassInfo.pClearValues = clearColor@;
+
+	clearValues := [VkClearValue(), VkClearValue()];
+	clearValues[0].value.color = float32:[0.0, 0.0, 0.0, 1.0];
+	clearValues[1].value.depthStencil = {float32(1.0), uint32(0)};
+	
+	renderPassInfo.clearValueCount = uint32(2);
+	renderPassInfo.pClearValues = fixed clearValues;
 
 	vkCmdBeginRenderPass(commandBuffer, renderPassInfo@, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1593,8 +1669,8 @@ VulkanRenderer::UpdateUniformBuffer(currentFrame: uint32)
 	ubo.view.LookAt(Vec3(2.0, 2.0, 2.0), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 1.0));
 	ubo.projection.Perspective(
 		Math.Deg2Rad(45.0), 
-		this.swapChainExtent.width as float / this.swapChainExtent.height as float32, 
-		0.1, 
+		this.swapChainExtent.width / this.swapChainExtent.height as float32, 
+		0.1,
 		10.0
 	);
 	ubo.projection[1][1] *= -1;
@@ -1610,11 +1686,16 @@ VulkanRenderer::RecreateSwapchain()
 
 	this.InitializeSwapchain();
 	this.InitializeImageViews();
+	this.InitializeDepthResources();
 	this.InitializeFrameBuffers();
 }
 
 VulkanRenderer::DestroySwapchain()
 {
+	vkDestroyImageView(this.device, this.depthImageView, null);
+    vkDestroyImage(this.device, this.depthImage, null);
+    vkFreeMemory(this.device, this.depthImageMemory, null);
+
 	for (i .. this.frameBufferCount)
 	{
 		vkDestroyFramebuffer(this.device, this.frameBuffers[i]~, null);
