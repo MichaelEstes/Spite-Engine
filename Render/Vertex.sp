@@ -2,7 +2,7 @@ package Vertex
 
 import Vec
 import Vulkan
-import FixedArray
+import SizedArray
 
 state Vertex2
 {
@@ -28,9 +28,9 @@ VkVertexInputBindingDescription Vertex2BindingDescription()
 	return bindingDescription;
 }
 
-FixedArray<VkVertexInputAttributeDescription> Vertex2AttributeDescriptions()
+SizedArray<VkVertexInputAttributeDescription, 3> Vertex2AttributeDescriptions()
 {
-	attributeDescriptions := FixedArray<VkVertexInputAttributeDescription>(3, VkVertexInputAttributeDescription());
+	attributeDescriptions := SizedArray<VkVertexInputAttributeDescription, 3>(VkVertexInputAttributeDescription());
 	
 	attributeDescriptions[0].binding = 0;
 	attributeDescriptions[0].location = 0;
@@ -60,9 +60,9 @@ VkVertexInputBindingDescription Vertex3BindingDescription()
 	return bindingDescription;
 }
 
-FixedArray<VkVertexInputAttributeDescription> Vertex3AttributeDescriptions()
+SizedArray<VkVertexInputAttributeDescription, 3> Vertex3AttributeDescriptions()
 {
-	attributeDescriptions := FixedArray<VkVertexInputAttributeDescription>(3, VkVertexInputAttributeDescription());
+	attributeDescriptions := SizedArray<VkVertexInputAttributeDescription, 3>(VkVertexInputAttributeDescription());
 	
 	attributeDescriptions[0].binding = 0;
 	attributeDescriptions[0].location = 0;

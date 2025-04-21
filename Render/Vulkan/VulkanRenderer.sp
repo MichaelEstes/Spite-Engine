@@ -569,10 +569,10 @@ VkExtent2D VulkanRenderer::SelectSwapExtent()
 	imageViewCreateInfo.image = image;
 	imageViewCreateInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
 	imageViewCreateInfo.format = format;
-	imageViewCreateInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-	imageViewCreateInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-	imageViewCreateInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-	imageViewCreateInfo.components.a = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+	//imageViewCreateInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+	//imageViewCreateInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+	//imageViewCreateInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+	//imageViewCreateInfo.components.a = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
 	imageViewCreateInfo.subresourceRange.aspectMask = aspectFlags;
 	imageViewCreateInfo.subresourceRange.baseMipLevel = uint32(0);
 	imageViewCreateInfo.subresourceRange.levelCount = uint32(1);
@@ -614,10 +614,6 @@ VulkanRenderer::InitializeRenderPass()
 	colorAttachment.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
 	colorAttachment.finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-	colorAttachmentRef := VkAttachmentReference();
-	colorAttachmentRef.attachment = uint32(0);
-	colorAttachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
 	depthAttachment := VkAttachmentDescription();
 	depthAttachment.format = this.FindDepthFormat();
 	depthAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
@@ -628,8 +624,12 @@ VulkanRenderer::InitializeRenderPass()
 	depthAttachment.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
 	depthAttachment.finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+	colorAttachmentRef := VkAttachmentReference();
+	colorAttachmentRef.attachment = uint32(0);
+	colorAttachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
 	depthAttachmentRef := VkAttachmentReference();
-	depthAttachmentRef.attachment = 1;
+	depthAttachmentRef.attachment = uint32(1);
 	depthAttachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	subpass := VkSubpassDescription();
@@ -717,37 +717,23 @@ VulkanRenderer::InitializePipeline()
 
 	bindingDescription := Vertex3BindingDescription();
 	attributeDescriptions := Vertex3AttributeDescriptions();
-	defer delete attributeDescriptions;
 
 	vertexInputInfo := VkPipelineVertexInputStateCreateInfo();
 	vertexInputInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputInfo.vertexBindingDescriptionCount = uint32(1);
-	vertexInputInfo.vertexAttributeDescriptionCount = attributeDescriptions.count;
+	vertexInputInfo.vertexAttributeDescriptionCount = attributeDescriptions.Count();
 	vertexInputInfo.pVertexBindingDescriptions = bindingDescription@;
-	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions[0];
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions[0]@;
 
 	inputAssembly := VkPipelineInputAssemblyStateCreateInfo();
 	inputAssembly.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	inputAssembly.topology = VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	inputAssembly.primitiveRestartEnable = VkFalse;
 
-	viewport := VkViewport();
-	viewport.x = float32(0.0);
-	viewport.y = float32(0.0);
-	viewport.width = this.swapChainExtent.width as float32;
-	viewport.height = this.swapChainExtent.height as float32;
-	viewport.minDepth = float32(0.0);
-	viewport.maxDepth = float32(1.0);
-
-	scissor := VkRect2D();
-	scissor.offset = {int32(0), int32(0)};
-	scissor.extent = this.swapChainExtent;
-
 	viewportState := VkPipelineViewportStateCreateInfo();
 	viewportState.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	viewportState.viewportCount = uint32(1);
 	viewportState.scissorCount = uint32(1);
-	viewportState.pScissors = scissor@;
 
 	rasterizer := VkPipelineRasterizationStateCreateInfo();
 	rasterizer.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -755,12 +741,12 @@ VulkanRenderer::InitializePipeline()
 	rasterizer.rasterizerDiscardEnable = VkFalse;
 	rasterizer.polygonMode = VkPolygonMode.VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = float32(1.0);
-	rasterizer.cullMode = VkCullModeFlagBits.VK_CULL_MODE_NONE;
+	rasterizer.cullMode = VkCullModeFlagBits.VK_CULL_MODE_BACK_BIT;
 	rasterizer.frontFace = VkFrontFace.VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizer.depthBiasEnable = VkFalse;
-	rasterizer.depthBiasConstantFactor = float32(0.0); 
-	rasterizer.depthBiasClamp = float32(0.0);
-	rasterizer.depthBiasSlopeFactor = float32(0.0);
+	//rasterizer.depthBiasConstantFactor = float32(0.0); 
+	//rasterizer.depthBiasClamp = float32(0.0);
+	//rasterizer.depthBiasSlopeFactor = float32(0.0);
 
 	multisampling := VkPipelineMultisampleStateCreateInfo();
 	multisampling.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -778,11 +764,10 @@ VulkanRenderer::InitializePipeline()
     depthStencil.depthCompareOp = VkCompareOp.VK_COMPARE_OP_LESS;
     depthStencil.depthBoundsTestEnable = VkFalse;
     depthStencil.stencilTestEnable = VkFalse;
-	depthStencil.minDepthBounds = float32(0.0); // Optional
-	depthStencil.maxDepthBounds = float32(1.0); // Optional
-	depthStencil.front = VkStencilOpState(); // Optional
-	depthStencil.back = VkStencilOpState();  // Optional
-
+	//depthStencil.minDepthBounds = float32(0.0); // Optional
+	//depthStencil.maxDepthBounds = float32(1.0); // Optional
+	//depthStencil.front = VkStencilOpState(); // Optional
+	//depthStencil.back = VkStencilOpState();  // Optional
 
 	colorBlendAttachment := VkPipelineColorBlendAttachmentState();
 	colorBlendAttachment.colorWriteMask = VkColorComponentFlagBits.VK_COLOR_COMPONENT_R_BIT | 
@@ -790,12 +775,12 @@ VulkanRenderer::InitializePipeline()
 			VkColorComponentFlagBits.VK_COLOR_COMPONENT_B_BIT | 
 			VkColorComponentFlagBits.VK_COLOR_COMPONENT_A_BIT;
 	colorBlendAttachment.blendEnable = VkFalse;
-	colorBlendAttachment.srcColorBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstColorBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.colorBlendOp = VkBlendOp.VK_BLEND_OP_ADD; // Optional
-	colorBlendAttachment.srcAlphaBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstAlphaBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.alphaBlendOp = VkBlendOp.VK_BLEND_OP_ADD; // Optional
+	//colorBlendAttachment.srcColorBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ONE; // Optional
+	//colorBlendAttachment.dstColorBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ZERO; // Optional
+	//colorBlendAttachment.colorBlendOp = VkBlendOp.VK_BLEND_OP_ADD; // Optional
+	//colorBlendAttachment.srcAlphaBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ONE; // Optional
+	//colorBlendAttachment.dstAlphaBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ZERO; // Optional
+	//colorBlendAttachment.alphaBlendOp = VkBlendOp.VK_BLEND_OP_ADD; // Optional
 
 	colorBlending := VkPipelineColorBlendStateCreateInfo();
 	colorBlending.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -812,19 +797,19 @@ VulkanRenderer::InitializePipeline()
 	pipelineLayoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = uint32(1);
 	pipelineLayoutInfo.pSetLayouts = this.descriptorSetLayout@;
-	pipelineLayoutInfo.pushConstantRangeCount = uint32(0); // Optional
-	pipelineLayoutInfo.pPushConstantRanges = null; // Optional
-
-	CheckResult(
-		vkCreatePipelineLayout(this.device, pipelineLayoutInfo@, null, this.pipelineLayout@),
-		"Error creating Vulkan pipeline layout"
-	);
+	//pipelineLayoutInfo.pushConstantRangeCount = uint32(0); // Optional
+	//pipelineLayoutInfo.pPushConstantRanges = null; // Optional
 
 	dynamicStates := [VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT, VkDynamicState.VK_DYNAMIC_STATE_SCISSOR];
 	dynamicState := VkPipelineDynamicStateCreateInfo();
 	dynamicState.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamicState.dynamicStateCount = uint32(2);
 	dynamicState.pDynamicStates = fixed dynamicStates;
+
+	CheckResult(
+		vkCreatePipelineLayout(this.device, pipelineLayoutInfo@, null, this.pipelineLayout@),
+		"Error creating Vulkan pipeline layout"
+	);
 
 	pipelineInfo := VkGraphicsPipelineCreateInfo();
 	pipelineInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -841,13 +826,16 @@ VulkanRenderer::InitializePipeline()
 	pipelineInfo.layout = this.pipelineLayout;
 	pipelineInfo.renderPass = this.renderPass;
 	pipelineInfo.subpass = uint32(0);
-	pipelineInfo.basePipelineHandle = null; // Optional
-	pipelineInfo.basePipelineIndex = int32(-1); // Optional
+	//pipelineInfo.basePipelineHandle = null; // Optional
+	//pipelineInfo.basePipelineIndex = int32(-1); // Optional
 
 	CheckResult(
 		vkCreateGraphicsPipelines(this.device, null, uint32(1), pipelineInfo@, null, this.pipeline@),
 		"Error creating Vulkan pipeline"
 	);
+
+	vkDestroyShaderModule(this.device, fragShaderModule, null);
+    vkDestroyShaderModule(this.device, vertShaderModule, null);
 }
 
 *VkShaderModule_T VulkanRenderer::CreateShaderModule(byteCode: string)
@@ -933,14 +921,19 @@ VkFormat VulkanRenderer::FindSupportedFormat(candidates: []VkFormat, tiling: VkI
 VkFormat VulkanRenderer::FindDepthFormat()
 {
 	return this.FindSupportedFormat(
-		[VkFormat.VK_FORMAT_D32_SFLOAT, VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT, VkFormat.VK_FORMAT_D24_UNORM_S8_UINT],
+		[
+			VkFormat.VK_FORMAT_D32_SFLOAT, 
+			VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT, 
+			VkFormat.VK_FORMAT_D24_UNORM_S8_UINT
+		],
 		VkImageTiling.VK_IMAGE_TILING_OPTIMAL,
 		VkFormatFeatureFlagBits.VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
 	);
 }
 
 bool VulkanRenderer::HasStencilComponent(format: VkFormat) {
-    return format == VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT || format == VkFormat.VK_FORMAT_D24_UNORM_S8_UINT;
+    return format == VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT || 
+	format == VkFormat.VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
 VulkanRenderer::InitializeDepthResources()
@@ -954,10 +947,14 @@ VulkanRenderer::InitializeDepthResources()
 		VkImageTiling.VK_IMAGE_TILING_OPTIMAL, 
 		VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 
 		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
-		this.depthImage@, 
+		this.depthImage@,
 		this.depthImageMemory@
 	);
-    this.depthImageView = this.CreateImageView(this.depthImage, depthFormat, VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT);
+    this.depthImageView = this.CreateImageView(
+		this.depthImage, 
+		depthFormat, 
+		VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT
+	);
 
 	this.TransitionImageLayout(
 		this.depthImage, 
@@ -984,6 +981,7 @@ VulkanRenderer::CreateImage(width: uint32, height: uint32, format: VkFormat, til
     imageInfo.usage = usage;
     imageInfo.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
     imageInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+
 
 	CheckResult(
 		vkCreateImage(this.device, imageInfo@, null, image),
@@ -1097,15 +1095,15 @@ VulkanRenderer::InitializeTextureSampler()
 }
 
 vertices := Vertex3:[
-    {{float32(-0.5), float32(-0.5), float32(0.0)}, {float32(1.0), float32(0.0), float32(0.0)}, {float32(1.0), float32(0.0)}},
-    {{float32(0.5), float32(-0.5), float32(0.0)},  {float32(0.0), float32(1.0), float32(0.0)}, {float32(0.0), float32(0.0)}},
-    {{float32(0.5), float32(0.5), float32(0.0)},   {float32(0.0), float32(0.0), float32(1.0)}, {float32(0.0), float32(1.0)}},
-	{{float32(-0.5), float32(0.5), float32(0.0)},  {float32(1.0), float32(1.0), float32(1.0)}, {float32(1.0), float32(1.0)}},
+    {{float32(-0.5), float32(-0.5), float32(0.0)}, {float32(1.0), float32(0.0), float32(0.0)}, {float32(0.0), float32(0.0)}},
+    {{float32(0.5), float32(-0.5), float32(0.0)},  {float32(0.0), float32(1.0), float32(0.0)}, {float32(1.0), float32(0.0)}},
+    {{float32(0.5), float32(0.5), float32(0.0)},   {float32(0.0), float32(0.0), float32(1.0)}, {float32(1.0), float32(1.0)}},
+	{{float32(-0.5), float32(0.5), float32(0.0)},  {float32(1.0), float32(1.0), float32(1.0)}, {float32(0.0), float32(1.0)}},
 
-	{{float32(-0.5), float32(-0.5), float32(-0.5)}, {float32(1.0), float32(0.0), float32(0.0)}, {float32(1.0), float32(0.0)}},
-    {{float32(0.5), float32(-0.5), float32(-0.5)},  {float32(0.0), float32(1.0), float32(0.0)}, {float32(0.0), float32(0.0)}},
-    {{float32(0.5), float32(0.5), float32(-0.5)},   {float32(0.0), float32(0.0), float32(1.0)}, {float32(0.0), float32(1.0)}},
-	{{float32(-0.5), float32(0.5), float32(-0.5)},  {float32(1.0), float32(1.0), float32(1.0)}, {float32(1.0), float32(1.0)}},
+	{{float32(-0.5), float32(-0.5), float32(-0.5)}, {float32(1.0), float32(0.0), float32(0.0)}, {float32(0.0), float32(0.0)}},
+    {{float32(0.5), float32(-0.5), float32(-0.5)},  {float32(0.0), float32(1.0), float32(0.0)}, {float32(1.0), float32(0.0)}},
+    {{float32(0.5), float32(0.5), float32(-0.5)},   {float32(0.0), float32(0.0), float32(1.0)}, {float32(1.0), float32(1.0)}},
+	{{float32(-0.5), float32(0.5), float32(-0.5)},  {float32(1.0), float32(1.0), float32(1.0)}, {float32(0.0), float32(1.0)}},
 ];
 vertexCount := #compile uint32 => (#typeof vertices).FixedArrayCount();
 
@@ -1156,7 +1154,7 @@ VulkanRenderer::CreateBuffer(size: uint64, usage: uint32, properties: uint32, bu
 	allocInfo := VkCommandBufferAllocateInfo();
     allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = this.transferCommandPool;
+    allocInfo.commandPool = this.graphicsCommandPool;
     allocInfo.commandBufferCount = 1;
 
 	commandBuffer: *VkCommandBuffer_T = null;
@@ -1180,10 +1178,10 @@ VulkanRenderer::EndSingleTimeCommands(commandBuffer: *VkCommandBuffer_T)
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = commandBuffer@;
 	
-	vkQueueSubmit(this.transferQueue, 1, submitInfo@, null);
-	vkQueueWaitIdle(this.transferQueue);
+	vkQueueSubmit(this.GraphicsQueue(), 1, submitInfo@, null);
+	vkQueueWaitIdle(this.GraphicsQueue());
 
-	vkFreeCommandBuffers(this.device, this.transferCommandPool, 1, commandBuffer@);
+	vkFreeCommandBuffers(this.device, this.graphicsCommandPool, 1, commandBuffer@);
 }
 
 VulkanRenderer::CopyBuffer(srcBuffer: *VkBuffer_T, dstBuffer: *VkBuffer_T, size: uint64)
@@ -1324,7 +1322,8 @@ VulkanRenderer::InitializeVertexBuffer()
 	this.CreateBuffer(
 		bufferSize, 
 		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
 		stagingBuffer@, 
 		stagingBufferMemory@
 	);
@@ -1336,7 +1335,8 @@ VulkanRenderer::InitializeVertexBuffer()
 
 	this.CreateBuffer(
 		bufferSize, 
-		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
+		VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
 		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
 		this.vertexBuffer@, 
 		this.vertexBufferMemory@
@@ -1356,7 +1356,8 @@ VulkanRenderer::InitializeIndexBuffer()
 	this.CreateBuffer(
 		bufferSize, 
 		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
 		stagingBuffer@, 
 		stagingBufferMemory@
 	);
@@ -1368,7 +1369,8 @@ VulkanRenderer::InitializeIndexBuffer()
 
 	this.CreateBuffer(
 		bufferSize, 
-		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
+		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
+		VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
 		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
 		this.indexBuffer@, 
 		this.indexBufferMemory@
@@ -1388,7 +1390,8 @@ VulkanRenderer::InitializeUniformBuffers()
 		this.CreateBuffer(
 			bufferSize, 
 			VkBufferUsageFlagBits.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
-			VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+			VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
+			VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
 			this.uniformBuffers[i]@, 
 			this.uniformBuffersMemory[i]@
 		);
@@ -1466,7 +1469,6 @@ VulkanRenderer::InitializeDescriptorSets()
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pImageInfo = imageInfo@;
 
-
 		vkUpdateDescriptorSets(this.device, 2, fixed descriptorWrites, 0, null);
     }
 }
@@ -1495,7 +1497,7 @@ VulkanRenderer::InitializeCommandBuffer()
 	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = this.graphicsCommandPool;
 	allocInfo.level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = uint32(2);
+	allocInfo.commandBufferCount = FramesInFlight;
 
 	CheckResult(
 		vkAllocateCommandBuffers(this.device, allocInfo@, fixed this.commandBuffers),
@@ -1529,8 +1531,8 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 {
 	beginInfo := VkCommandBufferBeginInfo();
 	beginInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = uint32(0); // Optional
-	beginInfo.pInheritanceInfo = null; // Optional
+	//beginInfo.flags = uint32(0); // Optional
+	//beginInfo.pInheritanceInfo = null; // Optional
 
 	CheckResult(
 		vkBeginCommandBuffer(commandBuffer, beginInfo@), 
@@ -1544,7 +1546,6 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 	renderPassInfo.renderArea.offset = {uint32(0), uint32(0)};
 	renderPassInfo.renderArea.extent = this.swapChainExtent;
 
-
 	clearValues := [VkClearValue(), VkClearValue()];
 	clearValues[0].value.color = float32:[0.0, 0.0, 0.0, 1.0];
 	clearValues[1].value.depthStencil = {float32(1.0), uint32(0)};
@@ -1553,18 +1554,12 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 	renderPassInfo.pClearValues = fixed clearValues;
 
 	vkCmdBeginRenderPass(commandBuffer, renderPassInfo@, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
-
 	{
 		vkCmdBindPipeline(
 			commandBuffer, 
 			VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, 
 			this.pipeline
 		);
-
-		vertexBuffers := [this.vertexBuffer,];
-		offsets:= [uint64(0),];
-		vkCmdBindVertexBuffers(commandBuffer, uint32(0), uint32(1), fixed vertexBuffers, fixed offsets);
-		vkCmdBindIndexBuffer(commandBuffer, this.indexBuffer, 0, VkIndexType.VK_INDEX_TYPE_UINT16);
 
 		viewport := VkViewport();
 		viewport.x = float32(0.0);
@@ -1580,6 +1575,12 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
         scissor.extent = this.swapChainExtent;
         vkCmdSetScissor(commandBuffer, uint32(0), uint32(1), scissor@);
 
+		vertexBuffers := [this.vertexBuffer,];
+		offsets:= [uint64(0),];
+		vkCmdBindVertexBuffers(commandBuffer, uint32(0), uint32(1), fixed vertexBuffers, fixed offsets);
+		
+		vkCmdBindIndexBuffer(commandBuffer, this.indexBuffer, 0, VkIndexType.VK_INDEX_TYPE_UINT16);
+
 		vkCmdBindDescriptorSets(
 			commandBuffer, 
 			VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, 
@@ -1592,7 +1593,6 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 		);
 		vkCmdDrawIndexed(commandBuffer, indexCount, uint32(1), uint32(0), uint32(0), uint32(0));
 	}
-
 	vkCmdEndRenderPass(commandBuffer);
 	CheckResult(vkEndCommandBuffer(commandBuffer), "Error recording Vulkan command buffer");
 }
@@ -1626,7 +1626,6 @@ VulkanRenderer::DrawFrame()
 	waitSemaphores := [this.imageAvailableSemaphores[this.currentFrame],];
 	waitStages := [VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,];
 	signalSemaphores := [this.renderFinishedSemaphores[this.currentFrame],];
-	swapChains := [this.swapChain,];
 
 	submitInfo := VkSubmitInfo();
 	submitInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1642,6 +1641,8 @@ VulkanRenderer::DrawFrame()
 		vkQueueSubmit(this.GraphicsQueue(), uint32(1), submitInfo@, this.inFlightFences[this.currentFrame]),
 		"Error submitting Vulkan draw command buffer"
 	);
+
+	swapChains := [this.swapChain,];
 
 	presentInfo := VkPresentInfoKHR();
 	presentInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
