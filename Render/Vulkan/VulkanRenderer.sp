@@ -489,7 +489,7 @@ VulkanRenderer::InitializeSwapchain()
 	swapchainCreateInfo.preTransform = this.surfaceCapabilities.currentTransform;
 	swapchainCreateInfo.compositeAlpha = VkCompositeAlphaFlagBitsKHR.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchainCreateInfo.presentMode = selectedPresentMode;
-	swapchainCreateInfo.clipped = uint32(1);
+	swapchainCreateInfo.clipped = VkTrue;
 	swapchainCreateInfo.oldSwapchain = null;
 
 	CheckResult(
@@ -752,10 +752,10 @@ VulkanRenderer::InitializePipeline()
 	multisampling.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisampling.sampleShadingEnable = VkFalse;
 	multisampling.rasterizationSamples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
-	multisampling.minSampleShading = float32(1.0); 
-	multisampling.pSampleMask = null; 
-	multisampling.alphaToCoverageEnable = VkFalse; 
-	multisampling.alphaToOneEnable = VkFalse;
+	//multisampling.minSampleShading = float32(1.0); 
+	//multisampling.pSampleMask = null; 
+	//multisampling.alphaToCoverageEnable = VkFalse; 
+	//multisampling.alphaToOneEnable = VkFalse;
 
 	depthStencil := VkPipelineDepthStencilStateCreateInfo();
     depthStencil.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -826,8 +826,8 @@ VulkanRenderer::InitializePipeline()
 	pipelineInfo.layout = this.pipelineLayout;
 	pipelineInfo.renderPass = this.renderPass;
 	pipelineInfo.subpass = uint32(0);
-	//pipelineInfo.basePipelineHandle = null; // Optional
-	//pipelineInfo.basePipelineIndex = int32(-1); // Optional
+	pipelineInfo.basePipelineHandle = null; // Optional
+	pipelineInfo.basePipelineIndex = int32(-1); // Optional
 
 	CheckResult(
 		vkCreateGraphicsPipelines(this.device, null, uint32(1), pipelineInfo@, null, this.pipeline@),
@@ -982,7 +982,6 @@ VulkanRenderer::CreateImage(width: uint32, height: uint32, format: VkFormat, til
     imageInfo.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
     imageInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
 
-
 	CheckResult(
 		vkCreateImage(this.device, imageInfo@, null, image),
 		"Error creating Vulkan image"
@@ -1025,7 +1024,8 @@ VulkanRenderer::InitializeTextureImage()
 	this.CreateBuffer(
 		imageSize, 
 		VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		stagingBuffer@, 
 		stagingBufferMemory@
 	);
@@ -1040,7 +1040,8 @@ VulkanRenderer::InitializeTextureImage()
 		height, 
 		VkFormat.VK_FORMAT_R8G8B8A8_SRGB, 
 		VkImageTiling.VK_IMAGE_TILING_OPTIMAL, 
-		VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, 
+		VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, 
 		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
 		this.textureImage@, 
 		this.textureImageMemory@
@@ -1120,9 +1121,11 @@ VulkanRenderer::CreateBuffer(size: uint64, usage: uint32, properties: uint32, bu
 	bufferInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferInfo.size = size;
 	bufferInfo.usage = usage;
-	bufferInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_CONCURRENT;
-	bufferInfo.queueFamilyIndexCount = 2;
-	bufferInfo.pQueueFamilyIndices = fixed [this.graphicsQueueIndices[0]~, this.transferQueueIndex];
+	bufferInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+
+	//bufferInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_CONCURRENT;
+	//bufferInfo.queueFamilyIndexCount = 2;
+	//bufferInfo.pQueueFamilyIndices = fixed [this.graphicsQueueIndices[0]~, this.transferQueueIndex];
 
 	CheckResult(
 		vkCreateBuffer(this.device, bufferInfo@, null, buffer),
@@ -1135,11 +1138,7 @@ VulkanRenderer::CreateBuffer(size: uint64, usage: uint32, properties: uint32, bu
 	allocInfo := VkMemoryAllocateInfo();
 	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.allocationSize = memRequirements.size;
-	allocInfo.memoryTypeIndex = this.FindMemoryType(
-		memRequirements.memoryTypeBits, 
-		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
-		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-	);
+	allocInfo.memoryTypeIndex = this.FindMemoryType(memRequirements.memoryTypeBits, properties);
 
 	CheckResult(
 		vkAllocateMemory(this.device, allocInfo@, null, bufferMemory),
@@ -1178,8 +1177,9 @@ VulkanRenderer::EndSingleTimeCommands(commandBuffer: *VkCommandBuffer_T)
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = commandBuffer@;
 	
-	vkQueueSubmit(this.GraphicsQueue(), 1, submitInfo@, null);
-	vkQueueWaitIdle(this.GraphicsQueue());
+	queue := this.GraphicsQueue();
+	vkQueueSubmit(queue, 1, submitInfo@, null);
+	vkQueueWaitIdle(queue);
 
 	vkFreeCommandBuffers(this.device, this.graphicsCommandPool, 1, commandBuffer@);
 }
@@ -1295,11 +1295,7 @@ VulkanRenderer::CopyBufferToImage(buffer: *VkBuffer_T, image: *VkImage_T, width:
 		region.imageSubresource.layerCount = 1;
 
 		region.imageOffset = {int32(0), int32(0), int32(0)};
-		region.imageExtent = {
-		    width,
-		    height,
-		    uint32(1)
-		};
+		region.imageExtent = {width, height, uint32(1)};
 
 		vkCmdCopyBufferToImage(
 			commandBuffer,
@@ -1458,8 +1454,6 @@ VulkanRenderer::InitializeDescriptorSets()
 		descriptorWrites[0].descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		descriptorWrites[0].descriptorCount = 1;
 		descriptorWrites[0].pBufferInfo = bufferInfo@;
-		descriptorWrites[0].pImageInfo = null; // Optional
-		descriptorWrites[0].pTexelBufferView = null; // Optional
 
 		descriptorWrites[1].sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[1].dstSet = this.descriptorSets[i];
@@ -1468,6 +1462,7 @@ VulkanRenderer::InitializeDescriptorSets()
         descriptorWrites[1].descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pImageInfo = imageInfo@;
+		//descriptorWrites[1].pTexelBufferView = null; // Optional
 
 		vkUpdateDescriptorSets(this.device, 2, fixed descriptorWrites, 0, null);
     }
@@ -1539,17 +1534,16 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 		"Error beginning Vulkan command buffer recording"
 	);
 
+	clearValues := [VkClearValue(), VkClearValue()];
+	clearValues[0].value.color = float32:[0.0, 0.0, 0.0, 1.0];
+	clearValues[1].value.depthStencil = {float32(1.0), uint32(0)};
+
 	renderPassInfo := VkRenderPassBeginInfo();
 	renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassInfo.renderPass = this.renderPass;
 	renderPassInfo.framebuffer = this.frameBuffers[imageIndex]~;
 	renderPassInfo.renderArea.offset = {uint32(0), uint32(0)};
 	renderPassInfo.renderArea.extent = this.swapChainExtent;
-
-	clearValues := [VkClearValue(), VkClearValue()];
-	clearValues[0].value.color = float32:[0.0, 0.0, 0.0, 1.0];
-	clearValues[1].value.depthStencil = {float32(1.0), uint32(0)};
-	
 	renderPassInfo.clearValueCount = uint32(2);
 	renderPassInfo.pClearValues = fixed clearValues;
 
@@ -1571,7 +1565,7 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 		vkCmdSetViewport(commandBuffer, uint32(0), uint32(1), viewport@);
 
 		scissor := VkRect2D();
-        scissor.offset = {uint32(0), uint32(0)};
+        scissor.offset = {int32(0), int32(0)};
         scissor.extent = this.swapChainExtent;
         vkCmdSetScissor(commandBuffer, uint32(0), uint32(1), scissor@);
 
