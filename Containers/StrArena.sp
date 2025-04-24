@@ -51,9 +51,18 @@ StrArena::Expand()
 
 string StrArena::Get(count: uint)
 {
-	if (this.next + count > this.curr.end) this.Expand();
+	terminatedCount := count + 1;
+	if (this.next + terminatedCount > this.curr.end) this.Expand();
 
 	ptr := this.next as *byte;
-	this.next = this.next + count;
+	this.next = this.next + terminatedCount;
+	(this.next - 1)~ = byte(0);
 	return string(count, ptr);
+}
+
+string StrArena::Copy(str: string)
+{
+	copied := this.Get(str.count);
+	copy_bytes(copied[0], str[0], str.count);
+	return copied;
 }

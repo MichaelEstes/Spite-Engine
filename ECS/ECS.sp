@@ -143,7 +143,11 @@ ECS::RunSystems(systems: []System)
 		}
 	}
 
-	while (!instance.systemFrameCount.CompareExchange(systems.count@, 0)) {}
+	expected := systems.count
+	while (!instance.systemFrameCount.CompareExchange(expected@, 0)) 
+	{
+		if(expected == 0) break;
+	}
 }
 
 ECS::Start()

@@ -1,6 +1,7 @@
 package JSON
 
 import Arena
+import StrArena
 import OS
 
 extern
@@ -128,18 +129,20 @@ state JSONBoolean
 state JSON
 {
 	mem := Arena(),
+	strs := StrArena(),
 	root: *JSONValue
 }
 
 JSON::delete
 {
 	delete this.mem;
+	delete this.strs;
 }
 
 JSON ParseJSON(str: string)
 {
 	json := JSON();
-	json.root = ParseJSONValue(StringView(str), json.mem);
+	json.root = ParseJSONValue(StringView(str), json);
 	return json;
 }
 
@@ -158,7 +161,7 @@ JSONEatWhitespace(view: StringView)
 	while (IsJSONWhitespace(view[0]~)) view.Increment();
 }
 
-*JSONValue ParseJSONValue(view: StringView, arena: Arena)
+*JSONValue ParseJSONValue(view: StringView, json: JSON)
 {
 	JSONEatWhitespace(view);
 
@@ -166,11 +169,11 @@ JSONEatWhitespace(view: StringView)
 
 	switch (char)
 	{
-		case ('{') return ParseJSONObject(view, arena);
+		case ('{') return ParseJSONObject(view, json);
 		
-		case ('[') return ParseJSONArray(view, arena);
+		case ('[') return ParseJSONArray(view, json);
 
-		case ('"') return ParseJSONString(view, arena);
+		case ('"') return ParseJSONString(view, json);
 		
 		case ('-') continue;
 		case ('0') continue;
@@ -182,23 +185,23 @@ JSONEatWhitespace(view: StringView)
 		case ('6') continue;
 		case ('7') continue;
 		case ('8') continue;
-		case ('9') return ParseJSONNumber(view, arena);
+		case ('9') return ParseJSONNumber(view, json);
 	}
 
 	if (view.StartsWith(trueStr))
 	{
 		view.Advance(trueStr.count);
-		return CreateJSONBoolean(true, arena);
+		return CreateJSONBoolean(true, json);
 	}
 	else if (view.StartsWith(falseStr))
 	{
 		view.Advance(falseStr.count);
-		return CreateJSONBoolean(false, arena);
+		return CreateJSONBoolean(false, json);
 	}
 	else if (view.StartsWith(nullStr))
 	{
 		view.Advance(nullStr.count);
-		nullValue := arena.Emplace<JSONValue>();
+		nullValue := json.mem.Emplace<JSONValue>();
 		nullValue.kind = JSONValueKind.Null;
 		return nullValue;
 	}
@@ -206,7 +209,7 @@ JSONEatWhitespace(view: StringView)
 	return null;
 }
 
-string ParseString(view: StringView)
+string ParseString(view: StringView, json: JSON)
 {
 	view.Increment();
 	start := view[0];
@@ -218,25 +221,26 @@ string ParseString(view: StringView)
 	}
 	view.Increment();
 
-	strCopy := ZeroedAllocator<byte>().Alloc(strCount + 1);
-	copy_bytes(strCopy, start, strCount);
-	return string(strCount, strCopy);
+	str := json.strs.Get(strCount);
+	copy_bytes(str[0], start, strCount);
+
+	return str;
 }
 
-*JSONValue CreateJSONBoolean(value: bool, arena: Arena)
+*JSONValue CreateJSONBoolean(value: bool, json: JSON)
 {
-	boolValue := arena.Emplace<JSONValue>();
+	boolValue := json.mem.Emplace<JSONValue>();
 	boolValue.kind = JSONValueKind.Boolean;
-	boolValue.value.boolean = arena.Emplace<JSONBoolean>();
+	boolValue.value.boolean = json.mem.Emplace<JSONBoolean>();
 	boolValue.value.boolean.value = value;
 	return boolValue;
 }
 
-*JSONValue ParseJSONObject(view: StringView, arena: Arena)
+*JSONValue ParseJSONObject(view: StringView, json: JSON)
 {
-	objValue := arena.Emplace<JSONValue>();
+	objValue := json.mem.Emplace<JSONValue>();
 	objValue.kind = JSONValueKind.Object;
-	objValue.value.object = arena.Emplace<JSONObject>();
+	objValue.value.object = json.mem.Emplace<JSONObject>();
 	view.Increment();
 	JSONEatWhitespace(view);
 
@@ -245,13 +249,13 @@ string ParseString(view: StringView)
 		JSONEatWhitespace(view);
 		assert view[0]~ == '"', "Expected JSON object member string";
 
-		memberName := ParseString(view);
+		memberName := ParseString(view, json);
 
 		JSONEatWhitespace(view);
 		assert view[0]~ == ':', "Expected JSON object member name separator ':'";
 		view.Increment();
 
-		objValue.value.object.members.Insert(memberName, ParseJSONValue(view, arena));
+		objValue.value.object.members.Insert(memberName, ParseJSONValue(view, json));
 		
 		JSONEatWhitespace(view);
 		if (view[0]~ == ',') view.Increment();
@@ -261,11 +265,11 @@ string ParseString(view: StringView)
 	return objValue;
 }
 
-*JSONValue ParseJSONArray(view: StringView, arena: Arena)
+*JSONValue ParseJSONArray(view: StringView, json: JSON)
 {
-	arrValue := arena.Emplace<JSONValue>();
+	arrValue := json.mem.Emplace<JSONValue>();
 	arrValue.kind = JSONValueKind.Array;
-	arrValue.value.array = arena.Emplace<JSONArray>();
+	arrValue.value.array = json.mem.Emplace<JSONArray>();
 	view.Increment();
 	JSONEatWhitespace(view);
 
@@ -273,7 +277,7 @@ string ParseString(view: StringView)
 	{
 		JSONEatWhitespace(view);
 		
-		arrValue.value.array.values.Add(ParseJSONValue(view, arena)@);
+		arrValue.value.array.values.Add(ParseJSONValue(view, json)@);
 
 		JSONEatWhitespace(view);
 		if (view[0]~ == ',') view.Increment();
@@ -283,12 +287,12 @@ string ParseString(view: StringView)
 	return arrValue;
 }
 
-*JSONValue ParseJSONString(view: StringView, arena: Arena)
+*JSONValue ParseJSONString(view: StringView, json: JSON)
 {
-	strValue := arena.Emplace<JSONValue>();
+	strValue := json.mem.Emplace<JSONValue>();
 	strValue.kind = JSONValueKind.String;
-	strValue.value.str = arena.Emplace<JSONString>();
-	strValue.value.str.value = ParseString(view);
+	strValue.value.str = json.mem.Emplace<JSONString>();
+	strValue.value.str.value = ParseString(view, json);
 
 	return strValue;
 }
@@ -298,11 +302,11 @@ bool IsDigit(char: byte)
 	return char >= '0' && char <= '9';
 }
 
-*JSONValue ParseJSONNumber(view: StringView, arena: Arena)
+*JSONValue ParseJSONNumber(view: StringView, json: JSON)
 {
-	numValue := arena.Emplace<JSONValue>();
+	numValue := json.mem.Emplace<JSONValue>();
 	numValue.kind = JSONValueKind.Number;
-	numValue.value.number = arena.Emplace<JSONNumber>();
+	numValue.value.number = json.mem.Emplace<JSONNumber>();
 	
 	start := view[0];
 	count := 0;
@@ -352,17 +356,18 @@ bool IsDigit(char: byte)
 		}
 	}
 
-	strCopy := ZeroedAllocator<byte>().Alloc(count + 1);
-	defer delete strCopy;
+	//RFC 7159 max expected value of a JSON number
+	strCopy := [40]byte;
+	copy_bytes(fixed strCopy, start, count);
+	strCopy[count + 1] = 0
 
-	copy_bytes(strCopy, start, count);
 	if (isFloat)
 	{
-		numValue.value.number.value.f = atof(strCopy[0]);
+		numValue.value.number.value.f = atof(fixed strCopy);
 	}
 	else
 	{
-		numValue.value.number.value.i = StringToInt(string(count, strCopy[0]));
+		numValue.value.number.value.i = StringToInt(string(count, fixed strCopy));
 	}
 
 	return numValue;

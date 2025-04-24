@@ -3,6 +3,8 @@ package Main
 import Transform
 import Core
 
+import GLTF
+
 state Test
 {
 	i: int
@@ -65,6 +67,8 @@ Main()
 	//scene.RemoveComponent<Transform>(Entity(6));
 	//scene.RemoveComponent<Test>(Entity(7));
 
-	Core.Initialize();
-	Core.Start();
+	gltf := LoadGLTF("C:\\Users\\Flynn\\Documents\\Spite Engine\\Files\\GLTF\\Resource\\Avocado.gltf");
+
+	//Core.Initialize();
+	//Core.Start();
 }

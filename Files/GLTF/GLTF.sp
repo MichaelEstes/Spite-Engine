@@ -5,29 +5,35 @@ import Matrix
 import Vec
 import Quaternion
 import Color
+import Arena
+import StrArena
+import JSON
 
 state GLTF
 {
-    asset: Asset
+    mem := Arena()
+    strMem := StrArena();
 
-    scenes: Array<Scene>,
-    nodes: Array<Node>,
-    meshes: Array<Mesh>,
-    materials: Array<Material>,
-    animations: Array<Animation>,
-    cameras: Array<Camera>,
-    skins: Array<Skin>,
-    textures: Array<Texture>,
-    images: Array<Image>,
-    samplers: Array<Sampler>,
-    buffers: Array<Buffer>,
-    bufferViews: Array<BufferView>,
-    accessors: Array<Accessor>,
+    asset: GLTFAsset
+
+    scenes: Array<GLTFScene>,
+    nodes: Array<GLTFNode>,
+    meshes: Array<GLTFMesh>,
+    materials: Array<GLTFMaterial>,
+    animations: Array<GLTFAnimation>,
+    cameras: Array<GLTFCamera>,
+    skins: Array<GLTFSkin>,
+    textures: Array<GLTFTexture>,
+    images: Array<GLTFImage>,
+    samplers: Array<GLTFSampler>,
+    buffers: Array<GLTFBuffer>,
+    bufferViews: Array<GLTFBufferView>,
+    accessors: Array<GLTFAccessor>,
 	
     scene: uint32
 }
 
-state Asset
+state GLTFAsset
 {
 	version: string,
 	generator: *string,
@@ -35,20 +41,20 @@ state Asset
 	minVersion: *string
 }
 
-state Scene
+state GLTFScene
 {
 	nodes: Array<uint32>,
 	name: *string
 }
 
-state TRS
+state GLTFTRS
 {
 	translation: Vec3,
 	rotation: Quaternion,
 	scale: Vec3
 }
 
-state Node
+state GLTFNode
 {
     name: *string,
     
@@ -57,7 +63,7 @@ state Node
     
     transform: ?{
         matrix: Matrix4,
-        trs: TRS
+        trs: GLTFTRS
     },
     
     camera: uint32,
@@ -67,13 +73,13 @@ state Node
     trs: bool
 }
 
-state Mesh
+state GLTFMesh
 {
-	primitives: Array<Primitives>,
+	primitives: Array<GLTFPrimitive>,
 	weights: Array<float32>,
 }
 
-state Primitive
+state GLTFPrimitive
 {
     attributes: Map<string, uint32>,
     targets: Array<Map<string, uint32>>,
@@ -83,43 +89,43 @@ state Primitive
     mode: uint32
 }
 
-state TextureInfo
+state GLTFTextureInfo
 {
     index: uint32,
     texCoord: uint32
 }
 
-state MaterialPBRMetallicRoughness
+state GLTFMaterialPBRMetallicRoughness
 {
     baseColorFactor: Color,
-    baseColorTexture: *TextureInfo,
+    baseColorTexture: *GLTFTextureInfo,
     
-	metallicRoughnessTexture: *TextureInfo
+	metallicRoughnessTexture: *GLTFTextureInfo
 
     metallicFactor: float32,
     roughnessFactor: float32,
 }
 
-state NormalTextureInfo
+state GLTFNormalTextureInfo
 {
-	info: TextureInfo,
+	info: GLTFTextureInfo,
     scale: float32
 }
 
-state OcclusionTextureInfo
+state GLTFOcclusionTextureInfo
 {
-    info: TextureInfo,
+    info: GLTFTextureInfo,
     strength: float32
 }
 
-state Material
+state GLTFMaterial
 {
     name: *string,
     
-    pbrMetallicRoughness: *MaterialPBRMetallicRoughness,
-    normalTexture: *NormalTextureInfo,
-    occlusionTexture: *OcclusionTextureInfo,
-    emissiveTexture: *TextureInfo,
+    pbrMetallicRoughness: *GLTFMaterialPBRMetallicRoughness,
+    normalTexture: *GLTFNormalTextureInfo,
+    occlusionTexture: *GLTFOcclusionTextureInfo,
+    emissiveTexture: *GLTFTextureInfo,
 
     emissiveFactor: Vec3,
     alphaMode: string,
@@ -128,19 +134,19 @@ state Material
     doubleSided: bool
 }
 
-state Camera
+state GLTFCamera
 {
     name: *string,
     
     camera: ?{
-        perspective: CameraPerspective,
-        orthographic: CameraOrthographic
+        perspective: GLTFCameraPerspective,
+        orthographic: GLTFCameraOrthographic
     },
 
     type: string
 }
 
-state CameraPerspective
+state GLTFCameraPerspective
 {
     aspectRatio: float32,
     yfov: float32,
@@ -148,7 +154,7 @@ state CameraPerspective
     znear: float32
 }
 
-state CameraOrthographic
+state GLTFCameraOrthographic
 {
     xmag: float32,
     ymag: float32,
@@ -156,7 +162,7 @@ state CameraOrthographic
     zfar: float32
 }
 
-state Buffer
+state GLTFBuffer
 {
     name: *string,
 
@@ -164,7 +170,7 @@ state Buffer
     byteLength: uint32
 }
 
-state BufferView
+state GLTFBufferView
 {
     name: *string,
 
@@ -175,27 +181,27 @@ state BufferView
     target: uint32
 }
 
-state AccessorSparseIndices
+state GLTFAccessorSparseIndices
 {
     bufferView: uint32,
     componentType: uint32,
     byteOffset: uint32
 }
 
-state AccessorSparseValues
+state GLTFAccessorSparseValues
 {
     bufferView: uint32,
     byteOffset: uint32
 }
 
-state AccessorSparse
+state GLTFAccessorSparse
 {
-    indices: AccessorSparseIndices,
-    values: AccessorSparseValues,
+    indices: GLTFAccessorSparseIndices,
+    values: GLTFAccessorSparseValues,
     count: uint32
 }
 
-state Accessor
+state GLTFAccessor
 {
     name: *string,
 
@@ -203,7 +209,7 @@ state Accessor
     min: Array<float32>,
     
 	type: string,
-    sparse: *AccessorSparse,
+    sparse: *GLTFAccessorSparse,
 
     bufferView: uint32,
     byteOffset: uint32,
@@ -213,7 +219,7 @@ state Accessor
     normalized: bool
 }
 
-state Texture
+state GLTFTexture
 {
     name: *string,
     
@@ -221,7 +227,7 @@ state Texture
     source: uint32
 }
 
-state Sampler
+state GLTFSampler
 {
     name: *string,
 
@@ -231,7 +237,7 @@ state Sampler
     wrapT: uint32
 }
 
-state Image
+state GLTFImage
 {
     name: *string,
     
@@ -241,27 +247,27 @@ state Image
     bufferView: uint32
 }
 
-state Animation
+state GLTFAnimation
 {
     name: *string,
     
-    channels: Array<AnimationChannel>,
-    samplers: Array<AnimationSampler>
+    channels: Array<GLTFAnimationChannel>,
+    samplers: Array<GLTFAnimationSampler>
 }
 
-state AnimationChannel
+state GLTFAnimationChannel
 {
-    target: AnimationChannelTarget,
+    target: GLTFAnimationChannelTarget,
     sampler: uint32,
 }
 
-state AnimationChannelTarget
+state GLTFAnimationChannelTarget
 {
     path: string,  // "translation", "rotation", "scale", or "weights"
     node: uint32
 }
 
-state AnimationSampler
+state GLTFAnimationSampler
 {
     interpolation: string  // "LINEAR", "STEP", "CUBICSPLINE"
 
@@ -269,7 +275,7 @@ state AnimationSampler
     output: uint32,  
 }
 
-state Skin
+state GLTFSkin
 {
     name: *string,
     
@@ -278,3 +284,61 @@ state Skin
     inverseBindMatrices: uint32,
     skeleton: uint32
 }
+
+GLTF LoadGLTF(file: string)
+{
+    gltf := GLTF();
+
+    json := ParseJSONFile(file);
+    defer delete json;
+
+    root := json.root.Object();
+
+    ParseGLTFAsset(gltf, root);
+
+
+    log gltf;
+    return gltf;
+}
+
+ParseGLTFAsset(gltf: GLTF, root: *JSONObject)
+{
+    assetValue := root.GetMember("asset");
+    if (!assetValue) return;
+
+    assetObj := assetValue.Object();
+    if (!assetObj) return;
+
+    versionValue := assetObj.GetMember("version");
+    if (versionValue)
+    {
+        version := versionValue.String().value
+        gltf.asset.version = gltf.strMem.Copy(version);
+    }
+
+    generatorValue := assetObj.GetMember("generator");
+    if (generatorValue)
+    {
+        str := gltf.mem.Emplace<string>();
+        generator := generatorValue.String().value;
+        str~ = gltf.strMem.Copy(generator);
+        gltf.asset.generator = str;
+    }
+    copyrightValue := assetObj.GetMember("copyright");
+    if (copyrightValue)
+    {
+        str := gltf.mem.Emplace<string>();
+        copyright := copyrightValue.String().value;
+        str~ = gltf.strMem.Copy(copyright);
+        gltf.asset.copyright = str;
+    }
+    minVersionValue := assetObj.GetMember("minVersion");
+    if (minVersionValue)
+    {
+        str := gltf.mem.Emplace<string>();
+        minVersion := minVersionValue.String().value;
+        str~ = gltf.strMem.Copy(minVersion);
+        gltf.asset.minVersion = str;
+    }
+}
+
