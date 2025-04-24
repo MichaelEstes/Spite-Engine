@@ -298,7 +298,7 @@ Type Atomic::Exchange(value: Type, order: MemoryOrder = MemoryOrder.Sequential)
 	return exchange(this.value@, value, order);
 }
 
-bool Atomic::CompareExchange(expected: *byte, value: byte, succeed: MemoryOrder = MemoryOrder.Sequential, fail: MemoryOrder = MemoryOrder.Sequential)
+bool Atomic::CompareExchange(expected: *Type, value: Type, succeed: MemoryOrder = MemoryOrder.Sequential, fail: MemoryOrder = MemoryOrder.Sequential)
 {
 	cmpexch := #compile ::bool(*Type, *Type, Type, MemoryOrder, MemoryOrder) {
 		type := #typeof Type;

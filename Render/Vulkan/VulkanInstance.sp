@@ -18,8 +18,8 @@ InitializeVulkanInstance()
         null,													
         uint32(0),												
         appInfo@,													
-        validationCount,												
-        fixed validationLayers,												
+        0,												
+        null,												
         vulkanInstance.extensionCount,											
         vulkanInstance.extensionNames,											
     } as VkInstanceCreateInfo;

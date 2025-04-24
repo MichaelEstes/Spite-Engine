@@ -39,7 +39,7 @@ CheckResult(result: VkResult, errorMsg: string)
 {
 	if (result != VkResult.VK_SUCCESS)
 	{
-		log errorMsg;
+		log errorMsg, result;
 	}
 }
 
@@ -695,8 +695,12 @@ VulkanRenderer::InitializeDescriptorSetLayout()
 
 VulkanRenderer::InitializePipeline()
 {
-	vertShader := ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Shaders\\vert.spv");
-	fragShader := ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Shaders\\frag.spv");
+	//vertShader := ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Shaders\\vert.spv");
+	//fragShader := ReadFile("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Shaders\\frag.spv");
+
+	vertShader := ReadFile("/home/mini/Documents/spite-engine/Render/Shaders/vert.spv");
+	fragShader := ReadFile("/home/mini/Documents/spite-engine/Render/Shaders/frag.spv");
+
 
 	vertShaderModule := this.CreateShaderModule(vertShader);
 	fragShaderModule := this.CreateShaderModule(fragShader);
@@ -1005,7 +1009,8 @@ VulkanRenderer::CreateImage(width: uint32, height: uint32, format: VkFormat, til
 
 VulkanRenderer::InitializeTextureImage()
 {
-	imageSurface := Image.LoadTextureImage("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Resource\\test.jpg");
+	//imageSurface := Image.LoadTextureImage("C:\\Users\\Flynn\\Documents\\Spite Engine\\Render\\Resource\\test.jpg");
+	imageSurface := Image.LoadTextureImage("/home/mini/Documents/spite-engine/Render/Resource/test.jpg");
 	if (!imageSurface)
 	{
 		log "Error loading texture image";

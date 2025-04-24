@@ -7,6 +7,17 @@ extern
 	void GetSystemInfo(lpSystemInfo: *_SystemInfoWin) as _GetSystemInfoWin;
 }
 
+extern
+{
+    #link linux "libc";
+
+    int32 sysconf(name: int32);
+    int32 getpagesize();
+}
+
+// Linux sysconf constants
+_SC_NPROCESSORS_ONLN: int32 = 84;
+
 state SystemInfo
 {
 	processorCount: uint32,
@@ -44,7 +55,10 @@ SystemInfo GetSystemInfoWin()
 
 SystemInfo GetSystemInfoLinux()
 {
-	return SystemInfo();
+	sysInfo := SystemInfo();
+	sysInfo.processorCount = sysconf(_SC_NPROCESSORS_ONLN);
+	sysInfo.pageSize = getpagesize();
+	return sysInfo;
 }
 
 SystemInfo GetSystemInfo()

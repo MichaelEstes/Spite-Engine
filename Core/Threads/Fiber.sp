@@ -19,6 +19,8 @@ state Job
 	data: *any
 }
 
+NoOpJob := {::(data: *any) {return;}, null} as Job;
+
 state Fibers
 {
 	threads: []uint,
@@ -31,7 +33,9 @@ state Fibers
 	jobsMain := Queue<Job>(),
 
 	currentProcess := Atomic<uint32>(),
-	processCount: uint32
+	processCount: uint32,
+
+	running: bool
 }
 
 fibers: *Fibers = null;
@@ -39,8 +43,12 @@ fibers: *Fibers = null;
 InitalizeFibers()
 {
 	fibers = new Fibers();
-	fibers.processCount = Math.Max(GetSystemInfo().processorCount as int - 2, 1);
+
+	sysInfo := GetSystemInfo()
+	fibers.processCount = Math.Max(sysInfo.processorCount - 2, 1);
 	
+	fibers.running = true;
+
 	for (i .. fibers.processCount)
 	{
 		fibers.jobsHigh.Add(Queue<Job>());
@@ -103,7 +111,7 @@ RunMainFiber()
 
 Job GetNextJob(index: uint)
 {
-	job := Job();
+	job := NoOpJob~;
 
 	fibers.locks[index].Lock();
 	if (fibers.jobsHigh[index].count)
@@ -129,9 +137,6 @@ RunFiber(index: uint)
 	while (true)
 	{
 		job := GetNextJob(index);
-		if (job.func)
-		{
-			job.func(job.data);
-		}
+		job.func(job.data);
 	}
 }

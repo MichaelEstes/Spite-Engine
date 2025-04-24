@@ -143,8 +143,7 @@ ECS::RunSystems(systems: []System)
 		}
 	}
 
-	while (instance.systemFrameCount.Load(MemoryOrder.Relaxed) != systems.count) {}
-	instance.systemFrameCount.Store(0, MemoryOrder.Relaxed);
+	while (!instance.systemFrameCount.CompareExchange(systems.count@, 0)) {}
 }
 
 ECS::Start()
