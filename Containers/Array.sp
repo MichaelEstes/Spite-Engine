@@ -15,6 +15,7 @@ Array::(initialCapacity: uint32)
 
 Array::delete 
 {
+	for (item in this) delete item;
 	this.mem.Dealloc(this.count);
 }
 

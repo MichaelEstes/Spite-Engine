@@ -38,6 +38,19 @@ state JSONValue
 	kind: JSONValueKind
 }
 
+JSONValue::delete
+{
+	switch (this.kind)
+	{
+		case (JSONValueKind.Object) delete this.value.object~;
+		case (JSONValueKind.Array) delete this.value.array~;
+		case (JSONValueKind.String) break;
+		case (JSONValueKind.Number) break;
+		case (JSONValueKind.Boolean) break;
+		case (JSONValueKind.Null) break;
+	}
+}
+
 JSONValue::log()
 {
 	switch (this.kind)
@@ -86,6 +99,12 @@ state JSONObject
 	members := Map<string, *JSONValue>(),
 }
 
+JSONObject::delete
+{
+	for (kv in this.members) delete kv.value~~;
+	delete this.members;
+}
+
 *JSONValue JSONObject::GetMember(name: string)
 {
 	if (this.members.Has(name))
@@ -99,6 +118,12 @@ state JSONObject
 state JSONArray
 {
 	values: []*JSONValue
+}
+
+JSONArray::delete
+{
+	for (value in this.values) delete value~;
+	delete this.values;
 }
 
 *JSONValue JSONArray::GetValue(index: uint)
@@ -135,6 +160,7 @@ state JSON
 
 JSON::delete
 {
+	delete this.root;
 	delete this.mem;
 	delete this.strs;
 }

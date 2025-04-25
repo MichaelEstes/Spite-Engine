@@ -56,7 +56,6 @@ string StrArena::Get(count: uint)
 
 	ptr := this.next as *byte;
 	this.next = this.next + terminatedCount;
-	(this.next - 1)~ = byte(0);
 	return string(count, ptr);
 }
 
