@@ -1124,3 +1124,99 @@ ParseGLTFBufferViews(gltf: GLTF, root: *JSONObject)
         gltf.bufferViews.Add(bufferView);
     }
 }
+
+ParseGLTFAccessors(gltf: GLTF, root: *JSONObject)
+{
+    accessorsValue := root.GetMember("accessors");
+    if (!accessorsValue) return;
+
+    accessorsArr := accessorsValue.Array();
+    gltf.accessors.SizeTo(accessorsArr.values.count);
+    for (accessorValue in accessorsArr.values)
+    {
+        accessor := GLTFAccessor();
+        accessorObj := accessorValue.Object();
+        
+        accessor.name = ParseGLTFStringPtr(gltf, accessorObj.GetMember("name"));
+        
+        bufferViewValue := accessorObj.GetMember("bufferView");
+        if (bufferViewValue)
+            accessor.bufferView = bufferViewValue.Number().value.i;
+        
+        byteOffsetValue := accessorObj.GetMember("byteOffset");
+        if (byteOffsetValue)
+            accessor.byteOffset = byteOffsetValue.Number().value.i;
+        
+        componentTypeValue := accessorObj.GetMember("componentType");
+        accessor.componentType = componentTypeValue.Number().value.i;
+        
+        normalizedValue := accessorObj.GetMember("normalized");
+        if (normalizedValue)
+            accessor.normalized = normalizedValue.Boolean().value;
+        
+        countValue := accessorObj.GetMember("count");
+        accessor.count = countValue.Number().value.i;
+        
+        typeValue := accessorObj.GetMember("type");
+        accessor.type = gltf.strMem.Copy(typeValue.String().value);
+        
+        minValue := accessorObj.GetMember("min");
+        if (minValue)
+        {
+            minArr := minValue.Array();
+            accessor.min.SizeTo(minArr.values.count);
+            for (value in minArr.values)
+            {
+                accessor.min.Add(value.Number().value.f);
+            }
+        }
+        
+        maxValue := accessorObj.GetMember("max");
+        if (maxValue)
+        {
+            maxArr := maxValue.Array();
+            accessor.max.SizeTo(maxArr.values.count);
+            for (value in maxArr.values)
+            {
+                accessor.max.Add(value.Number().value.f);
+            }
+        }
+        
+        sparseValue := accessorObj.GetMember("sparse");
+        if (sparseValue)
+        {
+            sparseObj := sparseValue.Object();
+            sparse := gltf.mem.Emplace<GLTFAccessorSparse>();
+            
+            sparseCountValue := sparseObj.GetMember("count");
+            sparse.count = sparseCountValue.Number().value.i;
+            
+            indicesValue := sparseObj.GetMember("indices");
+            indicesObj := indicesValue.Object();
+            
+            bufferViewValue := indicesObj.GetMember("bufferView");
+            sparse.indices.bufferView = bufferViewValue.Number().value.i;
+            
+            componentTypeValue := indicesObj.GetMember("componentType");
+            sparse.indices.componentType = componentTypeValue.Number().value.i;
+            
+            byteOffsetValue := indicesObj.GetMember("byteOffset");
+            if (byteOffsetValue)
+                sparse.indices.byteOffset = byteOffsetValue.Number().value.i;
+            
+            valuesValue := sparseObj.GetMember("values");
+            valuesObj := valuesValue.Object();
+            
+            bufferViewValue = valuesObj.GetMember("bufferView");
+            sparse.values.bufferView = bufferViewValue.Number().value.i;
+            
+            byteOffsetValue = valuesObj.GetMember("byteOffset");
+            if (byteOffsetValue)
+                sparse.values.byteOffset = byteOffsetValue.Number().value.i;
+            
+            accessor.sparse = sparse;
+        }
+        
+        gltf.accessors.Add(accessor);
+    }
+}
