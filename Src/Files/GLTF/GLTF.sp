@@ -1,5 +1,6 @@
 package GLTF
 
+import OS
 import Array
 import Matrix
 import Vec
@@ -352,9 +353,12 @@ GLTFSkin::delete
 
 GLTF LoadGLTF(file: string)
 {
+    path := GetAbsolutePath(file);
+    defer delete path;
+
     gltf := GLTF();
 
-    json := ParseJSONFile(file);
+    json := ParseJSONFile(path);
     defer delete json;
 
     root := json.root.Object();

@@ -18,7 +18,7 @@ enum ResourceFlags: uint32
 	Packed,
 }
 
-ResourceData
+state ResourceData
 {
 	contents: *void,
 	byteCount: uint,
