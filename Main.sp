@@ -30,7 +30,7 @@ testComponent := ECS.instance.RegisterComponent<Test>(
 );
 
 transformSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
-	//log "System called", dt;
+	//log "Transform System called", dt;
 	
 	for (item in scene.Iterate<Transform>())
 	{
@@ -39,7 +39,7 @@ transformSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 });
 
 testSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
-	//log "System called", dt;
+	//log "Test System called", dt;
 	
 	for (item in scene.Iterate<Test>())
 	{

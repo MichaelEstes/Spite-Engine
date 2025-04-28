@@ -1,5 +1,6 @@
 package Fiber
 
+import Array
 import Thread
 import SystemInfo
 import Queue
@@ -23,19 +24,19 @@ NoOpJob := {::(data: *any) {return;}, null} as Job;
 
 state Fibers
 {
-	threads: []uint,
-	jobsHigh := []Queue<Job>,
-	jobsMedium := []Queue<Job>,
-	jobsLow := []Queue<Job>,
-	locks := []SpinLock,
+	threads: Array<uint>,
+
+	jobsHigh := Array<Queue<Job>>(),
+	jobsMedium := Array<Queue<Job>>(),
+	jobsLow := Array<Queue<Job>>(),
+	
+	locks := Array<SpinLock>(),
 
 	mainThread: uint,
 	jobsMain := Queue<Job>(),
 
 	currentProcess := Atomic<uint32>(),
 	processCount: uint32,
-
-	running: bool
 }
 
 fibers: *Fibers = null;
@@ -47,8 +48,6 @@ InitalizeFibers()
 	sysInfo := GetSystemInfo()
 	fibers.processCount = Math.Max(sysInfo.processorCount - 2, 1);
 	
-	fibers.running = true;
-
 	for (i .. fibers.processCount)
 	{
 		fibers.jobsHigh.Add(Queue<Job>());
