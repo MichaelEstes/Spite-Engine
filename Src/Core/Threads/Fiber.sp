@@ -7,28 +7,31 @@ import Queue
 import Atomic
 import SpinLock
 
-enum JobPriority
+enum JobPriority: byte
 {
 	High,
 	Medium,
 	Low
 }
 
+state JobHandle
+{
+	counter: Atomic<uint32>
+}
+
 state Job
 {
 	func: ::(*any),
-	data: *any
+	data: *any,
+	handle: *JobHandle
 }
-
-NoOpJob := {::(data: *any) {return;}, null} as Job;
 
 state Fibers
 {
 	threads: Array<uint>,
 
-	jobsHigh := Array<Queue<Job>>(),
-	jobsMedium := Array<Queue<Job>>(),
-	jobsLow := Array<Queue<Job>>(),
+	// Jobs indexed by priority
+	jobs := [Array<Queue<Job>>(), Array<Queue<Job>>(), Array<Queue<Job>>()],
 	
 	locks := Array<SpinLock>(),
 
@@ -46,14 +49,18 @@ InitalizeFibers()
 	fibers = new Fibers();
 
 	sysInfo := GetSystemInfo()
-	fibers.processCount = Math.Max(sysInfo.processorCount - 2, 1);
+	// - 3, executable start thread, main fiber thread, IO thread
+	fibers.processCount = Math.Max(sysInfo.processorCount - 3, 1);
 	
 	for (i .. fibers.processCount)
 	{
-		fibers.jobsHigh.Add(Queue<Job>());
-		fibers.jobsMedium.Add(Queue<Job>());
-		fibers.jobsLow.Add(Queue<Job>());
+		for (jobArr in fibers.jobs)
+		{
+			jobArr.Add(Queue<Job>());
+		}
+
 		fibers.locks.Add(SpinLock());
+
 		thread := CreateFiberThread(i);
 		fibers.threads.Add(thread);
 	}
@@ -61,18 +68,43 @@ InitalizeFibers()
 	fibers.mainThread = CreateMainFiber();
 }
 
-AddJob(func: ::(*any), data: *any = null, priority: JobPriority = JobPriority.Medium)
+AddJob(func: ::(*any), data: *any = null, priority: JobPriority = JobPriority.Medium, handle: *JobHandle = null)
 {
-	job := {func, data} as Job;
-	index := fibers.currentProcess.Add(1) % fibers.processCount;
-	fibers.locks[index].Lock();
-	switch (priority)
+	if (handle)
 	{
-		case (JobPriority.High) fibers.jobsHigh[index].Enqueue(job);
-		case (JobPriority.Medium) fibers.jobsMedium[index].Enqueue(job);
-		case (JobPriority.Low) fibers.jobsLow[index].Enqueue(job);
+		handle.counter = Atomic<uint32>(1);
+	}
+
+	job := {func, data, handle} as Job;
+
+	index := fibers.currentProcess.Add(1) % fibers.processCount;
+	
+	fibers.locks[index].Lock();
+	{
+		fibers.jobs[priority][index].Enqueue(job);
 	}
 	fibers.locks[index].Unlock();
+}
+
+WaitForJob(handle: *JobHandle)
+{
+	currThread := GetCurrentThreadID();
+
+	// Waiting for a job on a fiber thread, continue running jobs
+	for (i .. fibers.processCount)
+	{
+		thread := fibers.threads[i];
+		if (currThread == thread)
+		{
+			while (handle.counter.Load(MemoryOrder.Acquire) != 0)
+			{
+				RunNext(i);
+			}
+		}
+	}
+
+	// Waiting on a non fiber thread, spin. Add sleep here?
+	while (handle.counter.Load(MemoryOrder.Acquire) != 0) {}
 }
 
 uint CreateMainFiber()
@@ -110,24 +142,36 @@ RunMainFiber()
 
 Job GetNextJob(index: uint)
 {
-	job := NoOpJob~;
+	job := Job();
 
 	fibers.locks[index].Lock();
-	if (fibers.jobsHigh[index].count)
 	{
-		job = fibers.jobsHigh[index].Dequeue();
-	}
-	else if (fibers.jobsMedium[index].count)
-	{
-		job = fibers.jobsMedium[index].Dequeue();
-	}
-	else if (fibers.jobsLow[index].count)
-	{
-		job = fibers.jobsLow[index].Dequeue();
+		for (jobArr in fibers.jobs)
+		{
+			jobQueue := jobArr[index];
+			if (jobQueue.count)
+			{
+				job = jobQueue.Dequeue();
+				break;
+			}
+		}
 	}
 	fibers.locks[index].Unlock();
 
 	return job;
+}
+
+RunNext(index: uint) =>
+{
+	job := GetNextJob(index);
+	if (job.func)
+	{
+		job.func(job.data);
+		if (job.handle)
+		{
+			job.handle.counter.Sub(uint32(1));
+		}
+	}
 }
 
 RunFiber(index: uint)
@@ -135,7 +179,6 @@ RunFiber(index: uint)
 	//log "Starting fiber thread", index;
 	while (true)
 	{
-		job := GetNextJob(index);
-		job.func(job.data);
+		RunNext(index);
 	}
 }
