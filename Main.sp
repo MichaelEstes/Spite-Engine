@@ -4,6 +4,7 @@ import Transform
 import Core
 
 import GLTF
+import File
 
 state Test
 {
@@ -72,5 +73,10 @@ Main()
 	//gltf := LoadGLTF("C:\\Users\\Flynn\\Documents\\Spite Engine\\Files\\GLTF\\Resource\\Cameras.gltf");
 
 	Core.Initialize();
-	Core.Start();
+	//Core.Start();
+
+	contents := "";
+	handle := LoadFileFiber("./Resource/Models/BrainStem.gltf", contents@);
+	WaitForHandle(handle);
+	log contents;
 }

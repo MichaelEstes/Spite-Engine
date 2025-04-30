@@ -68,14 +68,9 @@ InitalizeFibers()
 	fibers.mainThread = CreateMainFiber();
 }
 
-AddJob(func: ::(*any), data: *any = null, priority: JobPriority = JobPriority.Medium, handle: *JobHandle = null)
+AddJob(func: ::(*any), data: *any = null, priority: JobPriority = JobPriority.Medium, handle: **JobHandle = null)
 {
-	if (handle)
-	{
-		handle.counter = Atomic<uint32>(1);
-	}
-
-	job := {func, data, handle} as Job;
+	job := {func, data, JobHandle()} as Job;
 
 	index := fibers.currentProcess.Add(1) % fibers.processCount;
 	
@@ -86,7 +81,7 @@ AddJob(func: ::(*any), data: *any = null, priority: JobPriority = JobPriority.Me
 	fibers.locks[index].Unlock();
 }
 
-AddJobs(funcs: []::(*any), data: []*any, priority: JobPriority = JobPriority.Medium, handle: *JobHandle = null)
+AddJobs(funcs: []::(*any), data: []*any, priority: JobPriority = JobPriority.Medium, handle: **JobHandle = null)
 {
 	count := funcs.count;
 	if (handle)
@@ -112,6 +107,7 @@ AddJobs(funcs: []::(*any), data: []*any, priority: JobPriority = JobPriority.Med
 
 WaitForHandle(handle: *JobHandle)
 {
+	log "Waiting for handle: ", handle;
 	currThread := GetCurrentThreadID();
 
 	for (i .. fibers.processCount)
@@ -121,13 +117,16 @@ WaitForHandle(handle: *JobHandle)
 		// Waiting for a job on a fiber thread, continue running jobs
 		if (currThread == thread)
 		{
+			log "Waiting for handle on fiber thread";
 			while (handle.counter.Load(MemoryOrder.Acquire) != 0)
 			{
 				RunNext(i);
 			}
+			return;
 		}
 	}
 
+	log "Waiting for handle on non fiber thread";
 	// Waiting on a non fiber thread, spin. Add sleep here?
 	while (handle.counter.Load(MemoryOrder.Acquire) != 0) {}
 }
