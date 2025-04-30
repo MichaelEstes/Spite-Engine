@@ -86,14 +86,39 @@ AddJob(func: ::(*any), data: *any = null, priority: JobPriority = JobPriority.Me
 	fibers.locks[index].Unlock();
 }
 
-WaitForJob(handle: *JobHandle)
+AddJobs(funcs: []::(*any), data: []*any, priority: JobPriority = JobPriority.Medium, handle: *JobHandle = null)
+{
+	count := funcs.count;
+	if (handle)
+	{
+		handle.counter = Atomic<uint32>(count);
+	}	
+
+	for (i .. count)
+	{
+		func := funcs[i];
+		data := data[i];
+		job := {func, data, handle} as Job;
+
+		index := fibers.currentProcess.Add(1) % fibers.processCount;
+
+		fibers.locks[index].Lock();
+		{
+			fibers.jobs[priority][index].Enqueue(job);
+		}
+		fibers.locks[index].Unlock();	
+	}
+}
+
+WaitForHandle(handle: *JobHandle)
 {
 	currThread := GetCurrentThreadID();
 
-	// Waiting for a job on a fiber thread, continue running jobs
 	for (i .. fibers.processCount)
 	{
 		thread := fibers.threads[i];
+		
+		// Waiting for a job on a fiber thread, continue running jobs
 		if (currThread == thread)
 		{
 			while (handle.counter.Load(MemoryOrder.Acquire) != 0)
