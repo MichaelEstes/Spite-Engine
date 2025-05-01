@@ -47,10 +47,10 @@ testSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 		//log item;
 	}
 
-	contents := "";
+	contents := string();
 	handle := LoadFileFiber("./Resource/Models/BrainStem.gltf", contents@);
 	WaitForHandle(handle);
-	log "Waited for contents on fiber thread", contents.count;
+	//log "Waited for contents on fiber thread", contents.count;
 	delete contents;
 
 	scene.GetSingleton<SingletonTest>().myValue += 1;
@@ -80,6 +80,15 @@ Main()
 
 	Core.Initialize();
 	Core.Start();
+
+	//while (true)
+	//{
+	//	contents := "";
+	//	handle := LoadFileFiber("./Resource/Models/BrainStem.gltf", contents@);
+	//	WaitForHandle(handle);
+	//	//log contents;
+	//	delete contents;
+	//}
 
 	//contents := "";
 	//handle := LoadFileFiber("./Resource/Models/BrainStem.gltf", contents@);

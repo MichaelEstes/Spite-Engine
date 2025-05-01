@@ -137,7 +137,7 @@ WaitForHandle(handle: *JobHandle)
 
 	defer DeallocJobHandle(handle);
 	currThread := GetCurrentThreadID();
-
+	
 	for (i .. fibers.processCount)
 	{
 		thread := fibers.threadIDs[i];

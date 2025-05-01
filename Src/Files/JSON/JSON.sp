@@ -160,7 +160,7 @@ state JSON
 
 JSON::delete
 {
-	delete this.root;
+	delete this.root~;
 	delete this.mem;
 	delete this.strs;
 }
