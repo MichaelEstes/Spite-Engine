@@ -47,6 +47,12 @@ testSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 		//log item;
 	}
 
+	contents := "";
+	handle := LoadFileFiber("./Resource/Models/BrainStem.gltf", contents@);
+	WaitForHandle(handle);
+	log "Waited for contents on fiber thread", contents.count;
+	delete contents;
+
 	scene.GetSingleton<SingletonTest>().myValue += 1;
 });
 
@@ -73,10 +79,10 @@ Main()
 	//gltf := LoadGLTF("C:\\Users\\Flynn\\Documents\\Spite Engine\\Files\\GLTF\\Resource\\Cameras.gltf");
 
 	Core.Initialize();
-	//Core.Start();
+	Core.Start();
 
-	contents := "";
-	handle := LoadFileFiber("./Resource/Models/BrainStem.gltf", contents@);
-	WaitForHandle(handle);
-	log contents;
+	//contents := "";
+	//handle := LoadFileFiber("./Resource/Models/BrainStem.gltf", contents@);
+	//WaitForHandle(handle);
+	//log "Waited for contents", contents.count;
 }

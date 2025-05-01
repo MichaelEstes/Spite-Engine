@@ -19,9 +19,9 @@ Array::delete
 	this.mem.Dealloc(this.count);
 }
 
-*Type Array::operator::[](index: uint32)
+ref Type Array::operator::[](index: uint32)
 {
-	return this.mem[index];
+	return this.mem[index]~;
 }
 
 Iterator Array::operator::in()

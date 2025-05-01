@@ -21,10 +21,16 @@ SlabAllocator::(slotSize: uint32, capacity: uint32)
 
 	for (i: uint32 .. capacity)
 	{
-		this.freeStack[i].Store(i + 1);
+		this.freeStack[i].Store(i);
 	}
 	this.freeStack[capacity - 1].Store(int32(-1));
-	this.end.Store(0);
+	this.end = Atomic<int32>(0);
+}
+
+SlabAllocator::delete 
+{
+	this.slots.Dealloc(this.slotSize * this.capacity);
+	this.freeStack.Dealloc(this.capacity);
 }
 
 *byte SlabAllocator::Alloc()
@@ -50,9 +56,9 @@ SlabAllocator::Dealloc(ptr: *any)
 
 	currEnd := this.end.Load(MemoryOrder.Relaxed);
 	
-	this.freeStack[index].Store(currEnd, MemoryOrder.Relaxed);
+	this.freeStack[index].Store(currEnd, MemoryOrder.Release);
 	while (!this.end.CompareExchange(currEnd@, index))
 	{
-		this.freeStack[index].Store(currEnd, MemoryOrder.Relaxed);
+		this.freeStack[index].Store(currEnd, MemoryOrder.Release);
 	}
 }
