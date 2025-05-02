@@ -1,8 +1,12 @@
 package Thread
 
+import Time
+
 extern
 {
 	#link windows "kernel32";
+
+    void Sleep(dwMilliseconds: uint32) as WinSleep;
 
 	*void CreateThread(
 		lpThreadAttributes: *WinSecurityAttributes,
@@ -31,11 +35,44 @@ extern
 	uint32 pthread_self();
 }
 
+extern
+{
+	#link linux "libc";
+
+	int32 nanosleep(req: *TimeSpec, rem: *TimeSpec);
+}
+
 state WinSecurityAttributes
 {
 	nLength: uint32,
 	lpSecurityDescriptor: *void,
 	bInheritHandle: bool
+}
+
+void SleepWindows(milliseconds: uint32)
+{
+    WinSleep(milliseconds);
+}
+
+void SleepLinux(milliseconds: uint32)
+{
+    // Convert milliseconds to seconds and nanoseconds
+    ts := TimeSpec();
+    ts.tv_sec = milliseconds / 1000;
+    ts.tv_nsec = (milliseconds % 1000) * 1000000; // Convert remaining ms to ns
+    
+    nanosleep(ts@, null);
+}
+
+void Sleep(milliseconds: uint32)
+{
+    sleep := #compile ::void(uint32) 
+    {
+        if(targetOs == OS_Kind.Windows) return SleepWindows;
+        else return SleepLinux;
+    }
+    
+    sleep(milliseconds);
 }
 
 uint CreateThreadWin(func: ::uint32(*void), data: *void, id: *uint32)

@@ -44,6 +44,8 @@ state Fibers
 
 	currentProcess := Atomic<uint32>(),
 	processCount: uint32,
+
+	running := true
 }
 
 fibers: *Fibers = null;
@@ -52,7 +54,7 @@ InitalizeFibers()
 {
 	fibers = new Fibers();
 
-	sysInfo := GetSystemInfo()
+	sysInfo := GetSystemInfo();
 	// - 3, executable start thread, main fiber thread, IO thread
 	fibers.processCount = Math.Max(sysInfo.processorCount - 3, 1);
 	
@@ -111,7 +113,7 @@ AddJobs(funcs: []::(*any), data: []*any, priority: JobPriority = JobPriority.Med
 	jobHandle: *JobHandle = null;
 	if (handle)
 	{
-		jobHandle = CreateJobHandle(1);
+		jobHandle = CreateJobHandle(count);
 		handle~ = jobHandle;
 	}	
 
@@ -145,7 +147,7 @@ WaitForHandle(handle: *JobHandle)
 		// Waiting for a job on a fiber thread, continue running jobs
 		if (currThread == thread)
 		{
-			while (handle.counter.Load(MemoryOrder.Acquire) != 0)
+			while (handle.counter.Load(MemoryOrder.Relaxed) != 0)
 			{
 				RunNext(i);
 			}
@@ -153,8 +155,8 @@ WaitForHandle(handle: *JobHandle)
 		}
 	}
 
-	// Waiting on a non fiber thread, spin. Add sleep here?
-	while (handle.counter.Load(MemoryOrder.Acquire) != 0) {}
+	// Waiting on a non fiber thread, spin
+	while (handle.counter.Load(MemoryOrder.Relaxed) != 0) {}
 }
 
 uint CreateMainFiber()
@@ -181,7 +183,8 @@ uint CreateFiberThread(index: uint)
 RunMainFiber()
 {
 	//log "Starting main fiber thread: ", GetCurrentThreadID();
-	while (true)
+	
+	while (fibers.running)
 	{
 		if (fibers.jobsMain.count)
 		{
@@ -220,7 +223,7 @@ RunNext(index: uint) =>
 		job.func(job.data);
 		if (job.handle)
 		{
-			job.handle.counter.Sub(uint32(1));
+			job.handle.counter.Sub(uint32(1), MemoryOrder.Relaxed);
 		}
 	}
 }
@@ -228,7 +231,8 @@ RunNext(index: uint) =>
 RunFiber(index: uint)
 {
 	//log "Starting fiber thread", index;
-	while (true)
+	
+	while (fibers.running)
 	{
 		RunNext(index);
 	}

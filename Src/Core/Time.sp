@@ -6,6 +6,8 @@ extern
 
 	bool QueryPerformanceFrequency(frequency: *int64);
 	bool QueryPerformanceCounter(performanceCount: *int64);
+	
+	void Sleep(dwMilliseconds: uint32) as WinSleep;
 }
 
 extern
@@ -14,6 +16,8 @@ extern
 
 	int32 clock_gettime(clk_id: int32, timespec: *TimeSpec);
 	int32 clock_getres(clk_id: int32, timespec: *TimeSpec);
+
+	int32 nanosleep(req: *TimeSpec, rem: *TimeSpec);
 }
 
 CLOCK_MONOTONIC := int32(1);

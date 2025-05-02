@@ -5,6 +5,7 @@ import Core
 
 import GLTF
 import File
+import Thread
 
 state Test
 {
@@ -47,11 +48,14 @@ testSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 		//log item;
 	}
 
-	contents := string();
-	handle := LoadFileFiber("./Resource/Models/BrainStem.gltf", contents@);
-	WaitForHandle(handle);
-	//log "Waited for contents on fiber thread", contents.count;
-	delete contents;
+	data := 0;
+	handle: *Fiber.JobHandle = null; 
+    Fiber.AddJob(::(data: *int) {
+        Thread.Sleep(1000);
+		data~ = 2;
+    }, data@, Fiber.JobPriority.High, handle@);
+	Fiber.WaitForHandle(handle);
+	log data;
 
 	scene.GetSingleton<SingletonTest>().myValue += 1;
 });
@@ -80,18 +84,4 @@ Main()
 
 	Core.Initialize();
 	Core.Start();
-
-	//while (true)
-	//{
-	//	contents := "";
-	//	handle := LoadFileFiber("./Resource/Models/BrainStem.gltf", contents@);
-	//	WaitForHandle(handle);
-	//	//log contents;
-	//	delete contents;
-	//}
-
-	//contents := "";
-	//handle := LoadFileFiber("./Resource/Models/BrainStem.gltf", contents@);
-	//WaitForHandle(handle);
-	//log "Waited for contents", contents.count;
 }
