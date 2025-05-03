@@ -148,7 +148,7 @@ WaitForHandle(handle: *JobHandle)
 		// Waiting for a job on a fiber thread, continue running jobs
 		if (currThread == thread)
 		{
-			while (handle.counter.Load(MemoryOrder.Acquire) != 0)
+			while (handle.counter.Load() != 0)
 			{
 				RunNext(i);
 			}
@@ -158,7 +158,7 @@ WaitForHandle(handle: *JobHandle)
 	}
 
 	// Waiting on a non fiber thread, spin
-	while (handle.counter.Load(MemoryOrder.Acquire) != 0) {}
+	while (handle.counter.Load() != 0) {}
 	DeallocJobHandle(handle);
 }
 
@@ -218,7 +218,7 @@ Job GetNextJob(index: uint)
 	return job;
 }
 
-RunNext(index: uint) =>
+RunNext(index: uint)
 {
 	job := GetNextJob(index);
 	if (job.func)

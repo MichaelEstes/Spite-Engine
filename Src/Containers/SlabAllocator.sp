@@ -101,15 +101,10 @@ int SlabAllocator::GetSlabIndex()
 
 SlabAllocator::Dealloc(ptr: *any)
 {
-	log "Deallocating";
 	offset := (ptr - this.slabs[0]) as uint;
 	slabIndex := offset / this.slabCount;
 	itemIndex := offset / this.itemSize;
 	
-	//log "Offset: ", offset;
-	//log "Slab Count: ", this.slabCount;
-	//log "Deallocating Slab index: ", slabIndex;
-
 	this.lock.Lock();
 	{
 		this.slabStatus.Clear(slabIndex);

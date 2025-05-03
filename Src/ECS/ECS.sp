@@ -124,6 +124,8 @@ ECS::OnComponentRemove(id: uint16, componentData: *any)
 
 ECS::RunSystems(systems: []System)
 {
+	instance.systemFrameCount.Store(this.scenes.count * systems.count);
+
 	for (scene in this.scenes.Values())
 	{
 		for (system in systems) 
@@ -138,16 +140,12 @@ ECS::RunSystems(systems: []System)
 				scene.lastFrameTime = currTime;
 				
 				system.run(scene~, dt);
-				instance.systemFrameCount.Add(1, MemoryOrder.Relaxed);
+				instance.systemFrameCount.Sub(1, MemoryOrder.Relaxed);
 			}, sceneSystem);
 		}
 	}
 
-	expected := systems.count
-	while (!instance.systemFrameCount.CompareExchange(expected@, 0)) 
-	{
-		if(expected == 0) break;
-	}
+	while (instance.systemFrameCount.Load() != 0) {}
 }
 
 ECS::Start()

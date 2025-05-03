@@ -51,8 +51,10 @@ testSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 	data := 0;
 	handle: *Fiber.JobHandle = null; 
     Fiber.AddJob(::(data: *int) {
-        Thread.Sleep(1000);
-		data~ = 2;
+		for (i .. 10000)
+		{
+			data~ = i;
+		}
     }, data@, Fiber.JobPriority.High, handle@);
 	Fiber.WaitForHandle(handle);
 	log data;
