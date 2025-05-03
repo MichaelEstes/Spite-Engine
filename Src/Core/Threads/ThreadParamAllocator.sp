@@ -5,10 +5,10 @@ import SlabAllocator
 state ThreadParamAllocator
 {
 	slabs := [
-		SlabAllocator(32, 256),
-		SlabAllocator(64, 128),
-		SlabAllocator(128, 64),
-		SlabAllocator(256, 32)
+		SlabAllocator(32, 64, 4),
+		SlabAllocator(64, 32, 4),
+		SlabAllocator(128, 16, 4),
+		SlabAllocator(256, 8, 4)
 	]
 }
 

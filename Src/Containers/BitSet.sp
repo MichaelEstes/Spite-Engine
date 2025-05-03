@@ -22,6 +22,11 @@ BitSet::(count: uint)
 	this.alloc.Alloc(byteCount);
 }
 
+BitSet::delete 
+{
+	this.alloc.Dealloc(this.bitCount / bitsInByte);
+}
+
 bool BitSet::operator::[](i: uint)  
 { 
 	if(!this.Inbounds(i)) return false;

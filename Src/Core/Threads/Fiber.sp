@@ -40,7 +40,7 @@ state Fibers
 	mainThread: uint,
 	jobsMain := Queue<Job>(),
 
-	handleAllocator := SlabAllocator(#sizeof JobHandle, 1024),
+	handleAllocator: SlabAllocator,
 
 	currentProcess := Atomic<uint32>(),
 	processCount: uint32,
@@ -57,7 +57,8 @@ InitalizeFibers()
 	sysInfo := GetSystemInfo();
 	// - 3, executable start thread, main fiber thread, IO thread
 	fibers.processCount = Math.Max(sysInfo.processorCount - 3, 1);
-	
+	fibers.handleAllocator = SlabAllocator(#sizeof JobHandle, 32, fibers.processCount);
+
 	for (i .. fibers.processCount)
 	{
 		for (jobArr in fibers.jobs)
@@ -137,7 +138,7 @@ WaitForHandle(handle: *JobHandle)
 {
 	assert handle != null, "Cannot wait for a null handle";
 
-	defer DeallocJobHandle(handle);
+	//defer DeallocJobHandle(handle);
 	currThread := GetCurrentThreadID();
 	
 	for (i .. fibers.processCount)
@@ -147,16 +148,18 @@ WaitForHandle(handle: *JobHandle)
 		// Waiting for a job on a fiber thread, continue running jobs
 		if (currThread == thread)
 		{
-			while (handle.counter.Load(MemoryOrder.Relaxed) != 0)
+			while (handle.counter.Load(MemoryOrder.Acquire) != 0)
 			{
 				RunNext(i);
 			}
+			DeallocJobHandle(handle);
 			return;
 		}
 	}
 
 	// Waiting on a non fiber thread, spin
-	while (handle.counter.Load(MemoryOrder.Relaxed) != 0) {}
+	while (handle.counter.Load(MemoryOrder.Acquire) != 0) {}
+	DeallocJobHandle(handle);
 }
 
 uint CreateMainFiber()

@@ -1,64 +1,119 @@
 package SlabAllocator
 
 import Atomic
+import BitSet
+import SpinLock
+
 
 state SlabAllocator
 {
-	slots: Allocator<byte>,
-	freeStack: Allocator<Atomic<int32>>,
+	slabs: Allocator<byte>,
+
+	slabStatus: BitSet,
+	itemStatus: BitSet,
 	
-	end: Atomic<int32>,
-	slotSize: uint32,
-	capacity: uint32
+	currSlab: uint32,
+	itemSize: uint32,
+	itemCount: uint32,
+	slabCount: uint32,
+
+	lock: SpinLock,
 }
 
-SlabAllocator::(slotSize: uint32, capacity: uint32)
+SlabAllocator::(itemSize: uint32, itemCount: uint32, slabCount: uint32)
 {
-	this.slotSize = align_up(slotSize, 16);
-	this.capacity = capacity;
-	this.slots.Alloc(this.slotSize * capacity);
-	this.freeStack.Alloc(capacity);
+	this.itemSize = itemSize;
+	this.itemCount = itemCount;
+	this.slabCount = slabCount;
 
-	for (i: uint32 .. capacity)
-	{
-		this.freeStack[i].Store(i);
-	}
-	this.freeStack[capacity - 1].Store(int32(-1));
-	this.end = Atomic<int32>(0);
+	this.slabs.Alloc(itemSize * itemCount * slabCount);
+
+	this.slabStatus = BitSet(slabCount);
+	this.itemStatus = BitSet(itemCount * slabCount);
+	
+	this.currSlab = 0;
+
+	this.lock = SpinLock();
 }
 
 SlabAllocator::delete 
 {
-	this.slots.Dealloc(this.slotSize * this.capacity);
-	this.freeStack.Dealloc(this.capacity);
+	this.slabs.Dealloc(0);
+
+	delete this.slabStatus;
+	delete this.itemStatus;
+}
+
+int SlabAllocator::GetSlabIndex()
+{
+	start := this.currSlab;
+
+	this.currSlab = (this.currSlab + 1) % this.slabCount;
+	while (this.currSlab != start)
+	{
+		if (!this.slabStatus[this.currSlab]) return this.currSlab;
+		this.currSlab = (this.currSlab + 1) % this.slabCount;
+	}
+
+	return -1;	
 }
 
 *byte SlabAllocator::Alloc()
 {
-	currEnd := this.end.Load(MemoryOrder.Relaxed);
+	this.lock.Lock();
 
-	while (currEnd != -1)
+	index := this.GetSlabIndex();
+	if (index == -1) 
 	{
-		next := this.freeStack[currEnd].Load(MemoryOrder.Acquire);
-		if (this.end.CompareExchange(currEnd@, next))
+		log "Slab allocator full";
+		return null;
+	}
+
+	startItemIndex := index * this.itemCount;
+	startItemPtr := this.slabs[index * this.itemSize * this.itemCount];
+	itemPtr := null as *byte;
+	full := true;
+
+	for (i .. this.itemCount)
+	{
+		itemIndex := startItemIndex + i;
+		if (!this.itemStatus[itemIndex])
 		{
-			return this.slots[currEnd * this.slotSize];
+			if (!itemPtr)
+			{
+				this.itemStatus.Set(itemIndex);
+				itemPtr = startItemPtr + (i * this.itemSize);
+			}
+			else
+			{
+				full = false;
+				break;
+			}
 		}
 	}
 
-	return null;
+	if (full) this.slabStatus.Set(index);
+
+	this.lock.Unlock();
+
+	return itemPtr;
 }
 
 SlabAllocator::Dealloc(ptr: *any)
 {
-	offset := (ptr - this.slots[0]) as uint;
-	index := (offset / this.slotSize) as int32;
-
-	currEnd := this.end.Load(MemoryOrder.Relaxed);
+	log "Deallocating";
+	offset := (ptr - this.slabs[0]) as uint;
+	slabIndex := offset / this.slabCount;
+	itemIndex := offset / this.itemSize;
 	
-	this.freeStack[index].Store(currEnd, MemoryOrder.Release);
-	while (!this.end.CompareExchange(currEnd@, index))
+	//log "Offset: ", offset;
+	//log "Slab Count: ", this.slabCount;
+	//log "Deallocating Slab index: ", slabIndex;
+
+	this.lock.Lock();
 	{
-		this.freeStack[index].Store(currEnd, MemoryOrder.Release);
+		this.slabStatus.Clear(slabIndex);
+		this.itemStatus.Clear(itemIndex);
 	}
+	this.lock.Unlock();
 }
