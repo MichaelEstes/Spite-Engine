@@ -9,15 +9,19 @@ import Color
 import Arena
 import StrArena
 import JSON
+import File
 
 InvalidGLTFIndex := -1 as uint32;
 
 state GLTF
 {
-    mem := Arena()
-    strMem := StrArena();
+    mem := Arena(),
+    strMem := StrArena(),
 
-    asset: GLTFAsset
+    src: string,
+    path: string,
+
+    asset: GLTFAsset,
 
     scenes: Array<GLTFScene>,
     nodes: Array<GLTFNode>,
@@ -52,6 +56,8 @@ GLTF::delete
     delete this.bufferViews;
     delete this.accessors;
 
+    delete this.src;
+    delete this.path;
     delete this.mem;
     delete this.strMem;
 }
@@ -120,6 +126,28 @@ GLTFMesh::delete
 {
     delete this.primitives;
     delete this.weights;
+}
+
+enum GLTFAttributeKind: uint32
+{
+    Unknown,
+    Position,
+    Normal,
+    Tangent,
+    TexCoord,
+    Color,
+    Joints,
+    Weights
+}
+
+state GLTFAttribute
+{
+    data: ?{
+        name: string,
+        index: uint32
+    }
+    accessor: uint32,
+    kind: GLTFAttributeKind
 }
 
 state GLTFPrimitive
@@ -215,7 +243,7 @@ state GLTFBuffer
 {
     name: *string,
 
-    uri: *string,
+    uri: GLTFURI,
     byteLength: uint32
 }
 
@@ -296,7 +324,7 @@ state GLTFImage
 {
     name: *string,
     
-    uri: *string,
+    uri: GLTFURI,
     mimeType: *string,
     
     bufferView: uint32
@@ -351,12 +379,20 @@ GLTFSkin::delete
     delete this.joints;
 }
 
+state GLTFURI
+{
+    uri: *string,
+    data: *byte,
+    byteCount: uint32
+}
+
 GLTF LoadGLTF(file: string)
 {
     path := GetAbsolutePath(file);
-    defer delete path;
 
     gltf := GLTF();
+    gltf.src = path;
+    gltf.path = OS.GetDirectoryName(path);
 
     json := ParseJSONFile(path);
     defer delete json;
@@ -395,6 +431,34 @@ GLTF LoadGLTF(file: string)
         str = strPtr;
     }
     return str;
+}
+
+GLTFURI ParseGLTFURI(gltf: GLTF, value: *JSONValue)
+{
+    uri := GLTFURI();
+
+    if (value)
+    {
+        uriPtr := gltf.mem.Emplace<string>();
+        uriPtr~ = gltf.strMem.Copy(value.String().value);
+        uri.uri = uriPtr;
+
+        if (IsDataURI(uriPtr~))
+        {
+
+        }
+        else
+        {
+            filePath := OS.JoinPaths([gltf.path, uriPtr~])
+            defer delete filePath;
+            
+            contents := OS.ReadFile(filePath)
+            uri.data = contents.mem;
+            uri.byteCount = contents.count;
+        }
+    }
+
+    return uri;
 }
 
 ParseGLTFAsset(gltf: GLTF, root: *JSONObject)
@@ -1006,13 +1070,7 @@ ParseGLTFImages(gltf: GLTF, root: *JSONObject)
         
         image.name = ParseGLTFStringPtr(gltf, imageObj.GetMember("name"));
         
-        uriValue := imageObj.GetMember("uri");
-        if (uriValue)
-        {
-            uriPtr := gltf.mem.Emplace<string>();
-            uriPtr~ = gltf.strMem.Copy(uriValue.String().value);
-            image.uri = uriPtr;
-        }
+        image.uri = ParseGLTFURI(gltf, imageObj.GetMember("uri"));
         
         mimeTypeValue := imageObj.GetMember("mimeType");
         if (mimeTypeValue)
@@ -1078,13 +1136,7 @@ ParseGLTFBuffers(gltf: GLTF, root: *JSONObject)
         
         buffer.name = ParseGLTFStringPtr(gltf, bufferObj.GetMember("name"));
         
-        uriValue := bufferObj.GetMember("uri");
-        if (uriValue)
-        {
-            uriPtr := gltf.mem.Emplace<string>();
-            uriPtr~ = gltf.strMem.Copy(uriValue.String().value);
-            buffer.uri = uriPtr;
-        }
+        buffer.uri = ParseGLTFURI(gltf, bufferObj.GetMember("uri"));
         
         byteLengthValue := bufferObj.GetMember("byteLength");
         buffer.byteLength = byteLengthValue.Number().value.i;

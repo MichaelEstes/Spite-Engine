@@ -48,17 +48,6 @@ testSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 		//log item;
 	}
 
-	data := 0;
-	handle: *Fiber.JobHandle = null; 
-    Fiber.AddJob(::(data: *int) {
-		for (i .. 10000)
-		{
-			data~ = i;
-		}
-    }, data@, Fiber.JobPriority.High, handle@);
-	Fiber.WaitForHandle(handle);
-	log data;
-
 	scene.GetSingleton<SingletonTest>().myValue += 1;
 });
 
@@ -80,10 +69,11 @@ Main()
 	//scene.RemoveComponent<Transform>(Entity(6));
 	//scene.RemoveComponent<Test>(Entity(7));
 
-	gltf := LoadGLTF("./Resource/Models/BrainStem.gltf");
+	//Core.Initialize();
+	//Core.Start();
 
+	gltf := LoadGLTF("./Resource/Models/Box/Box.gltf");
 	//gltf := LoadGLTF("C:\\Users\\Flynn\\Documents\\Spite Engine\\Files\\GLTF\\Resource\\Cameras.gltf");
 
-	Core.Initialize();
-	Core.Start();
+	//log gltf;
 }

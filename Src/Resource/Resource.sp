@@ -2,6 +2,7 @@ package Resource
 
 enum ResourceType: uint32
 {
+	File,
 	GLTF,
 }
 
@@ -37,4 +38,5 @@ state Resource
 
 	handle: ResourceHandle,
 	type: ResourceType,
+	flags: ResourceFlags
 }
