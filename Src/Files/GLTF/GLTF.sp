@@ -177,7 +177,7 @@ state GLTFMaterialPBRMetallicRoughness
     baseColorFactor: Color,
     baseColorTexture: *GLTFTextureInfo,
     
-	metallicRoughnessTexture: *GLTFTextureInfo
+	metallicRoughnessTexture: *GLTFTextureInfo,
 
     metallicFactor: float32 = 1.0,
     roughnessFactor: float32 = 1.0
