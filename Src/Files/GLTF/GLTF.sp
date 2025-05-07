@@ -417,6 +417,8 @@ GLTF LoadGLTF(file: string)
     ParseGLTFBuffers(gltf, root);
     ParseGLTFBufferViews(gltf, root);
 
+    log "GLTF MESHES: ", gltf.meshes
+
     return gltf;
 }
 
@@ -652,7 +654,7 @@ ParseGLTFMeshes(gltf: GLTF, root: *JSONObject)
             {
                 accessorKey := gltf.strMem.Copy(attributeKV.key~);
                 accessor := attributeKV.value~.Number().value.i;
-            
+
                 primitive.attributes.Insert(accessorKey, accessor);
             }
 
@@ -686,10 +688,10 @@ ParseGLTFMeshes(gltf: GLTF, root: *JSONObject)
                     primitive.targets.Add(target);
                 }
             }
-            
+
             mesh.primitives.Add(primitive);
         }
-        
+
         gltf.meshes.Add(mesh);
     }
 }

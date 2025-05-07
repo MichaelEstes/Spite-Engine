@@ -79,11 +79,11 @@ Main()
 	//scene.RemoveComponent<Transform>(Entity(6));
 	//scene.RemoveComponent<Test>(Entity(7));
 
-	Core.Initialize();
-	Core.Start();
+	//Core.Initialize();
+	//Core.Start();
 
-	//gltf := LoadGLTF("./Resource/Models/Box/Box.gltf");
-	//gltf := LoadGLTF("C:\\Users\\Flynn\\Documents\\Spite Engine\\Files\\GLTF\\Resource\\Cameras.gltf");
+	gltf := LoadGLTF("./Resource/Models/Box/Box.gltf");
+	FlushGLTFToECS(gltf);
 
 	//log gltf;
 }
