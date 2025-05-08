@@ -37,7 +37,7 @@ bool Array::next(it: Iterator)
 
 ref Type Array::current(it: Iterator)
 {
-	return this.mem[it.index];	
+	return this.mem[it.index]~;	
 }
 
 // Returns the index of the item added

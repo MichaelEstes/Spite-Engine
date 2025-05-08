@@ -138,7 +138,6 @@ WaitForHandle(handle: *JobHandle)
 {
 	assert handle != null, "Cannot wait for a null handle";
 
-	//defer DeallocJobHandle(handle);
 	currThread := GetCurrentThreadID();
 	
 	for (i .. fibers.processCount)

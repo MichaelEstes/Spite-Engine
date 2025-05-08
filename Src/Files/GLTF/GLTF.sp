@@ -416,8 +416,7 @@ GLTF LoadGLTF(file: string)
     ParseGLTFSamplers(gltf, root);
     ParseGLTFBuffers(gltf, root);
     ParseGLTFBufferViews(gltf, root);
-
-    log "GLTF MESHES: ", gltf.meshes
+    ParseGLTFAccessors(gltf, root);
 
     return gltf;
 }
