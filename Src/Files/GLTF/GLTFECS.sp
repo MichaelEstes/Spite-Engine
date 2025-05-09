@@ -2,6 +2,7 @@ package GLTF
 
 import Render
 import ArrayView
+import Vec
 
 *byte GetBufferData(gltf: GLTF, buffer: uint32)
 {
@@ -13,8 +14,6 @@ import ArrayView
 {
 	gltfBufferView := gltf.bufferViews[bufferView];
 
-	log "Buffer View", gltfBufferView;
-
 	data := GetBufferData(gltf, gltfBufferView.buffer);
 	data = data + gltfBufferView.byteOffset;
 
@@ -25,18 +24,21 @@ ArrayView<byte> GetAccessorData(gltf: GLTF, accessor: uint32)
 {
 	gltfAccessor := gltf.accessors[accessor];
 
-	log "Accessor", gltfAccessor;
-
 	data := GetBufferViewData(gltf, gltfAccessor.bufferView);
 	data = data + gltfAccessor.byteOffset;
 
-	return ArrayView(data, gltfAccessor.count);
+	return ArrayView<byte>(data, gltfAccessor.count);
 }
 
 AssignPositionToPrimitive(gltf: GLTF, accessor: uint32, primitive: Primitive)
 {
 	view := GetAccessorData(gltf, accessor);
+	vertices := ArrayView<Vec3>(view[0]@, view.count);
 
+	for (vert in vertices)
+	{
+		log vert;
+	}
 }
 
 AssignAttributeToPrimitive(gltf: GLTF, attrName: string, accessor: uint32, primitive: Primitive)
