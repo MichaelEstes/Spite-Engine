@@ -2,6 +2,8 @@ package Render
 
 import Vec
 import Color
+import ArrayView
+import Array
 
 enum GeometryKind: uint32
 {
@@ -16,13 +18,15 @@ enum GeometryKind: uint32
 
 state Geometry
 {
-    vertices: Array<Vec3>,
-    indicies: Array<uint32>,
+    vertices: ArrayView<Vec3>,
+    indices: ArrayView<uint16>,
 
-    normals: Array<Vec3>,
-    uvs: Array<Array<Vec2>>,
+    normals: ArrayView<Vec3>,
+    tangents: ArrayView<Vec4>,
 
-    colors: Array<Array<Color>>,
+    uvs: Array<ArrayView<Vec2>>,
+
+    colors: Array<ArrayView<Color>>,
 
     kind: GeometryKind
 }

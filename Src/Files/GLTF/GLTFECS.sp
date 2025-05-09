@@ -34,11 +34,24 @@ AssignPositionToPrimitive(gltf: GLTF, accessor: uint32, primitive: Primitive)
 {
 	view := GetAccessorData(gltf, accessor);
 	vertices := ArrayView<Vec3>(view[0]@, view.count);
+	
+	primitive.geometry.vertices = vertices;
+}
 
-	for (vert in vertices)
-	{
-		log vert;
-	}
+AssignNormalToPrimitive(gltf: GLTF, accessor: uint32, primitive: Primitive)
+{
+	view := GetAccessorData(gltf, accessor);
+	normals := ArrayView<Vec3>(view[0]@, view.count);
+	
+	primitive.geometry.normals = normals;
+}
+
+AssignTangentToPrimitive(gltf: GLTF, accessor: uint32, primitive: Primitive)
+{
+	view := GetAccessorData(gltf, accessor);
+	tangents := ArrayView<Vec4>(view[0]@, view.count);
+	
+	primitive.geometry.tangents = tangents;
 }
 
 AssignAttributeToPrimitive(gltf: GLTF, attrName: string, accessor: uint32, primitive: Primitive)
@@ -47,17 +60,39 @@ AssignAttributeToPrimitive(gltf: GLTF, attrName: string, accessor: uint32, primi
 	{
 		AssignPositionToPrimitive(gltf, accessor, primitive);
 	}
+	else if (attrName == "NORMAL")
+	{
+		AssignNormalToPrimitive(gltf, accessor, primitive);
+	}
+	else if (attrName == "TANGENT")
+	{
+		AssignTangentToPrimitive(gltf, accessor, primitive);
+	}
 }
 
+AssignIndiciesToPrimitive(gltf: GLTF, accessor: uint32, primitive: Primitive)
+{
+	view := GetAccessorData(gltf, accessor);
+	indices := ArrayView<uint16>(view[0]@, view.count);
+
+	for (index in indices)
+	{
+		log index;
+	}
+
+	primitive.geometry.indices = indices;
+}
 
 FlushGLTFToECS(gltf: GLTF)
 {
-	meshes := gltf.meshes;
+	gltfMeshes := gltf.meshes;
 	
-	for (mesh in meshes)
+	for (gltfMesh in gltfMeshes)
 	{
-		log "Primitive count: ", meshes[0].primitives.count;
-		for (gltfPrim in mesh.primitives)
+		mesh := Mesh()
+
+		mesh.primitives.SizeTo(gltfMesh.primitives.count);
+		for (gltfPrim in gltfMesh.primitives)
 		{
 			primitive := Primitive();
 			for (attrKV in gltfPrim.attributes)
@@ -67,6 +102,13 @@ FlushGLTFToECS(gltf: GLTF)
 
 				AssignAttributeToPrimitive(gltf, attrName, attrAccessor, primitive);
 			}
+
+			if (gltfPrim.indices != InvalidGLTFIndex)
+			{
+				AssignIndiciesToPrimitive(gltf, gltfPrim.indices, primitive);
+			}
+
+			mesh.primitives.Add(primitive);
 		}
 	}
 }
