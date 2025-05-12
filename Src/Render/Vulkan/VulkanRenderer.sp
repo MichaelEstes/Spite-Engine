@@ -11,6 +11,8 @@ import Vertex
 import UniformBufferObject
 import Time
 import FixedArray
+import Scene
+import ArrayView
 
 UINT64_MAX := uint64(-1);
 VkFalse := uint32(0);
@@ -43,12 +45,7 @@ CheckResult(result: VkResult, errorMsg: string)
 	}
 }
 
-Render()
-{
-	for (renderer in renderersByWindow.Values()) renderer.DrawFrame();
-}
-
-Destroy()
+DestroyAll()
 {
 	for (renderer in renderersByWindow.Values()) renderer.Destroy();
 }
@@ -1592,7 +1589,22 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 	CheckResult(vkEndCommandBuffer(commandBuffer), "Error recording Vulkan command buffer");
 }
 
-VulkanRenderer::DrawFrame()
+VulkanRenderer::PopulateSceneData(scene: Scene)
+{
+	
+}
+
+VulkanRenderer::DrawScenes(scenes: ArrayView<Scene>)
+{
+	for (scene in scenes)
+	{
+		this.PopulateSceneData(scene);
+	}
+
+	this.Draw();
+}
+
+VulkanRenderer::Draw()
 {
 	vkWaitForFences(this.device, uint32(1), this.inFlightFences[this.currentFrame]@, VkTrue, UINT64_MAX);
 

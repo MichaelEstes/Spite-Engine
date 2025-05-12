@@ -1,6 +1,6 @@
 package SparseSet
 
-import ValueIterator
+import ArrayView
 
 int32 DefaultResizeFactor(capacity: int32) => (capacity + 1) * 2;
 
@@ -66,9 +66,9 @@ bool SparseSet::next(it: Iterator)
 	return {key, value};
 }
 
-ValueIterator<Value> SparseSet::Values()
+ArrayView<Value> SparseSet::Values()
 {
-	return {this.denseValueArr[0], this.count as uint} as ValueIterator<Value>;
+	return ArrayView<Value>(this.denseValueArr[0], this.count as uint);
 }
 
 SparseSet::ResizeSparse(amount: uint32)

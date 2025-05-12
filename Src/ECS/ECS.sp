@@ -15,7 +15,8 @@ instance: ECS = ECS();
 enum ComponentKind: uint32
 {
 	Common,
-	Sparse
+	Sparse,
+	Tag
 }
 
 state Component
@@ -122,7 +123,7 @@ ECS::OnComponentRemove(id: uint16, componentData: *any)
 	callback(componentData);
 }
 
-ECS::RunSystems(systems: []System)
+ECS::RunSystems(systems: Array<System>)
 {
 	instance.systemFrameCount.Store(this.scenes.count * systems.count);
 
@@ -130,7 +131,7 @@ ECS::RunSystems(systems: []System)
 	{
 		for (system in systems) 
 		{
-			sceneSystem := instance.systemBuffer.Insert({scene, system@} as SceneSystem);
+			sceneSystem := instance.systemBuffer.Insert({scene@, system@} as SceneSystem);
 			Fiber.AddJob(::(data: *SceneSystem) {
 				scene := data.scene;
 				system := data.system;

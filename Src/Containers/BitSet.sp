@@ -75,3 +75,15 @@ BitSet::Toggle(i: uint)
 	offset := i % bitsInByte;
 	this.alloc[index]~ = this.alloc[index]~ ^ (1 << offset);
 }
+
+BitSet BitSet::Clone()
+{
+	cloned := BitSet();
+	cloned.bitCount = this.bitCount;
+
+	byteCount := this.bitCount / bitsInByte;
+	cloned.alloc.Alloc(byteCount);
+	copy_bytes(cloned.alloc[0], this.alloc[0], byteCount);
+
+	return cloned;
+}

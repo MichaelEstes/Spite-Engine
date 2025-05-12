@@ -39,19 +39,19 @@ MainLoop()
 {
 	running = true;
 
-	VulkanRenderer.CreateVulkanRenderer(Window.CreateMainWindow());
+	mainRenderer := VulkanRenderer.CreateVulkanRenderer(Window.CreateMainWindow());
 
 	currEvent := SDL.Event();
 	while (running)
 	{
 		ECS.instance.Update();
-		VulkanRenderer.Render();
+		mainRenderer.DrawScenes(ECS.instance.scenes.Values());
 		
 		while (SDL.PollEvent(currEvent@)) HandleSDLEvent(currEvent);
 	}
 
 	ECS.instance.Stop();
-	VulkanRenderer.Destroy();
+	VulkanRenderer.DestroyAll();
 }
 
 HandleSDLEvent(event: SDL.Event)

@@ -7,6 +7,8 @@ import GLTF
 import File
 import Thread
 
+import Query
+
 state Test
 {
 	i: int
@@ -37,6 +39,15 @@ transformSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 	for (item in scene.Iterate<Transform>())
 	{
 		//log item;
+	}
+
+	transformTestQuery := Query(scene@).With<Transform>().With<Test>();
+	result := transformTestQuery.Result();
+	defer delete result;
+
+	for (entity in result)
+	{
+		log "Query entity: ", entity;
 	}
 });
 
@@ -72,18 +83,22 @@ Main()
 		entity := scene.CreateEntity();
 		val := i as float;
 		scene.SetComponent<Transform>(entity, Transform(val, val, val));
-		scene.SetComponent<Test>(entity, i as Test);
+
+		if (i > 5)
+		{
+			scene.SetComponent<Test>(entity, i as Test);
+		}
 	}
 
 	//scene.RemoveEntity(Entity(5));
 	//scene.RemoveComponent<Transform>(Entity(6));
 	//scene.RemoveComponent<Test>(Entity(7));
 
-	//Core.Initialize();
-	//Core.Start();
-
 	gltf := LoadGLTF("./Resource/Models/Box/Box.gltf");
 	FlushGLTFToECS(gltf);
+
+	Core.Initialize();
+	Core.Start();
 
 	//log gltf;
 }

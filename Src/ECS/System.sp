@@ -1,6 +1,7 @@
 package System
 
 import Scene
+import Array
 
 enum SystemStep: byte
 {
@@ -20,11 +21,11 @@ state System
 
 state Systems
 {
-	onFixed: []System,
-	onEarlyFrame: []System,
-	onFrame: []System,
-	onPostFrame: []System,
+	onFixed: Array<System>,
+	onEarlyFrame: Array<System>,
+	onFrame: Array<System>,
+	onPostFrame: Array<System>,
 	
-	onStart: []System,
-	onStop: []System
+	onStart: Array<System>,
+	onStop: Array<System>
 }
