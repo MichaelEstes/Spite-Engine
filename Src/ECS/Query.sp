@@ -9,6 +9,11 @@ state QuerySet
 	entitySet: BitSet
 }
 
+QuerySet::delete
+{
+	delete this.entitySet;
+}
+
 Iterator QuerySet::operator::in()
 {
 	return {null, -1};
