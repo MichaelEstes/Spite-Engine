@@ -90,7 +90,6 @@ QuerySet Query::Result()
 	{
 		case (ComponentKind.Common)
 		{
-			log "FIRST ID: ", first.id;
 			compArr := this.scene.commonComponents.Get(first.id);
 			result.entitySet = compArr.entitySet.Clone();
 		}
