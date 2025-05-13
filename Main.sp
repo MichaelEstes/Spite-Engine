@@ -50,7 +50,7 @@ transformSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 
 	for (entity in result)
 	{
-		log "Query entity: ", entity;
+		//log "Query entity: ", entity;
 	}
 });
 

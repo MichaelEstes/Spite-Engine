@@ -30,3 +30,9 @@ state Geometry
 
     kind: GeometryKind
 }
+
+Geometry::delete
+{
+    delete this.uvs;
+    delete this.colors;
+}

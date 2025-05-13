@@ -38,3 +38,8 @@ state Material
 
 	doubleSided: bool
 }
+
+Material::delete
+{
+	delete this.maps;
+}

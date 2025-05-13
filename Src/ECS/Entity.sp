@@ -3,6 +3,8 @@ package Entity
 nullEntityID := uint32(0);
 invalidEntityID := uint32(-1);
 
+nullEntity := Entity(nullEntityID);
+
 state EntityComponent<Type>
 {
 	entity: Entity,

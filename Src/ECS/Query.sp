@@ -49,6 +49,13 @@ Query::delete
 	delete this.without;
 }
 
+ref Query Query::Scene(scene: *Scene)
+{
+	this.scene = scene;
+	
+	return this;
+}
+
 ref Query Query::With<Type>()
 {
 	component := ECS.instance.GetComponent<Type>();

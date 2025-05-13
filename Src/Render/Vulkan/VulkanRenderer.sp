@@ -11,8 +11,11 @@ import Vertex
 import UniformBufferObject
 import Time
 import FixedArray
-import Scene
 import ArrayView
+
+import Scene
+import Query
+import Render
 
 UINT64_MAX := uint64(-1);
 VkFalse := uint32(0);
@@ -1589,16 +1592,24 @@ VulkanRenderer::RecordCommandBuffer(commandBuffer: *VkCommandBuffer_T, imageInde
 	CheckResult(vkEndCommandBuffer(commandBuffer), "Error recording Vulkan command buffer");
 }
 
-VulkanRenderer::PopulateSceneData(scene: Scene)
+meshQuery := Query().With<Mesh>();
+
+VulkanRenderer::PopulateSceneData(scene: *Scene)
 {
-	
+	meshes := meshQuery.Scene(scene).Result();
+	defer delete meshes;
+
+	for (meshEntity in meshes)
+	{
+		log "Mesh Entity: ", meshEntity;
+	}
 }
 
 VulkanRenderer::DrawScenes(scenes: ArrayView<Scene>)
 {
 	for (scene in scenes)
 	{
-		this.PopulateSceneData(scene);
+		this.PopulateSceneData(scene@);
 	}
 
 	this.Draw();
