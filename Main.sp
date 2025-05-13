@@ -41,9 +41,12 @@ transformSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 		//log item;
 	}
 
-	transformTestQuery := Query(scene@).With<Transform>().With<Test>();
-	result := transformTestQuery.Result();
-	defer delete result;
+	query := Query(scene@).With<Transform>().Without<Test>();
+	result := query.Result();
+	defer {
+		delete query;
+		delete result;
+	}
 
 	for (entity in result)
 	{
@@ -94,10 +97,11 @@ Main()
 	//scene.RemoveComponent<Transform>(Entity(6));
 	//scene.RemoveComponent<Test>(Entity(7));
 
-	gltf := LoadGLTF("./Resource/Models/Box/Box.gltf");
-	FlushGLTFToECS(gltf);
-
 	Core.Initialize();
+
+	gltf := LoadGLTF("./Resource/Models/Box/Box.gltf");
+	FlushGLTFToECS(gltf, scene);
+
 	Core.Start();
 
 	//log gltf;

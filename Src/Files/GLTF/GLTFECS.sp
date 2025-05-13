@@ -4,6 +4,8 @@ import Render
 import ArrayView
 import Vec
 
+import Scene
+
 *byte GetBufferData(gltf: GLTF, buffer: uint32)
 {
 	gltfBuffer := gltf.buffers[buffer];
@@ -83,7 +85,7 @@ AssignIndiciesToPrimitive(gltf: GLTF, accessor: uint32, primitive: Primitive)
 	primitive.geometry.indices = indices;
 }
 
-FlushGLTFToECS(gltf: GLTF)
+FlushGLTFToECS(gltf: GLTF, scene: Scene)
 {
 	gltfMeshes := gltf.meshes;
 	
