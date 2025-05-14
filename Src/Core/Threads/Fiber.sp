@@ -27,6 +27,13 @@ state Job
 	handle: *JobHandle
 }
 
+state MainJob
+{
+	func: ::*any(*any),
+	data: *any,
+	callback: ::(*any)
+}
+
 state Fibers
 {
 	threads: Array<uint>,
@@ -38,13 +45,14 @@ state Fibers
 	locks := Array<SpinLock>(),
 
 	mainThread: uint,
-	jobsMain := Queue<Job>(),
+	jobsMain := Queue<MainJob>(),
 
 	handleAllocator: SlabAllocator,
 
 	currentProcess := Atomic<uint32>(),
 	processCount: uint32,
 
+	mainLock := SpinLock(),
 	running := true
 }
 
@@ -55,8 +63,8 @@ InitalizeFibers()
 	fibers = new Fibers();
 
 	sysInfo := GetSystemInfo();
-	// - 3, executable start thread, main fiber thread, IO thread
-	fibers.processCount = Math.Max(sysInfo.processorCount - 3, 1);
+	// - 2, executable start thread, main (IO) fiber thread
+	fibers.processCount = Math.Max(sysInfo.processorCount - 2, 1);
 	fibers.handleAllocator = SlabAllocator(#sizeof JobHandle, 32, fibers.processCount);
 
 	for (i .. fibers.processCount)
@@ -188,12 +196,39 @@ RunMainFiber()
 	
 	while (fibers.running)
 	{
-		if (fibers.jobsMain.count)
+		job := MainJob();
+		fibers.mainLock.Lock();
 		{
-			job := fibers.jobsMain.Dequeue();
-			job.func(job.data);
+			if (fibers.jobsMain.count)
+			{
+				job = fibers.jobsMain.Dequeue();
+			}
+		}
+		fibers.mainLock.Unlock();	
+		
+		if (job.func)
+		{
+			data := job.func(job.data);
+			if (job.callback)
+			{
+				job.callback(data);
+			}
 		}
 	}
+}
+
+RunOnMainFiber(func: ::*any(*any), data: *any, callback: ::(*any))
+{
+	job := MainJob();
+	job.func = func;
+	job.data = data;
+	job.callback = callback;
+
+	fibers.mainLock.Lock();
+	{
+		fibers.jobsMain.Enqueue(job);
+	}
+	fibers.mainLock.Unlock();	
 }
 
 Job GetNextJob(index: uint)

@@ -715,8 +715,8 @@ VulkanRenderer::InitializePipeline()
 
 	shaderStages := [vertShaderStageInfo, fragShaderStageInfo];
 
-	bindingDescription := Vertex3BindingDescription();
-	attributeDescriptions := Vertex3AttributeDescriptions();
+	bindingDescription := VertexBindingDescription();
+	attributeDescriptions := VertexAttributeDescriptions();
 
 	vertexInputInfo := VkPipelineVertexInputStateCreateInfo();
 	vertexInputInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -1096,7 +1096,7 @@ VulkanRenderer::InitializeTextureSampler()
 	);
 }
 
-vertices := Vertex3:[
+vertices := Vertex:[
     {{float32(-0.5), float32(-0.5), float32(0.0)}, {float32(1.0), float32(0.0), float32(0.0)}, {float32(0.0), float32(0.0)}},
     {{float32(0.5), float32(-0.5), float32(0.0)},  {float32(0.0), float32(1.0), float32(0.0)}, {float32(1.0), float32(0.0)}},
     {{float32(0.5), float32(0.5), float32(0.0)},   {float32(0.0), float32(0.0), float32(1.0)}, {float32(1.0), float32(1.0)}},
