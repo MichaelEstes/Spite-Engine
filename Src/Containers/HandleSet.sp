@@ -1,6 +1,7 @@
 package HandleSet
 
 import ArrayView
+import BitSet
 
 int32 DefaultResizeFactor(capacity: int32) => (capacity + 1) * 2;
 
@@ -15,13 +16,13 @@ state HandleSet<Value, InitialCapacity = 16, ResizeFactor = DefaultResizeFactor>
 	next: uint32,
 	capacity: uint32,
 
-	handleFlags: ZeroedAllocator<uint32>,
+	handleFlags: BitSet,
 	denseValueArr: Allocator<Value>
 }
 
 HandleSet::()
 {
-	this.handleArr.Alloc(InitialCapacity);
+	this.handleFlags = BitSet(InitialCapacity);
 	this.denseValueArr.Alloc(InitialCapacity);
 
 	this.next = 0;
@@ -30,7 +31,7 @@ HandleSet::()
 
 HandleSet::delete 
 {
-	this.handleArr.Dealloc(this.capacity);
+	delete this.handleFlags;
 	this.denseValueArr.Dealloc(this.capacity);
 }
 
@@ -38,7 +39,7 @@ HandleSet::Expand()
 {
 	resizedCapacity := ResizeFactor(this.capacity);
 
-	this.handleArr.Resize(resizedCapacity, this.capacity);
+	this.handleArr.Resize(resizedCapacity);
 	this.denseValueArr.Resize(resizedCapacity, this.capacity);
 	this.capacity = resizedCapacity;
 }
@@ -48,25 +49,27 @@ HandleValue HandleSet::GetNext()
 	if (this.next >= this.capacity) this.Expand();
 
 	index := this.next;
-	handleArr[index]~ = index + 1;
+	this.handleFlags.Set(index);
 
-	handleValue := HandleValue<Value>()
+	handleValue := HandleValue<Value>();
 	handleValue.handle = index;
 	handleValue.value = this.denseValueArr[index];
 	
 	this.next += 1;
-	while (this.handleArr[next] && next < this.capacity) this.next += 1;
+	while (this.handleFlags[this.next] && this.next < this.capacity) this.next += 1;
 	return handleValue;
 }
 
 bool HandleSet::Has(key: uint32)
 {
 	if (key >= this.capacity) return false;
-	return this.handleArr[key]~ != 0;
+	return this.handleFlags[key];
 }
 
 HandleSet::Remove(key: uint32)
 {
-	if (key >= this.capacity) return;
+	if (key > this.capacity) return;
 	
+	if (key < this.next) this.next = key;
+	this.handleFlags.Clear(key);
 }

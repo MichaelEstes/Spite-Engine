@@ -29,9 +29,7 @@ BitSet::delete
 
 BitSet::Resize(count: uint)
 {
-	byteCount := (((bitsInByte - count % bitsInByte) + count) / bitsInByte) - 1;
-	this.bitCount = byteCount * bitsInByte;
-	this.alloc.Resize(byteCount);
+	this.CheckResize(count);
 }
 
 bool BitSet::operator::[](i: uint)  

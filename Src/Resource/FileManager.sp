@@ -4,19 +4,12 @@ import ThreadParamAllocator
 import Fiber
 import OS
 import SparseSet
-
-state FileHandle
-{
-    id: uint32,
-    refCount: uint32
-}
+import HandleSet
 
 state FileManager
 {
-    fileToHandle := Map<string, FileHandle>(),
-    handleToContent := SparseSet<string>(),
-
-    currentID := uint32(0)
+    fileHandles := HandleSet<string>(),
+    fileReferences := SparseSet<uint32>()
 }
 
 fileManager := FileManager();
