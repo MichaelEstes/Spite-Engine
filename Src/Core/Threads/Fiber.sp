@@ -27,13 +27,6 @@ state Job
 	handle: *JobHandle
 }
 
-state MainJob
-{
-	func: ::*any(*any),
-	data: *any,
-	callback: ::(*any)
-}
-
 state Fibers
 {
 	threads: Array<uint>,
@@ -45,7 +38,7 @@ state Fibers
 	locks := Array<SpinLock>(),
 
 	mainThread: uint,
-	jobsMain := Queue<MainJob>(),
+	jobsMain := Queue<Job>(),
 
 	handleAllocator: SlabAllocator,
 
@@ -196,7 +189,7 @@ RunMainFiber()
 	
 	while (fibers.running)
 	{
-		job := MainJob();
+		job := Job();
 		fibers.mainLock.Lock();
 		{
 			if (fibers.jobsMain.count)
@@ -208,21 +201,16 @@ RunMainFiber()
 		
 		if (job.func)
 		{
-			data := job.func(job.data);
-			if (job.callback)
-			{
-				job.callback(data);
-			}
+			job.func(job.data);
 		}
 	}
 }
 
-RunOnMainFiber(func: ::*any(*any), data: *any, callback: ::(*any))
+RunOnMainFiber(func: ::(*any), data: *any)
 {
-	job := MainJob();
+	job := Job();
 	job.func = func;
 	job.data = data;
-	job.callback = callback;
 
 	fibers.mainLock.Lock();
 	{

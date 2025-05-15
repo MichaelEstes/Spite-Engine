@@ -1601,7 +1601,7 @@ VulkanRenderer::PopulateSceneData(scene: *Scene)
 
 	for (meshEntity in meshes)
 	{
-		log "Mesh Entity: ", meshEntity;
+		//log "Mesh Entity: ", meshEntity;
 	}
 }
 

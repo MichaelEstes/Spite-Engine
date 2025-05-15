@@ -386,19 +386,8 @@ state GLTFURI
     byteCount: uint32
 }
 
-GLTF LoadGLTF(file: string)
+GLTF ParseGLTF(gltf: GLTF, oot: JSONObject)
 {
-    path := GetAbsolutePath(file);
-
-    gltf := GLTF();
-    gltf.src = path;
-    gltf.path = OS.GetDirectoryName(path);
-
-    json := ParseJSONFile(path);
-    defer delete json;
-
-    root := json.root.Object();
-
     ParseGLTFAsset(gltf, root);
 
     sceneValue := root.GetMember("scene");
@@ -419,6 +408,22 @@ GLTF LoadGLTF(file: string)
     ParseGLTFAccessors(gltf, root);
 
     return gltf;
+}
+
+GLTF LoadGLTF(file: string)
+{
+    path := GetAbsolutePath(file);
+
+    gltf := GLTF();
+    gltf.src = path;
+    gltf.path = OS.GetDirectoryName(path);
+
+    json := ParseJSONFile(path);
+    defer delete json;
+
+    root := json.root.Object();
+
+    return ParseGLTF(gltf, root);
 }
 
 *string ParseGLTFStringPtr(gltf: GLTF, value: *JSONValue)
