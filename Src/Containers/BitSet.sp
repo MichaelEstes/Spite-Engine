@@ -27,6 +27,13 @@ BitSet::delete
 	this.alloc.Dealloc(this.bitCount / bitsInByte);
 }
 
+BitSet::Resize(count: uint)
+{
+	byteCount := (((bitsInByte - count % bitsInByte) + count) / bitsInByte) - 1;
+	this.bitCount = byteCount * bitsInByte;
+	this.alloc.Resize(byteCount);
+}
+
 bool BitSet::operator::[](i: uint)  
 { 
 	if(!this.Inbounds(i)) return false;
