@@ -35,16 +35,21 @@ HandleSet::delete
 	this.denseValueArr.Dealloc(this.capacity);
 }
 
+*Value HandleSet::operator::[](index: uint32)
+{
+	return this.denseValueArr[index];
+}
+
 HandleSet::Expand()
 {
 	resizedCapacity := ResizeFactor(this.capacity);
 
-	this.handleArr.Resize(resizedCapacity);
+	this.handleFlags.Resize(resizedCapacity);
 	this.denseValueArr.Resize(resizedCapacity, this.capacity);
 	this.capacity = resizedCapacity;
 }
 
-HandleValue HandleSet::GetNext()
+HandleValue<Value> HandleSet::GetNext()
 {
 	if (this.next >= this.capacity) this.Expand();
 

@@ -386,7 +386,7 @@ state GLTFURI
     byteCount: uint32
 }
 
-GLTF ParseGLTF(gltf: GLTF, oot: JSONObject)
+GLTF ParseGLTF(gltf: GLTF, root: *JSONObject)
 {
     ParseGLTFAsset(gltf, root);
 
