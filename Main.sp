@@ -103,10 +103,10 @@ Main()
 	gltf := LoadGLTF("./Resource/Models/Box/Box.gltf");
 	FlushGLTFToECS(gltf, scene);
 
-	FileManager.LoadFileAsync("./Resource/Models/Box/Box.gltf", ::(handle: uint32) {
+	FileManager.LoadFileAsync("./Resource/Models/Box/Box.gltf", ::(handle: FileHandle) {
 		fileContent := FileManager.TakeFileRef(handle);
 		defer FileManager.ReleaseFileRef(handle);
-		log "Loaded file: ", fileContent;
+		log "Loaded file: ", fileContent, "Handle: ", handle;
 	});
 
 	Core.Start();

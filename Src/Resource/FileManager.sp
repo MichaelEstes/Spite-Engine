@@ -6,6 +6,11 @@ import OS
 import SparseSet
 import HandleSet
 
+state FileHandle
+{
+    id: uint32
+}
+
 state FileRef
 {
     key: string,
@@ -20,7 +25,7 @@ FileRef::delete
 
 state FileManager
 {
-    fileToHandle := Map<string, uint32>(),
+    fileToHandle := Map<string, FileHandle>(),
     fileHandles := HandleSet<FileRef>()
 }
 
@@ -28,11 +33,11 @@ fileManager := FileManager();
 
 state LoadFileParam
 {
-    onLoad: ::(uint32),
+    onLoad: ::(FileHandle),
     file: string,
 }
 
-LoadFileAsync(file: string, onLoad: ::(uint32))
+LoadFileAsync(file: string, onLoad: ::(FileHandle))
 {
     if (fileManager.fileToHandle.Has(file))
     {
@@ -54,30 +59,31 @@ LoadFileAsync(file: string, onLoad: ::(uint32))
         handleValue.value.contents = fileContent;
         handleValue.value.refCount = 0;
 
-        handle := handleValue.handle;
+        handle := handleValue.handle as FileHandle;
         fileManager.fileToHandle.Insert(data.file, handle);
 
         data.onLoad(handle);
     }, loadFileParam);
 }
 
-string TakeFileRef(handle: uint32)
+string TakeFileRef(handle: FileHandle)
 {
-    fileRef := fileManager.fileHandles[handle]~;
+    fileRef := fileManager.fileHandles[handle.id]~;
     fileRef.refCount += 1;
     return fileRef.contents;
 }
 
-ReleaseFileRef(handle: uint32)
+ReleaseFileRef(handle: FileHandle)
 {
-    if (!fileManager.fileHandles.Has(handle)) return;
+    id := handle.id;
+    if (!fileManager.fileHandles.Has(id)) return;
 
-    fileRef := fileManager.fileHandles[handle]~;
+    fileRef := fileManager.fileHandles[id]~;
     fileRef.refCount -= 1;
     if (fileRef.refCount == 0)
     {
         fileManager.fileToHandle.Remove(fileRef.key);
-        fileManager.fileHandles.Remove(handle);
+        fileManager.fileHandles.Remove(id);
         delete fileRef;
     }
 }

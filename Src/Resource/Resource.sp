@@ -33,10 +33,11 @@ state ResourceHandle
 
 state Resource
 {
-	path: string,
+	key: string,
 	data: ResourceData,
 
-	handle: ResourceHandle,
 	type: ResourceType,
-	flags: ResourceFlags
+	flags: ResourceFlags,
+	result: ResourceResult,
+	refCount: uint32
 }
