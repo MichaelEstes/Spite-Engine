@@ -10,6 +10,8 @@ import Thread
 import Query
 import FileManager
 
+import GLTFLoader
+
 state Test
 {
 	i: int
@@ -100,13 +102,8 @@ Main()
 
 	Core.Initialize();
 
-	gltf := LoadGLTF("./Resource/Models/Box/Box.gltf");
-	FlushGLTFToECS(gltf, scene);
-
-	FileManager.LoadFileAsync("./Resource/Models/Box/Box.gltf", ::(handle: FileHandle) {
-		fileContent := FileManager.TakeFileRef(handle);
-		defer FileManager.ReleaseFileRef(handle);
-		log "Loaded file: ", fileContent, "Handle: ", handle;
+	LoadGLTFResource("./Resource/Models/Box/Box.gltf", scene, ::(handle: ResourceHandle) {
+		log "Loaded gltf: ", handle;
 	});
 
 	Core.Start();

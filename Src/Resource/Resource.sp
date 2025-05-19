@@ -1,29 +1,12 @@
 package Resource
 
-enum ResourceType: uint32
-{
-	File,
-	GLTF,
-}
+import Array
 
 enum ResourceResult: uint32
 {
 	Loaded,
 	NotFound,
-	LoadFailed,
-	Invalid
-}
-
-enum ResourceFlags: uint32
-{
-	Packed,
-}
-
-state ResourceData
-{
-	contents: *void,
-	byteCount: uint,
-	metadata: *void
+	LoadFailed
 }
 
 state ResourceHandle
@@ -31,13 +14,13 @@ state ResourceHandle
 	id: uint32
 }
 
-state Resource
+state Resource<Type>
 {
 	key: string,
-	data: ResourceData,
+	data: *Type,
+	metadata: *void
 
-	type: ResourceType,
-	flags: ResourceFlags,
+	parent: ResourceHandle,
 	result: ResourceResult,
 	refCount: uint32
 }

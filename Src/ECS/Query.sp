@@ -103,11 +103,14 @@ QuerySet Query::Result()
 		case (ComponentKind.Common)
 		{
 			compArr := this.scene.commonComponents.Get(first.id);
+			if (!compArr) return result;
+
 			result.entitySet = compArr.entitySet.Clone();
 		}
 		case (ComponentKind.Sparse)
 		{
 			compMap := this.scene.sparseComponents.Get(first.id);
+			if (!compMap) return result;
 			
 			maxEntity := uint32(0);
 			for (i .. compMap.count)
@@ -140,6 +143,8 @@ QuerySet Query::Result()
 			case (ComponentKind.Common)
 			{
 				compArr := this.scene.commonComponents.Get(comp.id);
+				if (!compArr) break;
+
 				for (i .. result.entitySet.bitCount)
 				{
 					if (result.entitySet[i] && !compArr.Has(Entity(i)))
@@ -149,6 +154,8 @@ QuerySet Query::Result()
 			case (ComponentKind.Sparse)
 			{
 				compMap := this.scene.sparseComponents.Get(comp.id);
+				if (!compMap) break;
+
 				for (i .. result.entitySet.bitCount)
 				{
 					if (result.entitySet[i] && !compMap.Has(Entity(i)))
@@ -165,6 +172,8 @@ QuerySet Query::Result()
 			case (ComponentKind.Common)
 			{
 				compArr := this.scene.commonComponents.Get(comp.id);
+				if (!compArr) break;
+
 				for (i .. result.entitySet.bitCount)
 				{
 					if (result.entitySet[i] && compArr.Has(Entity(i)))
@@ -174,6 +183,8 @@ QuerySet Query::Result()
 			case (ComponentKind.Sparse)
 			{
 				compMap := this.scene.sparseComponents.Get(comp.id);
+				if (!compMap) break;
+
 				for (i .. result.entitySet.bitCount)
 				{
 					if (result.entitySet[i] && compMap.Has(Entity(i)))

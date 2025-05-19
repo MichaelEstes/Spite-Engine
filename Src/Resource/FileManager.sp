@@ -33,36 +33,38 @@ fileManager := FileManager();
 
 state LoadFileParam
 {
-    onLoad: ::(FileHandle),
+    onLoad: ::(FileHandle, *any),
     file: string,
+    data: *any
 }
 
-LoadFileAsync(file: string, onLoad: ::(FileHandle))
+LoadFileAsync(file: string, onLoad: ::(FileHandle, *any), data: *any = null)
 {
     if (fileManager.fileToHandle.Has(file))
     {
         handle := fileManager.fileToHandle[file]~;
-        onLoad(handle);
+        onLoad(handle, data);
         return;
     }
 
     loadFileParam := AllocThreadParam<LoadFileParam>();
     loadFileParam.onLoad = onLoad;
     loadFileParam.file = file;
+    loadFileParam.data = data;
 
-    Fiber.RunOnMainFiber(::(data: *LoadFileParam) {
-        defer DeallocThreadParam<LoadFileParam>(data);
+    Fiber.RunOnMainFiber(::(param: *LoadFileParam) {
+        defer DeallocThreadParam<LoadFileParam>(param);
 
-        fileContent := OS.ReadFile(data.file);
+        fileContent := OS.ReadFile(param.file);
         handleValue := fileManager.fileHandles.GetNext();
-        handleValue.value.key = data.file;
+        handleValue.value.key = param.file;
         handleValue.value.contents = fileContent;
         handleValue.value.refCount = 0;
 
         handle := handleValue.handle as FileHandle;
-        fileManager.fileToHandle.Insert(data.file, handle);
+        fileManager.fileToHandle.Insert(param.file, handle);
 
-        data.onLoad(handle);
+        param.onLoad(handle, param.data);
     }, loadFileParam);
 }
 

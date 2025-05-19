@@ -174,6 +174,8 @@ JSON ParseJSON(str: string)
 
 JSON ParseJSONFile(file: string)
 {
+	contents := OS.ReadFile(file);
+	defer delete contents;
 	return ParseJSON(OS.ReadFile(file));
 }
 

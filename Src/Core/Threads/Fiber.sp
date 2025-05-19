@@ -139,6 +139,7 @@ WaitForHandle(handle: *JobHandle)
 {
 	assert handle != null, "Cannot wait for a null handle";
 
+	defer DeallocJobHandle(handle);
 	currThread := GetCurrentThreadID();
 	
 	for (i .. fibers.processCount)
@@ -152,14 +153,12 @@ WaitForHandle(handle: *JobHandle)
 			{
 				RunNext(i);
 			}
-			DeallocJobHandle(handle);
 			return;
 		}
 	}
 
 	// Waiting on a non fiber thread, spin
 	while (handle.counter.Load() != 0) {}
-	DeallocJobHandle(handle);
 }
 
 uint CreateMainFiber()
