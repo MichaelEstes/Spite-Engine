@@ -2,37 +2,55 @@ package Resource
 
 import HandleSet
 
-state ResourceManager<Type>
+state ResourceManager<Type, ParamType>
 {
 	resourceKeyToHandle := Map<string, ResourceHandle>(),
 	resources := HandleSet<Resource<Type>>(),
 
-	loader: ::Type(*ParamType),
+	getKey: ::string(ParamType)
+	loader: ::(ParamType, ::(Resource<Type>, ResourceParam<ParamType>)),
 	onLoad: ::(*Type),
 	onRelease: ::(*Type)
 }
 
-resourceManager := ResourceManager();
-
-ResourceManager<Type> RegisterResourceManager<ResourceType, ParamType>(loader: ::ResourceType(*any),
-															 onLoad: ::(*ResourceType) = null,
-															 onRelease: ::(*ResourceType) = null)
+ResourceManager::delete
 {
-	handle := ResourceLoaderHandle();
-	next := resourceManager.resourceLoaders.GetNext();
-	
-	handle.id = next.handle;
-
-	loader := next.value as ResourceLoader<ResourceType, ParamType>;
-	loader.loader = loader;
-	loader.onLoad = onLoad;
-	loader.onRelease = onRelease;
-
-	return handle;
+	delete this.resourceKeyToHandle;
+	delete this.resources;
 }
 
-ResourceHandle LoadResource<Type, ParamType>(loaderHandle: ResourceLoaderHandle, param: *ParamType)
+ResourceManager::LoadResource(param: ParamType, onLoad: ::(ResourceHandle))
 {
+	resourceKey := this.getKey(param);
 
+	if (this.resourceKeyToHandle.Has(resourceKey))
+	{
+		handle := this.resourceKeyToHandle[resourceKey]~;
+		onLoad(handle);
+		return;
+	}
+
+	resourceParam := ResourceParam<ParamType>();
+	resourceParam.key = resourceKey;
+	resourceParam.onLoad = onLoad;
+	resourceParam.data = param;
+
+	this.loader(resourceParam, ::(resource: Resource<Type>, param: ResourceParam<ParamType>) {
+
+	});
+}
+
+ResourceManager<Type> RegisterResourceManager<ResourceType, ParamType>(
+		getKey: ::string(ParamType), 
+		loader: ::(ResourceParam<ParamType>, ::(Resource<ResourceType>, ResourceParam<ParamType>)),
+		onLoad: ::(*ResourceType) = null, onRelease: ::(*ResourceType) = null
+	)
+{
+	resourceManager := ResourceManager<ResourceType, ParamType>();
+	resourceManager.loader = loader;
+	resourceManager.onLoad = onLoad;
+	resourceManager.onRelease = onRelease;
+
+	return resourceManager;
 }
 

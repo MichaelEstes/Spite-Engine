@@ -4,6 +4,8 @@ import Array
 
 enum ResourceResult: uint32
 {
+	NotLoaded,
+	Loading,
 	Loaded,
 	NotFound,
 	LoadFailed
@@ -14,10 +16,17 @@ state ResourceHandle
 	id: uint32
 }
 
+state ResourceParam<Type>
+{
+	key: string,
+	onLoad: ::(ResourceHandle),
+	data: Type
+}
+
 state Resource<Type>
 {
 	key: string,
-	data: *Type,
+	data: Type,
 	metadata: *void
 
 	parent: ResourceHandle,
