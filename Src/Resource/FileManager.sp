@@ -52,7 +52,8 @@ LoadFileAsync(file: string, onLoad: ::(FileHandle, *any), data: *any = null)
     loadFileParam.file = file;
     loadFileParam.data = data;
 
-    Fiber.RunOnMainFiber(::(param: *LoadFileParam) {
+    Fiber.RunOnMainFiber(::(param: *LoadFileParam) 
+    {
         defer DeallocThreadParam<LoadFileParam>(param);
 
         fileContent := OS.ReadFile(param.file);

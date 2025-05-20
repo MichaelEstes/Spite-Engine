@@ -10,7 +10,7 @@ import Thread
 import Query
 import FileManager
 
-import GLTFLoader
+import GLTFManager
 
 state Test
 {
