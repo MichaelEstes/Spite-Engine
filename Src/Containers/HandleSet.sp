@@ -5,6 +5,8 @@ import BitSet
 
 int32 DefaultResizeFactor(capacity: int32) => (capacity + 1) * 2;
 
+InvalidHandle := uint32(0);
+
 state HandleValue<Value>
 {
 	handle: uint32,
@@ -57,7 +59,7 @@ HandleValue<Value> HandleSet::GetNext()
 	this.handleFlags.Set(index);
 
 	handleValue := HandleValue<Value>();
-	handleValue.handle = index;
+	handleValue.handle = index + 1;
 	handleValue.value = this.denseValueArr[index];
 	
 	this.next += 1;
@@ -67,14 +69,16 @@ HandleValue<Value> HandleSet::GetNext()
 
 bool HandleSet::Has(key: uint32)
 {
-	if (key >= this.capacity) return false;
-	return this.handleFlags[key];
+	index := key - 1;
+	if (index >= this.capacity) return false;
+	return this.handleFlags[index];
 }
 
 HandleSet::Remove(key: uint32)
 {
-	if (key > this.capacity) return;
+	index := key - 1;
+	if (index > this.capacity) return;
 	
 	if (key < this.next) this.next = key;
-	this.handleFlags.Clear(key);
+	this.handleFlags.Clear(index);
 }

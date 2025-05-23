@@ -20,6 +20,7 @@ state ResourceHandle
 state ResourceParam<Type, ParamType>
 {
 	key: string,
+	manager: *ResourceManager<Type, ParamType>,
 	onResourceLoad: ::(*ResourceParam<Type, ParamType>),
 	onLoad: ::(ResourceHandle),
 	resource: *Resource<Type>,
@@ -44,8 +45,8 @@ state ResourceManager<Type, ParamType>
 
 	getKey: ::string(ParamType)
 	loader: ::(*ResourceParam<Type, ParamType>),
-	onLoad: ::(*Type),
-	onRelease: ::(*Type)
+	onLoad: ::(ResourceHandle),
+	onRelease: ::(ResourceHandle)
 }
 
 ResourceManager::delete
@@ -67,15 +68,15 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 
 	handleValue := this.resources.GetNext();
 
-	log handleValue;
-
 	handle := handleValue.handle as ResourceHandle;
 
 	resource := handleValue.value;
+	resource~ = Resource<Type>();
 	resource.result = ResourceResult.Loading;
 
 	resourceParam := AllocThreadParam<ResourceParam<Type, ParamType>>();
 	resourceParam.key = resourceKey;
+	resourceParam.manager = this@;
 	resourceParam.onLoad = onLoad;
 	resourceParam.param = param;
 	resourceParam.handle = handle;
@@ -84,7 +85,11 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 	resourceParam.onResourceLoad = ::(param: *ResourceParam<Type,ParamType>) {
 		defer DeallocThreadParam<ResourceParam<Type, ParamType>>(param);
 
-		if (param.onLoad) param.onLoad(param.handle);
+		handle := param.handle;
+		resourceManager := param.manager;
+		
+		if (resourceManager.onLoad) resourceManager.onLoad(handle)
+		param.onLoad(handle);
 	};
 
 	this.loader(resourceParam);
@@ -95,8 +100,8 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 ResourceManager<ResourceType, ParamType> RegisterResourceManager<ResourceType, ParamType>(
 		getKey: ::string(ParamType), 
 		loader: ::(*ResourceParam<ResourceType, ParamType>),
-		onLoad: ::(*ResourceType) = null, 
-		onRelease: ::(*ResourceType) = null
+		onLoad: ::(ResourceHandle) = null, 
+		onRelease: ::(ResourceHandle) = null
 	)
 {
 	resourceManager := ResourceManager<ResourceType, ParamType>();
