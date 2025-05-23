@@ -9,7 +9,7 @@ import Entity
 
 state GLTFResource
 {
-	children: Array<Resource>
+	children: Array<Resource<any>>
 }
 
 state GLTFLoadParam

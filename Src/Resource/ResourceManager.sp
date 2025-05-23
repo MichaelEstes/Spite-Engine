@@ -84,7 +84,7 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 	resourceParam.onResourceLoad = ::(param: *ResourceParam<Type,ParamType>) {
 		defer DeallocThreadParam<ResourceParam<Type, ParamType>>(param);
 
-		param.onLoad(param.handle);
+		if (param.onLoad) param.onLoad(param.handle);
 	};
 
 	this.loader(resourceParam);
@@ -100,6 +100,7 @@ ResourceManager<ResourceType, ParamType> RegisterResourceManager<ResourceType, P
 	)
 {
 	resourceManager := ResourceManager<ResourceType, ParamType>();
+	resourceManager.getKey = getKey;
 	resourceManager.loader = loader;
 	resourceManager.onLoad = onLoad;
 	resourceManager.onRelease = onRelease;
