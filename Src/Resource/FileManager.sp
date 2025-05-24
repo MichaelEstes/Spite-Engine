@@ -20,6 +20,7 @@ state FileRef
 
 FileRef::delete
 {
+    delete this.key;
     delete this.contents;
 }
 
@@ -36,6 +37,27 @@ state LoadFileParam
     onLoad: ::(FileHandle, *any),
     file: string,
     data: *any
+}
+
+FileHandle LoadFile(file: string)
+{
+    if (fileManager.fileToHandle.Has(file))
+    {
+        handle := fileManager.fileToHandle[file]~;
+        return handle;
+    }
+
+    fileName := file.Copy();
+    fileContent := OS.ReadFile(fileName);
+    handleValue := fileManager.fileHandles.GetNext();
+    handleValue.value.key = fileName;
+    handleValue.value.contents = fileContent;
+    handleValue.value.refCount = 0;
+
+    handle := handleValue.handle as FileHandle;
+    fileManager.fileToHandle.Insert(fileName, handle);
+
+    return handle;
 }
 
 LoadFileAsync(file: string, onLoad: ::(FileHandle, *any), data: *any = null)
@@ -56,14 +78,7 @@ LoadFileAsync(file: string, onLoad: ::(FileHandle, *any), data: *any = null)
     {
         defer DeallocThreadParam<LoadFileParam>(param);
 
-        fileContent := OS.ReadFile(param.file);
-        handleValue := fileManager.fileHandles.GetNext();
-        handleValue.value.key = param.file;
-        handleValue.value.contents = fileContent;
-        handleValue.value.refCount = 0;
-
-        handle := handleValue.handle as FileHandle;
-        fileManager.fileToHandle.Insert(param.file, handle);
+        handle := LoadFile(param.file);
 
         param.onLoad(handle, param.data);
     }, loadFileParam);
@@ -71,7 +86,7 @@ LoadFileAsync(file: string, onLoad: ::(FileHandle, *any), data: *any = null)
 
 string TakeFileRef(handle: FileHandle)
 {
-    fileRef := fileManager.fileHandles[handle.id]~;
+    fileRef := fileManager.fileHandles[handle.id];
     fileRef.refCount += 1;
     return fileRef.contents;
 }

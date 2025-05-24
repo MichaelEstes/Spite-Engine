@@ -17,6 +17,8 @@ state ResourceHandle
 	id: uint32
 }
 
+InvalidResourceHandle := ResourceHandle();
+
 state ResourceParam<Type, ParamType>
 {
 	key: string,
@@ -53,6 +55,23 @@ ResourceManager::delete
 {
 	delete this.resourceKeyToHandle;
 	delete this.resources;
+}
+
+ResourceManager::RemoveResource(handle: ResourceHandle)
+{
+    id := handle.id;
+    if (!this.resources.Has(id)) return;
+
+	if (this.onRelease) this.onRelease(handle);
+    this.resources.Remove(id);
+	for (kv in this.resourceKeyToHandle)
+	{
+		if (kv.value.id == id)
+		{
+			this.resourceKeyToHandle.Remove(kv.key~);
+			break;
+		}
+	}
 }
 
 ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(ResourceHandle))
@@ -95,6 +114,26 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 	this.loader(resourceParam);
 
 	return handle;
+}
+
+Resource<Type> ResourceManager::TakeResourceRef(handle: ResourceHandle)
+{
+    resource := this.resources[handle.id];
+	resource.refCount += 1;
+	return resource~;
+}
+
+ResourceManager::ReleaseResourceRef(handle: ResourceHandle)
+{
+    id := handle.id;
+    if (!this.resources.Has(id)) return;
+
+    resource := this.resources[id];
+    resource.refCount -= 1;
+    if (resource.refCount == 0)
+    {
+        this.RemoveResource(handle);
+    }
 }
 
 ResourceManager<ResourceType, ParamType> RegisterResourceManager<ResourceType, ParamType>(

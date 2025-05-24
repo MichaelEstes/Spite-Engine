@@ -9,7 +9,7 @@ import Color
 import Arena
 import StrArena
 import JSON
-import File
+import FileManager
 
 InvalidGLTFIndex := -1 as uint32;
 
@@ -37,7 +37,9 @@ state GLTF
     bufferViews: Array<GLTFBufferView>,
     accessors: Array<GLTFAccessor>,
 	
-    scene: uint32 = InvalidGLTFIndex
+    scene: uint32 = InvalidGLTFIndex,
+
+    fileHandle: FileHandle
 }
 
 GLTF::delete
@@ -60,6 +62,8 @@ GLTF::delete
     delete this.path;
     delete this.mem;
     delete this.strMem;
+
+    FileManager.ReleaseFileRef(this.fileHandle);
 }
 
 state GLTFAsset
@@ -381,9 +385,7 @@ GLTFSkin::delete
 
 state GLTFURI
 {
-    uri: *string,
-    data: *byte,
-    byteCount: uint32
+    uri: *string
 }
 
 GLTF ParseGLTF(gltf: GLTF, root: *JSONObject)
@@ -418,7 +420,11 @@ GLTF LoadGLTF(file: string)
     gltf.src = path;
     gltf.path = OS.GetDirectoryName(path);
 
-    json := ParseJSONFile(path);
+    fileHandle := FileManager.LoadFile(path);
+    gltf.fileHandle = fileHandle;
+    gltfFileContents := FileManager.TakeFileRef(fileHandle);
+
+    json := ParseJSON(gltfFileContents);
     defer delete json;
 
     root := json.root.Object();
@@ -448,20 +454,6 @@ GLTFURI ParseGLTFURI(gltf: GLTF, value: *JSONValue)
         uriPtr := gltf.mem.Emplace<string>();
         uriPtr~ = gltf.strMem.Copy(value.String().value);
         uri.uri = uriPtr;
-
-        if (IsDataURI(uriPtr~))
-        {
-
-        }
-        else
-        {
-            filePath := OS.JoinPaths([gltf.path, uriPtr~])
-            defer delete filePath;
-            
-            contents := OS.ReadFile(filePath)
-            uri.data = contents.mem;
-            uri.byteCount = contents.count;
-        }
     }
 
     return uri;

@@ -37,8 +37,10 @@ HandleSet::delete
 	this.denseValueArr.Dealloc(this.capacity);
 }
 
-*Value HandleSet::operator::[](index: uint32)
+*Value HandleSet::operator::[](handle: uint32)
 {
+	index := handle - 1;
+	if (index >= this.capacity) return null;
 	return this.denseValueArr[index];
 }
 
