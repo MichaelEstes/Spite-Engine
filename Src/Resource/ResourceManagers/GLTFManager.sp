@@ -22,7 +22,20 @@ state GLTFLoadParam
 	outEntities: *Array<Entity>
 }
 
-GLTFResourceManager := Resource.RegisterResourceManager<GLTFResource, GLTFLoadParam>(GetGLTFKey, GLTFManagerLoad);
+GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadParam>(
+	['g', 'l', 't', 'f'],
+	GetGLTFKey, 
+	GLTFManagerLoad,
+	::(handle: ResourceHandle) {
+		log "RELEASING GLTF RESOURCE", handle;
+		resource := Resource.GetResource<GLTFResource>(handle);
+		gltfResource := resource.data;
+
+		for (bufferHandle in gltfResource.buffers) Resource.ReleaseResourceRef(bufferHandle);
+	}
+);
+
+GLTFResourceManagerID := Resource.RegisterResourceManager(GLTFResourceManager@);
 
 string GetGLTFKey(param: GLTFLoadParam) => param.file;
 
@@ -69,18 +82,20 @@ ResourceHandle GetBufferHandle(gltf: GLTF, buffer: uint32)
 	return LoadURIResource(uri, gltf.path);
 }
 
-*byte GetBufferViewData(resource: *GLTFResource,gltf: GLTF, bufferView: uint32)
+*byte GetBufferViewData(resource: *GLTFResource, gltf: GLTF, bufferView: uint32)
 {
 	gltfBufferView := gltf.bufferViews[bufferView];
 
 	handle := GetBufferHandle(gltf, gltfBufferView.buffer);
-	data := URIResourceManager.TakeResourceRef(handle).buffer;
+	resource.buffers.Add(handle);
+
+	data := URIResourceManager.TakeResourceRef(handle).data.buffer;
 	data = data + gltfBufferView.byteOffset;
 
 	return data;
 }
 
-ArrayView<byte> GetAccessorData(resource: *GLTFResource,gltf: GLTF, accessor: uint32)
+ArrayView<byte> GetAccessorData(resource: *GLTFResource, gltf: GLTF, accessor: uint32)
 {
 	gltfAccessor := gltf.accessors[accessor];
 
@@ -90,7 +105,7 @@ ArrayView<byte> GetAccessorData(resource: *GLTFResource,gltf: GLTF, accessor: ui
 	return ArrayView<byte>(data, gltfAccessor.count);
 }
 
-AssignPositionToPrimitive(resource: *GLTFResource,gltf: GLTF, accessor: uint32, primitive: Primitive)
+AssignPositionToPrimitive(resource: *GLTFResource, gltf: GLTF, accessor: uint32, primitive: Primitive)
 {
 	view := GetAccessorData(resource, gltf, accessor);
 	vertices := ArrayView<Vec3>(view[0]@, view.count);
@@ -134,11 +149,6 @@ AssignIndiciesToPrimitive(resource: *GLTFResource, gltf: GLTF, accessor: uint32,
 {
 	view := GetAccessorData(resource, gltf, accessor);
 	indices := ArrayView<uint16>(view[0]@, view.count);
-
-	for (index in indices)
-	{
-		log index;
-	}
 
 	primitive.geometry.indices = indices;
 }

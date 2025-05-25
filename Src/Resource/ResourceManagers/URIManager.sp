@@ -15,7 +15,18 @@ state URIParam
 	basePath: string
 }
 
-URIResourceManager := Resource.RegisterResourceManager<URIResource, URIParam>(GetURIKey, URIManagerLoad);
+URIResourceManager := Resource.CreateResourceManager<URIResource, URIParam>(
+	['u', 'r', 'i', '_'],
+	GetURIKey, 
+	URIManagerLoad,
+	::(handle: ResourceHandle) {
+		resource := Resource.GetResource<URIResource>(handle);
+		log "RELEASING URI RESOURCE", resource;
+		delete resource.data.buffer;
+	}
+);
+
+URIResourceManagerID := Resource.RegisterResourceManager(URIResourceManager@);
 
 string GetURIKey(param: URIParam) => param.uri;
 
@@ -23,8 +34,7 @@ URIManagerLoad(uriParam: *ResourceParam<URIResource, URIParam>)
 {
 	uri := uriParam.param.uri;
 	basePath := uriParam.param.basePath;
-	resource := uriParam.resource.data@;
-
+	resource := uriParam.resource.data;
 	
 	if (File.IsDataURI(uri))
     {
@@ -32,7 +42,11 @@ URIManagerLoad(uriParam: *ResourceParam<URIResource, URIParam>)
     }
     else
     {
-        fileContent := OS.ReadFile(uri);
+		path := OS.JoinPaths([basePath, uri]);
+		defer delete path;
+		log "Loading URI file: ", path;
+        fileContent := OS.ReadFile(path);
+		log "URI file contents: ", fileContent;
 		resource.buffer = fileContent[0];
 		resource.count = fileContent.count;
 	}

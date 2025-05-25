@@ -15,6 +15,7 @@ enum ResourceResult: uint32
 state ResourceHandle
 {
 	id: uint32
+	manager: uint32
 }
 
 InvalidResourceHandle := ResourceHandle();
@@ -32,12 +33,15 @@ state ResourceParam<Type, ParamType>
 
 state Resource<Type>
 {
-	data: Type,
 	metadata: *void
 
 	parent: ResourceHandle,
 	result: ResourceResult,
-	refCount: uint32
+
+	refCount: int,
+	
+	//Data needs to be last in so the other fields can be accessed in a type erased context
+	data: Type
 }
 
 state ResourceManager<Type, ParamType>
@@ -45,10 +49,11 @@ state ResourceManager<Type, ParamType>
 	resourceKeyToHandle := Map<string, ResourceHandle>(),
 	resources := HandleSet<Resource<Type>>(),
 
-	getKey: ::string(ParamType)
+	getResourceKey: ::string(ParamType)
 	loader: ::(*ResourceParam<Type, ParamType>),
-	onLoad: ::(ResourceHandle),
-	onRelease: ::(ResourceHandle)
+	onRelease: ::(ResourceHandle),
+
+	id: uint32
 }
 
 ResourceManager::delete
@@ -76,7 +81,7 @@ ResourceManager::RemoveResource(handle: ResourceHandle)
 
 ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(ResourceHandle))
 {
-	resourceKey := this.getKey(param);
+	resourceKey := this.getResourceKey(param);
 
 	if (this.resourceKeyToHandle.Has(resourceKey))
 	{
@@ -88,6 +93,7 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 	handleValue := this.resources.GetNext();
 
 	handle := handleValue.handle as ResourceHandle;
+	handle.manager = this.id;
 
 	resource := handleValue.value;
 	resource~ = Resource<Type>();
@@ -107,7 +113,6 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 		handle := param.handle;
 		resourceManager := param.manager;
 		
-		if (resourceManager.onLoad) resourceManager.onLoad(handle)
 		param.onLoad(handle);
 	};
 
@@ -116,7 +121,13 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 	return handle;
 }
 
-Resource<Type> ResourceManager::TakeResourceRef(handle: ResourceHandle)
+ref Resource<Type> ResourceManager::GetResource(handle: ResourceHandle)
+{
+    resource := this.resources[handle.id];
+	return resource~;
+}
+
+ref Resource<Type> ResourceManager::TakeResourceRef(handle: ResourceHandle)
 {
     resource := this.resources[handle.id];
 	resource.refCount += 1;
@@ -129,26 +140,55 @@ ResourceManager::ReleaseResourceRef(handle: ResourceHandle)
     if (!this.resources.Has(id)) return;
 
     resource := this.resources[id];
-    resource.refCount -= 1;
-    if (resource.refCount == 0)
+	resource.refCount -= 1;
+    if (resource.refCount <= 0)
     {
         this.RemoveResource(handle);
     }
 }
 
-ResourceManager<ResourceType, ParamType> RegisterResourceManager<ResourceType, ParamType>(
-		getKey: ::string(ParamType), 
+resourceManagers := Map<uint32, *ResourceManager<any, any>>();
+
+ResourceManager<ResourceType, ParamType> CreateResourceManager<ResourceType, ParamType>(
+		name: [4]byte
+		getResourceKey: ::string(ParamType), 
 		loader: ::(*ResourceParam<ResourceType, ParamType>),
-		onLoad: ::(ResourceHandle) = null, 
 		onRelease: ::(ResourceHandle) = null
 	)
 {
+	id := (fixed name) as *uint32;
+	assert id, "Resource manager name can not null";
+
 	resourceManager := ResourceManager<ResourceType, ParamType>();
-	resourceManager.getKey = getKey;
+	resourceManager.id = id~;
+	resourceManager.getResourceKey = getResourceKey;
 	resourceManager.loader = loader;
-	resourceManager.onLoad = onLoad;
 	resourceManager.onRelease = onRelease;
 
 	return resourceManager;
 }
 
+uint32 RegisterResourceManager(resourceManager: *ResourceManager<any, any>)
+{
+	id := resourceManager.id;
+	resourceManagers.Insert(id, resourceManager);
+	return id;
+}
+
+ref Resource<Type> GetResource<Type>(handle: ResourceHandle)
+{
+	resourceManager := resourceManagers[handle.manager]~ as *ResourceManager<Type, any>;
+	return resourceManager.GetResource(handle);
+}
+
+ref Resource<Type> TakeResourceRef<Type>(handle: ResourceHandle)
+{
+	resourceManager := resourceManagers[handle.manager]~ as *ResourceManager<Type, any>;
+	return resourceManager.TakeResourceRef(handle);
+}
+
+ReleaseResourceRef(handle: ResourceHandle)
+{
+	resourceManager := resourceManagers[handle.manager]~;
+	resourceManager.ReleaseResourceRef(handle);
+}
