@@ -44,9 +44,8 @@ URIManagerLoad(uriParam: *ResourceParam<URIResource, URIParam>)
     {
 		path := OS.JoinPaths([basePath, uri]);
 		defer delete path;
-		log "Loading URI file: ", path;
+
         fileContent := OS.ReadFile(path);
-		log "URI file contents: ", fileContent;
 		resource.buffer = fileContent[0];
 		resource.count = fileContent.count;
 	}
