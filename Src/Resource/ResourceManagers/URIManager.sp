@@ -12,7 +12,8 @@ state URIResource
 state URIParam
 {
 	uri: string,
-	basePath: string
+	basePath: string,
+	parent: ResourceHandle
 }
 
 URIResourceManager := Resource.CreateResourceManager<URIResource, URIParam>(
@@ -21,43 +22,50 @@ URIResourceManager := Resource.CreateResourceManager<URIResource, URIParam>(
 	URIManagerLoad,
 	::(handle: ResourceHandle) {
 		resource := Resource.GetResource<URIResource>(handle);
-		log "RELEASING URI RESOURCE", resource;
 		delete resource.data.buffer;
 	}
 );
 
 URIResourceManagerID := Resource.RegisterResourceManager(URIResourceManager@);
 
-string GetURIKey(param: URIParam) => param.uri;
+string GetURIKey(param: URIParam) => OS.JoinPaths([param.basePath, param.uri]);
 
-URIManagerLoad(uriParam: *ResourceParam<URIResource, URIParam>)
+URIManagerLoad(uriResourceParam: *ResourceParam<URIResource, URIParam>)
 {
-	uri := uriParam.param.uri;
-	basePath := uriParam.param.basePath;
-	resource := uriParam.resource.data;
+	handle := uriResourceParam.handle;
+	param := uriResourceParam.param;
 	
+	uri := param.uri;
+	parent := param.parent;
+
+	resourceManager := uriResourceParam.manager;
+	resource := resourceManager.GetResource(handle);
+
+	resource.parent = param.parent;
+	resourceData := resource.data;
+
 	if (File.IsDataURI(uri))
     {
 		
     }
     else
     {
-		path := OS.JoinPaths([basePath, uri]);
-		defer delete path;
+		path := uriResourceParam.key;
 
         fileContent := OS.ReadFile(path);
-		resource.buffer = fileContent[0];
-		resource.count = fileContent.count;
+		resourceData.buffer = fileContent[0];
+		resourceData.count = fileContent.count;
 	}
 
-	uriParam.onResourceLoad(uriParam);
+	uriResourceParam.onResourceLoad(uriResourceParam, ResourceResult.Loaded);
 }
 
-ResourceHandle LoadURIResource(uri: string, basePath: string = "")
+ResourceHandle LoadURIResource(uri: string, basePath: string = "", parent: ResourceHandle = InvalidResourceHandle)
 {
 	uriParam := URIParam();
 	uriParam.uri = uri;
 	uriParam.basePath = basePath;
+	uriParam.parent = parent;
 
 	return URIResourceManager.LoadResource(uriParam, ::(handle: ResourceHandle){});
 }

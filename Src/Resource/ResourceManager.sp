@@ -9,6 +9,7 @@ enum ResourceResult: uint32
 	Loaded,
 	NotFound,
 	LoadFailed,
+	Released,
 	Invalid
 }
 
@@ -24,9 +25,8 @@ state ResourceParam<Type, ParamType>
 {
 	key: string,
 	manager: *ResourceManager<Type, ParamType>,
-	onResourceLoad: ::(*ResourceParam<Type, ParamType>),
+	onResourceLoad: ::(*ResourceParam<Type, ParamType>, ResourceResult),
 	onLoad: ::(ResourceHandle),
-	resource: *Resource<Type>,
 	param: ParamType,
 	handle: ResourceHandle
 }
@@ -52,6 +52,7 @@ state ResourceManager<Type, ParamType>
 	getResourceKey: ::string(ParamType)
 	loader: ::(*ResourceParam<Type, ParamType>),
 	onRelease: ::(ResourceHandle),
+	onChildRelease: ::(ResourceHandle, ResourceHandle),
 
 	id: uint32
 }
@@ -73,7 +74,9 @@ ResourceManager::RemoveResource(handle: ResourceHandle)
 	{
 		if (kv.value.id == id)
 		{
-			this.resourceKeyToHandle.Remove(kv.key~);
+			key := kv.key~;
+			this.resourceKeyToHandle.Remove(key);
+			delete key;
 			break;
 		}
 	}
@@ -92,8 +95,11 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 
 	handleValue := this.resources.GetNext();
 
-	handle := handleValue.handle as ResourceHandle;
+	handle := ResourceHandle();
+	handle.id = handleValue.handle;
 	handle.manager = this.id;
+
+	this.resourceKeyToHandle.Insert(resourceKey, handle);
 
 	resource := handleValue.value;
 	resource~ = Resource<Type>();
@@ -105,13 +111,15 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 	resourceParam.onLoad = onLoad;
 	resourceParam.param = param;
 	resourceParam.handle = handle;
-	resourceParam.resource = resource;
 
-	resourceParam.onResourceLoad = ::(param: *ResourceParam<Type,ParamType>) {
+	resourceParam.onResourceLoad = ::(param: *ResourceParam<Type,ParamType>, result: ResourceResult) {
 		defer DeallocThreadParam<ResourceParam<Type, ParamType>>(param);
 
 		handle := param.handle;
 		resourceManager := param.manager;
+
+		resource := resourceManager.GetResource(handle);
+		resource.result = result;
 		
 		param.onLoad(handle);
 	};
@@ -143,6 +151,7 @@ ResourceManager::ReleaseResourceRef(handle: ResourceHandle)
 	resource.refCount -= 1;
     if (resource.refCount <= 0)
     {
+		if (resource.parent.id) ChildResourceReleased(resource.parent, handle);
         this.RemoveResource(handle);
     }
 }
@@ -153,17 +162,19 @@ ResourceManager<ResourceType, ParamType> CreateResourceManager<ResourceType, Par
 		name: [4]byte
 		getResourceKey: ::string(ParamType), 
 		loader: ::(*ResourceParam<ResourceType, ParamType>),
-		onRelease: ::(ResourceHandle) = null
+		onRelease: ::(ResourceHandle) = null,
+		onChildRelease: ::(ResourceHandle, ResourceHandle) = null,
 	)
 {
-	id := (fixed name) as *uint32;
-	assert id, "Resource manager name can not null";
+	id := ((fixed name) as *uint32)~;
+	assert id, "Resource manager name can be not null";
 
 	resourceManager := ResourceManager<ResourceType, ParamType>();
-	resourceManager.id = id~;
+	resourceManager.id = id;
 	resourceManager.getResourceKey = getResourceKey;
 	resourceManager.loader = loader;
 	resourceManager.onRelease = onRelease;
+	resourceManager.onChildRelease = onChildRelease;
 
 	return resourceManager;
 }
@@ -191,4 +202,10 @@ ReleaseResourceRef(handle: ResourceHandle)
 {
 	resourceManager := resourceManagers[handle.manager]~;
 	resourceManager.ReleaseResourceRef(handle);
+}
+
+ChildResourceReleased(handle: ResourceHandle, child: ResourceHandle)
+{
+	resourceManager := resourceManagers[handle.manager]~;
+	if (resourceManager.onChildRelease) resourceManager.onChildRelease(handle, child);
 }

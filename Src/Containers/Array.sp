@@ -51,6 +51,16 @@ int Array::Add(item: Type)
 	return index;
 }
 
+//bool Array::Remove(item: Type, equals: ::bool(Type, Type) = DefaultEqual<Type>)
+//{
+//	for (i .. this.count)
+//	{
+//
+//	}
+//
+//	return false;
+//}
+
 Array::Expand()
 {
 	this.SizeTo((this.capacity + 1) * 2);

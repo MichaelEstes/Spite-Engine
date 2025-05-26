@@ -22,6 +22,13 @@ state GLTFLoadParam
 	outEntities: *Array<Entity>
 }
 
+state GLTFLoadData
+{
+	scene: *Scene,
+	resource: *GLTFResource,
+	handle: ResourceHandle,
+}
+
 GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadParam>(
 	['g', 'l', 't', 'f'],
 	GetGLTFKey, 
@@ -32,19 +39,27 @@ GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadPara
 		gltfResource := resource.data;
 
 		for (bufferHandle in gltfResource.buffers) Resource.ReleaseResourceRef(bufferHandle);
+	},
+	::(handle: ResourceHandle, child: ResourceHandle) {
+		resource := Resource.GetResource<GLTFResource>(handle);
+		if (resource.result == ResourceResult.Released) return;
+
+		gltfResource := resource.data;
 	}
 );
 
 GLTFResourceManagerID := Resource.RegisterResourceManager(GLTFResourceManager@);
 
-string GetGLTFKey(param: GLTFLoadParam) => param.file;
+string GetGLTFKey(param: GLTFLoadParam) => param.file.Copy();
 
 GLTFManagerLoad(param: *ResourceParam<GLTFResource, GLTFLoadParam>)
 {
 	Fiber.RunOnMainFiber(::(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>) 
 	{
 		param := resourceParam.param;
-		resource := resourceParam.resource.data@;
+		handle := resourceParam.handle;
+		resourceManager := resourceParam.manager;
+		resource := resourceManager.GetResource(handle).data@;
 	
 		file := param.file;
 		scene := param.scene;
@@ -52,15 +67,20 @@ GLTFManagerLoad(param: *ResourceParam<GLTFResource, GLTFLoadParam>)
 
 		gltf := LoadGLTF(file);
 
+		gltfData := GLTFLoadData();
+		gltfData.scene = scene;
+		gltfData.resource = resource;
+		gltfData.handle = handle;
+
 		for (gltfScene in gltf.scenes)
 		{
 			for (nodeIndex in gltfScene.nodes)
 			{
-				FlushNodeToECS(resource, gltf, scene, nodeIndex, nullEntity, outEntities);
+				FlushNodeToECS(gltfData, gltf, scene, nodeIndex, nullEntity, outEntities);
 			}
 		}
 
-		resourceParam.onResourceLoad(resourceParam);
+		resourceParam.onResourceLoad(resourceParam, ResourceResult.Loaded);
 	}, param);
 }
 
@@ -74,20 +94,20 @@ ResourceHandle LoadGLTFResource(file: string, scene: *Scene, onLoad: ::(Resource
 	return GLTFResourceManager.LoadResource(gltfParam, onLoad);
 }
 
-ResourceHandle GetBufferHandle(gltf: GLTF, buffer: uint32)
+ResourceHandle GetBufferHandle(gltfData: GLTFLoadData, gltf: GLTF, buffer: uint32)
 {
 	gltfBuffer := gltf.buffers[buffer];
 
 	uri := gltfBuffer.uri.uri~;
-	return LoadURIResource(uri, gltf.path);
+	return LoadURIResource(uri, gltf.path, gltfData.handle);
 }
 
-*byte GetBufferViewData(resource: *GLTFResource, gltf: GLTF, bufferView: uint32)
+*byte GetBufferViewData(gltfData: GLTFLoadData, gltf: GLTF, bufferView: uint32)
 {
 	gltfBufferView := gltf.bufferViews[bufferView];
 
-	handle := GetBufferHandle(gltf, gltfBufferView.buffer);
-	resource.buffers.Add(handle);
+	handle := GetBufferHandle(gltfData, gltf, gltfBufferView.buffer);
+	gltfData.resource.buffers.Add(handle);
 
 	data := URIResourceManager.TakeResourceRef(handle).data.buffer;
 	data = data + gltfBufferView.byteOffset;
@@ -95,65 +115,65 @@ ResourceHandle GetBufferHandle(gltf: GLTF, buffer: uint32)
 	return data;
 }
 
-ArrayView<byte> GetAccessorData(resource: *GLTFResource, gltf: GLTF, accessor: uint32)
+ArrayView<byte> GetAccessorData(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32)
 {
 	gltfAccessor := gltf.accessors[accessor];
 
-	data := GetBufferViewData(resource, gltf, gltfAccessor.bufferView);
+	data := GetBufferViewData(gltfData, gltf, gltfAccessor.bufferView);
 	data = data + gltfAccessor.byteOffset;
 
 	return ArrayView<byte>(data, gltfAccessor.count);
 }
 
-AssignPositionToPrimitive(resource: *GLTFResource, gltf: GLTF, accessor: uint32, primitive: Primitive)
+AssignPositionToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive)
 {
-	view := GetAccessorData(resource, gltf, accessor);
+	view := GetAccessorData(gltfData, gltf, accessor);
 	vertices := ArrayView<Vec3>(view[0]@, view.count);
 	
 	primitive.geometry.vertices = vertices;
 }
 
-AssignNormalToPrimitive(resource: *GLTFResource, gltf: GLTF, accessor: uint32, primitive: Primitive)
+AssignNormalToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive)
 {
-	view := GetAccessorData(resource, gltf, accessor);
+	view := GetAccessorData(gltfData, gltf, accessor);
 	normals := ArrayView<Vec3>(view[0]@, view.count);
 	
 	primitive.geometry.normals = normals;
 }
 
-AssignTangentToPrimitive(resource: *GLTFResource, gltf: GLTF, accessor: uint32, primitive: Primitive)
+AssignTangentToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive)
 {
-	view := GetAccessorData(resource, gltf, accessor);
+	view := GetAccessorData(gltfData, gltf, accessor);
 	tangents := ArrayView<Vec4>(view[0]@, view.count);
 	
 	primitive.geometry.tangents = tangents;
 }
 
-AssignAttributeToPrimitive(resource: *GLTFResource, gltf: GLTF, attrName: string, accessor: uint32, primitive: Primitive)
+AssignAttributeToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, attrName: string, accessor: uint32, primitive: Primitive)
 {
 	if (attrName == "POSITION")
 	{
-		AssignPositionToPrimitive(resource, gltf, accessor, primitive);
+		AssignPositionToPrimitive(gltfData, gltf, accessor, primitive);
 	}
 	else if (attrName == "NORMAL")
 	{
-		AssignNormalToPrimitive(resource, gltf, accessor, primitive);
+		AssignNormalToPrimitive(gltfData, gltf, accessor, primitive);
 	}
 	else if (attrName == "TANGENT")
 	{
-		AssignTangentToPrimitive(resource, gltf, accessor, primitive);
+		AssignTangentToPrimitive(gltfData, gltf, accessor, primitive);
 	}
 }
 
-AssignIndiciesToPrimitive(resource: *GLTFResource, gltf: GLTF, accessor: uint32, primitive: Primitive)
+AssignIndiciesToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive)
 {
-	view := GetAccessorData(resource, gltf, accessor);
+	view := GetAccessorData(gltfData, gltf, accessor);
 	indices := ArrayView<uint16>(view[0]@, view.count);
 
 	primitive.geometry.indices = indices;
 }
 
-FlushMeshToECS(resource: *GLTFResource, gltf: GLTF, scene: *Scene, meshIndex: uint32, entity: Entity)
+FlushMeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, entity: Entity)
 {
 	gltfMesh := gltf.meshes[meshIndex];
 	mesh := Mesh()
@@ -167,12 +187,12 @@ FlushMeshToECS(resource: *GLTFResource, gltf: GLTF, scene: *Scene, meshIndex: ui
 			attrName := attrKV.key~;
 			attrAccessor := attrKV.value~;
 
-			AssignAttributeToPrimitive(resource, gltf, attrName, attrAccessor, primitive);
+			AssignAttributeToPrimitive(gltfData, gltf, attrName, attrAccessor, primitive);
 		}
 
 		if (gltfPrim.indices != InvalidGLTFIndex)
 		{
-			AssignIndiciesToPrimitive(resource, gltf, gltfPrim.indices, primitive);
+			AssignIndiciesToPrimitive(gltfData, gltf, gltfPrim.indices, primitive);
 		}
 
 		mesh.primitives.Add(primitive);
@@ -181,7 +201,7 @@ FlushMeshToECS(resource: *GLTFResource, gltf: GLTF, scene: *Scene, meshIndex: ui
 	scene.SetComponent<Mesh>(entity, mesh);
 }
 
-FlushNodeToECS(resource: *GLTFResource, gltf: GLTF, scene: *Scene, nodeIndex: uint32, parentEntity: Entity, outEntities: *Array<Entity> = null)
+FlushNodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uint32, parentEntity: Entity, outEntities: *Array<Entity> = null)
 {
 	gltfNode := gltf.nodes[nodeIndex];
 
@@ -190,11 +210,11 @@ FlushNodeToECS(resource: *GLTFResource, gltf: GLTF, scene: *Scene, nodeIndex: ui
 
 	if (gltfNode.mesh != InvalidGLTFIndex)
 	{
-		FlushMeshToECS(resource, gltf, scene, gltfNode.mesh, entity);
+		FlushMeshToECS(gltfData, gltf, scene, gltfNode.mesh, entity);
 	}
 
 	for (childIndex in gltfNode.children)
 	{
-		FlushNodeToECS(resource, gltf, scene, childIndex, entity, outEntities);
+		FlushNodeToECS(gltfData, gltf, scene, childIndex, entity, outEntities);
 	}
 }
