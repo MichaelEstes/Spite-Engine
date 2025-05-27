@@ -51,15 +51,67 @@ int Array::Add(item: Type)
 	return index;
 }
 
-//bool Array::Remove(item: Type, equals: ::bool(Type, Type) = DefaultEqual<Type>)
-//{
-//	for (i .. this.count)
-//	{
-//
-//	}
-//
-//	return false;
-//}
+Array::Insert(item: Type, index: uint32)
+{
+	this[index] = item;
+}
+
+Array::Shift(index: uint32)
+{
+	while (index + 1 < this.count)
+	{
+		toShift := this[index + 1];
+		this.Insert(toShift, index);
+		index += 1;
+	}
+}
+
+Array::ShiftRange(index: uint32, end: uint32)
+{
+	while (index + 1 < end)
+	{
+		toShift := this[index + 1];
+		this.Insert(toShift, index);
+		index += 1;
+	}
+}
+
+bool Array::Remove(item: Type, equals: ::bool(Type, Type) = DefaultEqual<Type>)
+{
+	for (i .. this.count)
+	{
+		arrItem := this[i];
+		if (equals(arrItem, item)) 
+		{
+			this.Shift(i);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool Array::RemoveAll(item: Type, equals: ::bool(Type, Type) = DefaultEqual<Type>)
+{
+	removeIndicies := Array<uint32>();
+	for (i .. this.count)
+	{
+		if (equals(arrItem, item)) 
+		{
+			removeIndicies.Add(i);
+		}
+	}
+
+	if (removeIndicies.count > 0)
+	{
+		for (i .. removeIndicies.count - 1)
+		{
+
+		}
+	}
+
+	return removeIndicies.count > 0;
+}
 
 Array::Expand()
 {
