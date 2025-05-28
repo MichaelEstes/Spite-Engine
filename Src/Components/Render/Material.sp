@@ -21,7 +21,7 @@ state Material
 {
 	maps: Array<TextureMap>,
 
-	colorFactor: Color,
+	baseColor: Color,
 	emissiveFactor: Vec3,
 
 	normalScale := float32(1.0),

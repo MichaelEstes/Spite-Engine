@@ -79,7 +79,7 @@ GLTFManagerLoad(param: *ResourceParam<GLTFResource, GLTFLoadParam>)
 		{
 			for (nodeIndex in gltfScene.nodes)
 			{
-				FlushNodeToECS(gltfData, gltf, scene, nodeIndex, nullEntity, outEntities);
+				NodeToECS(gltfData, gltf, scene, nodeIndex, nullEntity, outEntities);
 			}
 		}
 
@@ -176,7 +176,21 @@ AssignIndiciesToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, 
 	primitive.geometry.indices = indices;
 }
 
-FlushMeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, entity: Entity)
+AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uint32, primitive: Primitive)
+{
+	gltfMaterial := gltf.materials[materialIndex];
+	
+	material := Material();
+
+	if (gltfMaterial.pbrMetallicRoughness)
+	{
+		pbr := gltfMaterial.pbrMetallicRoughness;
+		material.baseColor = pbr.baseColorFactor;
+	}
+
+}
+
+MeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, entity: Entity)
 {
 	gltfMesh := gltf.meshes[meshIndex];
 	mesh := Mesh()
@@ -198,13 +212,15 @@ FlushMeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uin
 			AssignIndiciesToPrimitive(gltfData, gltf, gltfPrim.indices, primitive);
 		}
 
+		AssignMaterialToPrimitive(gltfData, gltf, gltfPrim.material, primitive);
+
 		mesh.primitives.Add(primitive);
 	}
 
 	scene.SetComponent<Mesh>(entity, mesh);
 }
 
-FlushNodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uint32, parentEntity: Entity, outEntities: *Array<Entity> = null)
+NodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uint32, parentEntity: Entity, outEntities: *Array<Entity> = null)
 {
 	gltfNode := gltf.nodes[nodeIndex];
 
@@ -213,11 +229,11 @@ FlushNodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uin
 
 	if (gltfNode.mesh != InvalidGLTFIndex)
 	{
-		FlushMeshToECS(gltfData, gltf, scene, gltfNode.mesh, entity);
+		MeshToECS(gltfData, gltf, scene, gltfNode.mesh, entity);
 	}
 
 	for (childIndex in gltfNode.children)
 	{
-		FlushNodeToECS(gltfData, gltf, scene, childIndex, entity, outEntities);
+		NodeToECS(gltfData, gltf, scene, childIndex, entity, outEntities);
 	}
 }
