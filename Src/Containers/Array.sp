@@ -19,6 +19,15 @@ Array::delete
 	this.mem.Dealloc(this.count);
 }
 
+[]Type Array::log()
+{
+	arr := []Type;
+	arr.count = this.count;
+	arr.capacity = this.capacity;
+	arr.memory = this.mem;
+	return arr;
+}
+
 ref Type Array::operator::[](index: uint32)
 {
 	return this.mem[index]~;
@@ -49,6 +58,15 @@ int Array::Add(item: Type)
 	this.mem[index]~ = item;
 	this.count += 1;
 	return index;
+}
+
+Array::AddAll(items: []Type)
+{
+	newCount := this.count + items.count;
+	if(newCount >= this.capacity) this.ExpandAtLeastTo(newCount);
+
+	for (i .. items.count) this[this.count + i] = items[i];
+	this.count = newCount;
 }
 
 Array::Insert(item: Type, index: uint32)
@@ -84,6 +102,7 @@ bool Array::Remove(item: Type, equals: ::bool(Type, Type) = DefaultEqual<Type>)
 		if (equals(arrItem, item)) 
 		{
 			this.Shift(i);
+			this.count -= 1;
 			return true;
 		}
 	}
@@ -93,29 +112,40 @@ bool Array::Remove(item: Type, equals: ::bool(Type, Type) = DefaultEqual<Type>)
 
 bool Array::RemoveAll(item: Type, equals: ::bool(Type, Type) = DefaultEqual<Type>)
 {
-	removeIndicies := Array<uint32>();
-	for (i .. this.count)
-	{
-		if (equals(arrItem, item)) 
-		{
-			removeIndicies.Add(i);
-		}
-	}
-
-	if (removeIndicies.count > 0)
-	{
-		for (i .. removeIndicies.count - 1)
-		{
-
-		}
-	}
-
-	return removeIndicies.count > 0;
+    writeIndex := uint32(0);
+    removed := false;
+    
+    for (i .. this.count)
+    {
+        if (!equals(this[i], item))
+        {
+            if (i != writeIndex)
+            {
+                this[writeIndex] = this[i];
+            }
+            writeIndex += 1;
+        }
+        else
+        {
+            removed = true;
+        }
+    }
+    
+    this.count = writeIndex;
+    
+    return removed;
 }
 
 Array::Expand()
 {
 	this.SizeTo((this.capacity + 1) * 2);
+}
+
+Array::ExpandAtLeastTo(size: uint32)
+{
+	capacity := this.capacity;
+	while (capacity < size) capacity = (capacity + 1) * 2;
+	this.SizeTo(capacity);
 }
 
 Array::SizeTo(capacity: uint32)

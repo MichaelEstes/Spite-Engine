@@ -45,6 +45,9 @@ GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadPara
 		if (resource.result == ResourceResult.Released) return;
 
 		gltfResource := resource.data;
+		gltfResource.buffers.RemoveAll(child);
+
+		if (!gltfResource.buffers.count) Resource.ReleaseResourceRef(handle);
 	}
 );
 
