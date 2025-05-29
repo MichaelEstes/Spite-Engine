@@ -310,8 +310,8 @@ state GLTFTexture
 {
     name: *string,
     
-    sampler: uint32,
-    source: uint32
+    source: uint32,
+    sampler: uint32 = InvalidGLTFIndex
 }
 
 state GLTFSampler
@@ -331,7 +331,7 @@ state GLTFImage
     uri: GLTFURI,
     mimeType: *string,
     
-    bufferView: uint32
+    bufferView: uint32 = InvalidGLTFIndex;
 }
 
 state GLTFAnimation

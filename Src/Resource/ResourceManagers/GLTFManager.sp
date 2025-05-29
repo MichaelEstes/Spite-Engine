@@ -9,10 +9,12 @@ import Entity
 import Render
 import Array
 import URIManager
+import ImageManager
 
 state GLTFResource
 {
 	buffers: Array<ResourceHandle>,
+	images: Array<ResourceHandle>
 }
 
 state GLTFLoadParam
@@ -47,6 +49,7 @@ GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadPara
 		gltfResource := resource.data;
 		gltfResource.buffers.RemoveAll(child);
 
+		heldResourceCount := gltfResource.buffers.count + gltfResource.images.count;
 		if (!gltfResource.buffers.count) Resource.ReleaseResourceRef(handle);
 	}
 );
@@ -176,6 +179,21 @@ AssignIndiciesToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, 
 	primitive.geometry.indices = indices;
 }
 
+Texture LoadTexture(gltfData: GLTFLoadData, gltf: GLTF, textureIndex: uint32)
+{
+	gltfTexture := gltf.textures[textureIndex];
+	imageIndex := gltfTexture.source;
+	gltfImage := gltf.images[imageIndex];
+
+	uri := gltfImage.uri.uri~;
+	imageHandle := LoadImageResource(uri, gltf.path, gltfData.handle);
+
+	texture := Texture();
+	texture.imageHandle = imageHandle;
+
+
+}
+
 AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uint32, primitive: Primitive)
 {
 	gltfMaterial := gltf.materials[materialIndex];
@@ -186,6 +204,10 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 	{
 		pbr := gltfMaterial.pbrMetallicRoughness;
 		material.baseColor = pbr.baseColorFactor;
+		if (pbr.baseColorTexture)
+		{
+			baseColorTexture = LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
+		}
 	}
 
 }

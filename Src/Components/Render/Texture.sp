@@ -1,6 +1,7 @@
 package Render
 
 import SDL
+import Resource
 
 enum TextureFilter: uint16
 {
@@ -21,7 +22,7 @@ enum TextureWrap: uint16
 
 state Texture
 {
-	image: *SDL.Surface,
+	imageHandle: ResourceHandle,
 
 	magFilter: TextureFilter,
 	minFilter: TextureFilter,
