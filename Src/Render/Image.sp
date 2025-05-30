@@ -12,3 +12,8 @@ import SDL
 	return SDL.ConvertSurface(surface, format);
 }
 
+*SDL.Surface CreateTextureImage()
+{
+	return null;
+}
+

@@ -125,8 +125,8 @@ ArrayView<byte> GetAccessorData(gltfData: GLTFLoadData, gltf: GLTF, accessor: ui
 {
 	gltfAccessor := gltf.accessors[accessor];
 
-	data := GetBufferViewData(gltfData, gltf, gltfAccessor.bufferView);
-	data = data[0]@ + gltfAccessor.byteOffset;
+	data := GetBufferViewData(gltfData, gltf, gltfAccessor.bufferView)[0]@;
+	data = data + gltfAccessor.byteOffset;
 
 	return ArrayView<byte>(data, gltfAccessor.count);
 }
@@ -189,9 +189,9 @@ TextureMap LoadTexture(gltfData: GLTFLoadData, gltf: GLTF, textureIndex: uint32)
 
 	if (gltfImage.bufferView != InvalidGLTFIndex)
 	{
-		bufferView := gltf.bufferViews[gltfImage.bufferView];
-		handle := GetBufferHandle(gltfData, gltf, bufferView.buffer);
-		texture.image = Image.LoadTextureImageFromBuffer(view);
+		//bufferView := gltf.bufferViews[gltfImage.bufferView];
+		//handle := GetBufferHandle(gltfData, gltf, bufferView.buffer);
+		//buffer := URIResourceManager.TakeResourceRef(handle).data.buffer;
 	}
 	else
 	{

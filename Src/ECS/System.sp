@@ -8,6 +8,7 @@ enum SystemStep: byte
 	OnFixed,
 	OnEarlyFrame,
 	OnFrame,
+	OnDraw,
 	OnPostFrame,
 	
 	OnStart,
@@ -24,6 +25,7 @@ state Systems
 	onFixed: Array<System>,
 	onEarlyFrame: Array<System>,
 	onFrame: Array<System>,
+	onDraw: Array<System>,
 	onPostFrame: Array<System>,
 	
 	onStart: Array<System>,
