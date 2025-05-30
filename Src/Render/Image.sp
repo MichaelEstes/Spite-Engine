@@ -11,3 +11,4 @@ import SDL
 	surface := SDL.LoadImage(path);
 	return SDL.ConvertSurface(surface, format);
 }
+

@@ -36,6 +36,8 @@ state Material
 	occlusion := int16(-1),
 	emissive := int16(-1),
 
+	alphaMode: AlphaMode = AlphaMode.Opaque,
+
 	doubleSided: bool
 }
 

@@ -13,6 +13,8 @@ import FileManager
 
 InvalidGLTFIndex := -1 as uint32;
 
+bool IsValidGLTFIndex(index: uint32) => index != InvalidGLTFIndex;
+
 state GLTF
 {
     mem := Arena(),

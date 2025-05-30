@@ -108,7 +108,7 @@ ResourceHandle GetBufferHandle(gltfData: GLTFLoadData, gltf: GLTF, buffer: uint3
 	return LoadURIResource(uri, gltf.path, gltfData.handle);
 }
 
-*byte GetBufferViewData(gltfData: GLTFLoadData, gltf: GLTF, bufferView: uint32)
+ArrayView<byte> GetBufferViewData(gltfData: GLTFLoadData, gltf: GLTF, bufferView: uint32)
 {
 	gltfBufferView := gltf.bufferViews[bufferView];
 
@@ -118,7 +118,7 @@ ResourceHandle GetBufferHandle(gltfData: GLTFLoadData, gltf: GLTF, buffer: uint3
 	data := URIResourceManager.TakeResourceRef(handle).data.buffer;
 	data = data + gltfBufferView.byteOffset;
 
-	return data;
+	return ArrayView<byte>(data, gltfBufferView.byteLength);
 }
 
 ArrayView<byte> GetAccessorData(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32)
@@ -126,7 +126,7 @@ ArrayView<byte> GetAccessorData(gltfData: GLTFLoadData, gltf: GLTF, accessor: ui
 	gltfAccessor := gltf.accessors[accessor];
 
 	data := GetBufferViewData(gltfData, gltf, gltfAccessor.bufferView);
-	data = data + gltfAccessor.byteOffset;
+	data = data[0]@ + gltfAccessor.byteOffset;
 
 	return ArrayView<byte>(data, gltfAccessor.count);
 }
@@ -179,19 +179,40 @@ AssignIndiciesToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, 
 	primitive.geometry.indices = indices;
 }
 
-Texture LoadTexture(gltfData: GLTFLoadData, gltf: GLTF, textureIndex: uint32)
+TextureMap LoadTexture(gltfData: GLTFLoadData, gltf: GLTF, textureIndex: uint32)
 {
 	gltfTexture := gltf.textures[textureIndex];
 	imageIndex := gltfTexture.source;
 	gltfImage := gltf.images[imageIndex];
 
-	uri := gltfImage.uri.uri~;
-	imageHandle := LoadImageResource(uri, gltf.path, gltfData.handle);
-
 	texture := Texture();
-	texture.imageHandle = imageHandle;
+
+	if (gltfImage.bufferView != InvalidGLTFIndex)
+	{
+		bufferView := gltf.bufferViews[gltfImage.bufferView];
+		handle := GetBufferHandle(gltfData, gltf, bufferView.buffer);
+		texture.image = Image.LoadTextureImageFromBuffer(view);
+	}
+	else
+	{
+		uri := gltfImage.uri.uri~;
+		imageHandle := LoadImageResource(uri, gltf.path, gltfData.handle);
+
+		texture.imageHandle = imageHandle;
+	}
 
 
+	textureMap := TextureMap();
+	textureMap.texture = texture;
+
+	return textureMap;
+}
+
+AlphaMode GetAlphaMode(gltfMaterial: GLTFMaterial)
+{
+	if (gltfMaterial.alphaMode == "BLEND") return AlphaMode.Blend;
+	else if (gltfMaterial.alphaMode == "MASK") return AlphaMode.Mask;
+	else return AlphaMode.Opaque;
 }
 
 AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uint32, primitive: Primitive)
@@ -206,10 +227,44 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 		material.baseColor = pbr.baseColorFactor;
 		if (pbr.baseColorTexture)
 		{
-			baseColorTexture = LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
+			baseColorTextureMap := LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
+			material.color = material.maps.Add(baseColorTextureMap);
 		}
+
+		if (pbr.metallicRoughnessTexture)
+		{
+			metallicRoughnessTextureMap := LoadTexture(gltfData, gltf, pbr.metallicRoughnessTexture.index);
+			material.metallicRoughness = material.maps.Add(metallicRoughnessTextureMap);
+		}
+
+		material.metallicFactor = pbr.metallicFactor;
+		material.roughnessFactor = pbr.roughnessFactor;
 	}
 
+	if (gltfMaterial.normalTexture)
+	{
+		normalTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.normalTexture.info.index);
+		material.normal = material.maps.Add(normalTextureMap);
+	}
+
+	if (gltfMaterial.occlusionTexture)
+	{
+		occlusionTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.occlusionTexture.info.index);
+		material.occlusion = material.maps.Add(occlusionTextureMap);
+	}
+
+	if (gltfMaterial.emissiveTexture)
+	{
+		emissiveTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.emissiveTexture.index);
+		material.emissive = material.maps.Add(emissiveTextureMap);
+	}
+
+	material.emissiveFactor = gltfMaterial.emissiveFactor;
+	material.alphaCutoff = gltfMaterial.alphaCutoff;
+	material.doubleSided = gltfMaterial.doubleSided;
+	material.alphaMode = GetAlphaMode(gltfMaterial);
+
+	primitive.material = material;
 }
 
 MeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, entity: Entity)

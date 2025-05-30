@@ -52,7 +52,7 @@ ImageManagerLoad(imageResourceParam: *ResourceParam<ImageResource, ImageParam>)
     else
     {
 		path := imageResourceParam.key;
-		resourceData.image := Image.LoadImageImage(path);
+		resourceData.image = Image.LoadTextureImage(path);
 	}
 
 	imageResourceParam.onResourceLoad(imageResourceParam, ResourceResult.Loaded);
