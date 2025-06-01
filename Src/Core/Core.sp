@@ -6,6 +6,7 @@ import Window
 import SDL
 import Event
 import VulkanRenderer
+import SDLRenderer
 
 running := false;
 
@@ -18,6 +19,7 @@ Initialize()
 	SDL.VulkanLoadLibrary(null);
 
 	VulkanRenderer.InitializeVulkanInstance();
+	//SDLRenderer.InitializeSDLGPUInstance();
 
 	SDLEventEmitter.On(SDL.EventType.QUIT, ::(event: SDL.Event) {
 		running = false;
@@ -40,6 +42,7 @@ MainLoop()
 	running = true;
 
 	mainRenderer := VulkanRenderer.CreateVulkanRenderer(Window.CreateMainWindow());
+	//mainRenderer := SDLRenderer.CreateSDLRenderer(Window.CreateMainWindow());
 
 	currEvent := SDL.Event();
 	while (running)

@@ -223,6 +223,15 @@ bool Init(flags: uint32) => SDL_Init(flags);
 Quit() => SDL_Quit();
 *byte GetError() => SDL_GetError();
 
+void Check(error: bool, onError: ::(*byte))
+{
+    if (error)
+    {
+        errMsg := GetError();
+        onError(errMsg);
+    }
+}
+
 *Window CreateWindow(title: *byte, w: int32, h: int32, flags: uint) => SDL_CreateWindow(title, w, h, flags);
 void DestroyWindow(window: *Window) => SDL_DestroyWindow(window);
 bool GetWindowSizeInPixels(window: *Window, width: *int32, height: *int32) => SDL_GetWindowSizeInPixels(window, width, height);
