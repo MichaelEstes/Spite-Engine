@@ -1,5 +1,7 @@
 package VulkanRenderer
 
+import ArrayView
+
 state VulkanInstance
 {
 	instance: *VkInstance_T,
@@ -9,6 +11,13 @@ state VulkanInstance
 	physicalDeviceCount: uint32,
 	extensionCount: uint32,
 }
+
+ArrayView<*VkPhysicalDevice_T> VulkanInstance::PhysicalDevices()
+{
+	return ArrayView<*VkPhysicalDevice_T>(this.physicalDevices[0], this.physicalDeviceCount);
+}
+
+vulkanInstance := VulkanInstance();
 
 InitializeVulkanInstance()
 {

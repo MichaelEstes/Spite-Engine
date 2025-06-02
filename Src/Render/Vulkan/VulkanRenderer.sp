@@ -37,7 +37,6 @@ validationCount := #compile uint32 => (#typeof validationLayers).FixedArrayCount
 requiredDeviceExtensions := ["VK_KHR_swapchain"[0],];
 requiredDeviceExtensionCount := #compile uint32 => (#typeof requiredDeviceExtensions).FixedArrayCount();
 
-vulkanInstance := VulkanInstance();
 renderersByWindow := SparseSet<VulkanRenderer<>>();
 
 CheckResult(result: VkResult, errorMsg: string)
