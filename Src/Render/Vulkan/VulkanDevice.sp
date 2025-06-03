@@ -3,6 +3,7 @@ package VulkanRenderer
 state VulkanDevice
 {
 	device: *VkDevice_T,
+	queues: VulkanQueues,
 	physicalDevice: uint32
 }
 
@@ -83,4 +84,10 @@ VulkanDevice::SelectDefaultDevice()
 VulkanDevice::Initialize()
 {
 	this.SelectDefaultDevice();
+	physicalDevice := vulkanInstance.physicalDevices[this.physicalDevice]~;
+
+	this.queues.Initialize(physicalDevice);
+
+	createInfo := VkDeviceCreateInfo();
+
 }
