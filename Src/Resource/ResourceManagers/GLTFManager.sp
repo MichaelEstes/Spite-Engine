@@ -36,7 +36,6 @@ GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadPara
 	GetGLTFKey, 
 	GLTFManagerLoad,
 	::(handle: ResourceHandle) {
-		log "RELEASING GLTF RESOURCE", handle;
 		resource := Resource.GetResource<GLTFResource>(handle);
 		gltfResource := resource.data;
 

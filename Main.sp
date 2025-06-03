@@ -102,13 +102,13 @@ Main()
 
 	Core.Initialize();
 
-	LoadGLTFResource("./Resource/Models/Box/Box.gltf", scene, ::(handle: ResourceHandle) {
-		log "Loaded gltf: ", handle;
-
-		gltfResource := Resource.TakeResourceRef<GLTFResource>(handle);
-		log "GLTF RESOURCE: ", gltfResource;
-		Resource.ReleaseResourceRef(handle);
-	});
+//	LoadGLTFResource("./Resource/Models/Box/Box.gltf", scene, ::(handle: ResourceHandle) {
+//		log "Loaded gltf: ", handle;
+//
+//		gltfResource := Resource.TakeResourceRef<GLTFResource>(handle);
+//		log "GLTF RESOURCE: ", gltfResource;
+//		Resource.ReleaseResourceRef(handle);
+//	});
 
 	Core.Start();
 

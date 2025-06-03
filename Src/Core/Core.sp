@@ -48,7 +48,7 @@ MainLoop()
 	while (running)
 	{
 		ECS.instance.Update();
-		mainRenderer.DrawScenes(ECS.instance.scenes.Values());
+		//mainRenderer.DrawScenes(ECS.instance.scenes.Values());
 		
 		while (SDL.PollEvent(currEvent@)) HandleSDLEvent(currEvent);
 	}

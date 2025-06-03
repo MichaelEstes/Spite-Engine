@@ -26,7 +26,7 @@ Check(success: bool)
 
 }
 
-*GPUShader RegisterShader(renderer: file: string, entry: string, stage: GPUShaderStage,
+*GPUShader RegisterShader(renderer: SDLRenderer, file: string, entry: string, stage: GPUShaderStage,
 							samplers: uint32, textures: uint32, storageBuffers: uint32, uniformBuffers: uint32)
 {
 	contents := ReadFile(file);
@@ -42,7 +42,9 @@ Check(success: bool)
 	createInfo.num_storage_buffers = storageBuffers;
 	createInfo.num_uniform_buffers = uniformBuffers;
 
-	shader := CreateGPUShader()
+	shader := CreateGPUShader(instance.device, createInfo@);
+
+	return shader;
 }
 
 SDLRenderer CreateSDLRenderer(window: *Window)

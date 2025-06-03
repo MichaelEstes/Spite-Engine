@@ -52,6 +52,6 @@ InitializeVulkanInstance()
 	SDLEventEmitter.On(SDL.EventType.WINDOW_RESIZED, ::(event: SDL.Event) {
 		windowID := event.data.window.windowID;
 		renderer := renderersByWindow.Get(windowID);
-		renderer.RecreateSwapchain();
+		//renderer.RecreateSwapchain();
 	});
 }
