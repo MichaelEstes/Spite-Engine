@@ -60,7 +60,7 @@ state VulkanRenderer
 	surface: *VkSurfaceKHR_T,
 
 	device: VulkanDevice,
-
+	swapchain: VulkanSwapchain,
 }
 
 VulkanRenderer::Destroy()
@@ -78,7 +78,8 @@ VulkanRenderer::Destroy()
 
 	vulkanRenderer.InitializeSurface();
 
-	vulkanRenderer.device.Initialize();
+	vulkanRenderer.device.Initialize(vulkanRenderer.surface);
+	vulkanRenderer.swapchain.Initialize(vulkanRenderer);
 
 	//vulkanRenderer.DebugLogExtensions();
 

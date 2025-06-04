@@ -8,14 +8,20 @@ state VulkanQueues
 	graphicsQueueIndicies: Allocator<uint32>,
 	computeQueueIndicies: Allocator<uint32>,
 	transferQueueIndicies: Allocator<uint32>,
-
 	createQueueIndicies: Allocator<uint32>,
+
+	graphicsQueue: *VkQueue_T,
+	computeQueue: *VkQueue_T,
+	transferQueue: *VkQueue_T,
+	presentQueue: *VkQueue_T,
 
 	queueFamilyCount: uint32,
 	graphicsQueueCount: uint32,
 	computeQueueCount: uint32,
 	transferQueueCount: uint32,
-	createQueueCount: uint32
+	createQueueCount: uint32,
+
+	presentQueueIndex: uint32,
 }
 
 VulkanQueues::Initialize(physicalDevice: *VkPhysicalDevice_T)
@@ -116,7 +122,7 @@ Array<VkDeviceQueueCreateInfo> VulkanQueues::DeviceQueueCreateInfo()
 		priorities.Alloc(createInfo.queueCount);
 		for (i .. createInfo.queueCount)
 		{
-			priorities[i]~ = 1.0;
+			priorities[i]~ = float32(1.0);
 		}
 
 		createInfo.pQueuePriorities = priorities[0];
@@ -125,4 +131,66 @@ Array<VkDeviceQueueCreateInfo> VulkanQueues::DeviceQueueCreateInfo()
 	}
 
 	return arr;
+}
+
+VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T, surface: *VkSurfaceKHR_T)
+{
+	dedicatedQueueIndicies := Array<uint32>();
+	defer delete dedicatedQueueIndicies;
+	dedicatedQueueIndicies.SizeTo(this.createQueueCount);
+
+	graphicQueueIndex := this.graphicsQueueIndicies[0]~;
+	vkGetDeviceQueue(device, graphicQueueIndex, 0, this.graphicsQueue@);
+	dedicatedQueueIndicies.Add(graphicQueueIndex);
+
+	for (i .. this.computeQueueCount)
+	{
+		computeQueueIndex := this.computeQueueIndicies[i]~;
+		if (!dedicatedQueueIndicies.Has(computeQueueIndex))
+		{
+			vkGetDeviceQueue(device, computeQueueIndex, 0, this.computeQueue@);
+			dedicatedQueueIndicies.Add(computeQueueIndex);
+			log "Found dedicated compute queue";
+			break;
+		}
+	}
+	if (!this.computeQueue) vkGetDeviceQueue(device, this.computeQueueIndicies[0]~, 0, this.computeQueue@);
+
+	for (i .. this.transferQueueCount)
+	{
+		transferQueueIndex := this.transferQueueIndicies[i]~;
+		if (!dedicatedQueueIndicies.Has(transferQueueIndex))
+		{
+			vkGetDeviceQueue(device, transferQueueIndex, 0, this.transferQueue@);
+			dedicatedQueueIndicies.Add(transferQueueIndex);
+			log "Found dedicated transfer queue";
+			break;
+		}
+	}
+	if (!this.transferQueue) vkGetDeviceQueue(device, this.transferQueueIndicies[0]~, 0, this.computeQueue@);
+
+	for (i .. this.queueFamilyCount)
+	{
+		presentSupported := uint32(0);
+		vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, presentSupported@);
+		if (presentSupported)
+		{
+			if (!dedicatedQueueIndicies.Has(i))
+			{
+				vkGetDeviceQueue(device, i, 0, this.presentQueue@);
+				this.presentQueueIndex = i;
+				log "Found dedicated present queue";
+				break;
+			}
+			
+			this.presentQueueIndex = i;
+		}
+	}
+	if (!this.presentQueue) 
+	{
+		log "Using present queue family: ", this.presentQueueIndex;
+		vkGetDeviceQueue(device, this.presentQueueIndex, 0, this.presentQueue@);
+	}
+
+	log "Got device queues";
 }

@@ -136,6 +136,17 @@ bool Array::RemoveAll(item: Type, equals: ::bool(Type, Type) = DefaultEqual<Type
     return removed;
 }
 
+bool Array::Has(item: Type, equals: ::bool(Type, Type) = DefaultEqual<Type>)
+{
+	for (i .. this.count)
+	{
+		arrItem := this[i];
+		if (equals(arrItem, item)) return true;
+	}
+
+	return false;
+}
+
 Array::Expand()
 {
 	this.SizeTo((this.capacity + 1) * 2);

@@ -2,6 +2,7 @@ package VulkanRenderer
 
 state VulkanDevice
 {
+	deviceFeatures: VkPhysicalDeviceFeatures,
 	device: *VkDevice_T,
 	queues: VulkanQueues,
 	physicalDevice: uint32
@@ -81,7 +82,7 @@ VulkanDevice::SelectDefaultDevice()
 	this.physicalDevice = 0;
 }
 
-VulkanDevice::Initialize()
+VulkanDevice::Initialize(surface: *VkSurfaceKHR_T)
 {
 	this.SelectDefaultDevice();
 	physicalDevice := vulkanInstance.physicalDevices[this.physicalDevice]~;
@@ -97,11 +98,16 @@ VulkanDevice::Initialize()
 	createInfo.pQueueCreateInfos = queueCreateInfos[0]@;
 	createInfo.enabledExtensionCount = requiredDeviceExtensionCount;
 	createInfo.ppEnabledExtensionNames = requiredDeviceExtensions[0]@;
+	createInfo.pEnabledFeatures = this.deviceFeatures;
 
 	CheckResult(
 		vkCreateDevice(physicalDevice, createInfo@, null, this.device@),
 		"Error creating Vulkan device"
 	);
 
+	this.queues.GetQueues(this.device, physicalDevice, surface);
+
 	log "Initialized Vulkan device";
 }
+
+*VkPhysicalDevice_T VulkanDevice::GetPhysicalDevice() => vulkanInstance.physicalDevices[this.physicalDevice]~;
