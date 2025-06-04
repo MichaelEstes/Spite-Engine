@@ -103,7 +103,8 @@ VulkanQueues::Initialize(physicalDevice: *VkPhysicalDevice_T)
 Array<VkDeviceQueueCreateInfo> VulkanQueues::DeviceQueueCreateInfo()
 {
 	arr := Array<VkDeviceQueueCreateInfo>();
-
+	arr.SizeTo(this.createQueueCount);
+	
 	for (i .. this.createQueueCount)
 	{
 		createInfo := VkDeviceQueueCreateInfo();
@@ -113,6 +114,14 @@ Array<VkDeviceQueueCreateInfo> VulkanQueues::DeviceQueueCreateInfo()
 
 		priorities := Allocator<float32>();
 		priorities.Alloc(createInfo.queueCount);
+		for (i .. createInfo.queueCount)
+		{
+			priorities[i]~ = 1.0;
+		}
+
+		createInfo.pQueuePriorities = priorities[0];
+
+		arr.Add(createInfo);
 	}
 
 	return arr;

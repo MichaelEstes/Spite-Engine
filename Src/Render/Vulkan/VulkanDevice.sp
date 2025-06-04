@@ -88,6 +88,20 @@ VulkanDevice::Initialize()
 
 	this.queues.Initialize(physicalDevice);
 
-	createInfo := VkDeviceCreateInfo();
+	queueCreateInfos := this.queues.DeviceQueueCreateInfo();
+	defer delete queueCreateInfos;
 
+	createInfo := VkDeviceCreateInfo();
+	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	createInfo.queueCreateInfoCount = queueCreateInfos.count;
+	createInfo.pQueueCreateInfos = queueCreateInfos[0]@;
+	createInfo.enabledExtensionCount = requiredDeviceExtensionCount;
+	createInfo.ppEnabledExtensionNames = requiredDeviceExtensions[0]@;
+
+	CheckResult(
+		vkCreateDevice(physicalDevice, createInfo@, null, this.device@),
+		"Error creating Vulkan device"
+	);
+
+	log "Initialized Vulkan device";
 }
