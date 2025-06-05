@@ -21,6 +21,7 @@ state VulkanQueues
 	transferQueueCount: uint32,
 	createQueueCount: uint32,
 
+	graphicsQueueIndex: uint32,
 	presentQueueIndex: uint32,
 }
 
@@ -139,9 +140,9 @@ VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T
 	defer delete dedicatedQueueIndicies;
 	dedicatedQueueIndicies.SizeTo(this.createQueueCount);
 
-	graphicQueueIndex := this.graphicsQueueIndicies[0]~;
-	vkGetDeviceQueue(device, graphicQueueIndex, 0, this.graphicsQueue@);
-	dedicatedQueueIndicies.Add(graphicQueueIndex);
+	this.graphicsQueueIndex = this.graphicsQueueIndicies[0]~;
+	vkGetDeviceQueue(device, this.graphicsQueueIndex, 0, this.graphicsQueue@);
+	dedicatedQueueIndicies.Add(this.graphicsQueueIndex);
 
 	for (i .. this.computeQueueCount)
 	{

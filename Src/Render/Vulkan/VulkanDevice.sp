@@ -98,7 +98,7 @@ VulkanDevice::Initialize(surface: *VkSurfaceKHR_T)
 	createInfo.pQueueCreateInfos = queueCreateInfos[0]@;
 	createInfo.enabledExtensionCount = requiredDeviceExtensionCount;
 	createInfo.ppEnabledExtensionNames = requiredDeviceExtensions[0]@;
-	createInfo.pEnabledFeatures = this.deviceFeatures;
+	createInfo.pEnabledFeatures = this.deviceFeatures@;
 
 	CheckResult(
 		vkCreateDevice(physicalDevice, createInfo@, null, this.device@),
