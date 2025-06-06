@@ -52,6 +52,8 @@ DestroyAll()
 	for (renderer in renderersByWindow.Values()) renderer.Destroy();
 }
 
+frameCount := 2;
+
 state VulkanRenderer
 {
 	vkInstance: *VulkanInstance,
@@ -61,6 +63,9 @@ state VulkanRenderer
 
 	device: VulkanDevice,
 	swapchain: VulkanSwapchain,
+	frames: [frameCount]VulkanFrame,
+
+	currentFrame: uint32
 }
 
 VulkanRenderer::Destroy()
@@ -80,6 +85,11 @@ VulkanRenderer::Destroy()
 
 	vulkanRenderer.device.Initialize(vulkanRenderer.surface);
 	vulkanRenderer.swapchain.Initialize(vulkanRenderer);
+
+	for (i .. frameCount)
+	{
+		vulkanRenderer.frames[i].Initialize(vulkanRenderer);
+	}
 
 	//vulkanRenderer.DebugLogExtensions();
 

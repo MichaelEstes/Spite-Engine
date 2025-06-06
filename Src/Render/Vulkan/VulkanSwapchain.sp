@@ -8,20 +8,22 @@ state VulkanSwapchain
 
 	extent: VkExtent2D,
 
+	imageFormat: VkFormat,
+	colorSpace: VkColorSpaceKHR,
+
 	imageCount: uint32,
 	imageViewCount: uint32,
 }
 
-VkFormat VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)
+VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)
 {
-	return VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
+	this.imageFormat = VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
 }
 
-VkColorSpaceKHR VulkanSwapchain::SelectColorSpace(renderer: *VulkanRenderer)
+VulkanSwapchain::SelectColorSpace(renderer: *VulkanRenderer)
 {
-	return VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	this.colorSpace = VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 }
-
 
 VulkanSwapchain::Initialize(renderer: *VulkanRenderer)
 {
@@ -37,6 +39,9 @@ VulkanSwapchain::Initialize(renderer: *VulkanRenderer)
 
 	log "Surface capabilities: ", surfaceCapabilities;
 
+	this.SelectFormat(renderer);
+	this.SelectColorSpace(renderer);
+
 	this.imageCount = surfaceCapabilities.minImageCount;
 	if (surfaceCapabilities.maxImageCount && this.imageCount > surfaceCapabilities.maxImageCount)
 	{
@@ -49,8 +54,8 @@ VulkanSwapchain::Initialize(renderer: *VulkanRenderer)
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	createInfo.surface = renderer.surface;
 	createInfo.minImageCount = this.imageCount;
-	createInfo.imageFormat = this.SelectFormat(renderer);
-	createInfo.imageColorSpace = this.SelectColorSpace(renderer);
+	createInfo.imageFormat = this.imageFormat;
+	createInfo.imageColorSpace = this.colorSpace;
 	createInfo.imageExtent = surfaceCapabilities.currentExtent;
 	createInfo.imageArrayLayers = 1;
 	createInfo.imageUsage = VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
