@@ -11,8 +11,7 @@ state VulkanSwapchain
 	imageFormat: VkFormat,
 	colorSpace: VkColorSpaceKHR,
 
-	imageCount: uint32,
-	imageViewCount: uint32,
+	imageCount: uint32
 }
 
 VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)

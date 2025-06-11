@@ -71,6 +71,7 @@ state VulkanRenderer
 	postProcessPass: VulkanRenderPass,
 	uiPass: VulkanRenderPass,
 
+	frameBuffers: VulkanFrameBuffer,
 
 
 	currentFrame: uint32
@@ -101,9 +102,11 @@ VulkanRenderer::Destroy()
 
 	vulkanRenderer.CreateShadowMapPass();
 	vulkanRenderer.CreateOpaquePass();
-	vulkanRenderer.CreateTransparentPass();
-	vulkanRenderer.CreatePostProcessPass();
-	vulkanRenderer.CreateUIPass();
+	//vulkanRenderer.CreateTransparentPass();
+	//vulkanRenderer.CreatePostProcessPass();
+	//vulkanRenderer.CreateUIPass();
+
+	vulkanRenderer.frameBuffers.Initialize(vulkanRenderer, vulkanRenderer.opaquePass);
 
 	//vulkanRenderer.DebugLogExtensions();
 
