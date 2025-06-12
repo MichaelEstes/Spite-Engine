@@ -63,15 +63,11 @@ state VulkanRenderer
 
 	device: VulkanDevice,
 	swapchain: VulkanSwapchain,
+	depthBuffer: VulkanDepthBuffer,
 	frames: [frameCount]VulkanFrame,
 
-	shadowMapPass: VulkanRenderPass,
 	opaquePass: VulkanRenderPass,
-	transparentPass: VulkanRenderPass,
-	postProcessPass: VulkanRenderPass,
-	uiPass: VulkanRenderPass,
-
-	frameBuffers: VulkanFrameBuffer,
+	opaqueFrameBuffers: [frameCount]VulkanFrameBuffer,
 
 
 	currentFrame: uint32
@@ -100,13 +96,15 @@ VulkanRenderer::Destroy()
 		vulkanRenderer.frames[i].Initialize(vulkanRenderer);
 	}
 
-	vulkanRenderer.CreateShadowMapPass();
 	vulkanRenderer.CreateOpaquePass();
-	//vulkanRenderer.CreateTransparentPass();
-	//vulkanRenderer.CreatePostProcessPass();
-	//vulkanRenderer.CreateUIPass();
-
-	vulkanRenderer.frameBuffers.Initialize(vulkanRenderer, vulkanRenderer.opaquePass);
+	for (i .. frameCount)
+	{
+		vulkanRenderer.opaqueFrameBuffers[i].Initialize(
+			vulkanRenderer,
+			vulkanRenderer.opaquePass,
+			[vulkanRenderer.swapchain.imageViews[i]~,]
+		);
+	}
 
 	//vulkanRenderer.DebugLogExtensions();
 
@@ -157,49 +155,6 @@ VkFormat VulkanRenderer::FindDepthFormat()
 	);
 }
 
-VulkanRenderer::CreateShadowMapPass()
-{
-	depthAttachment := VkAttachmentDescription();
-	depthAttachment.format = this.FindDepthFormat();
-	depthAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
-	depthAttachment.loadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthAttachment.storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.stencilLoadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	depthAttachment.stencilStoreOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
-	depthAttachment.finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-
-	attachmentRef := VkAttachmentReference();
-	attachmentRef.attachment = 0;
-	attachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	subpass := VkSubpassDescription();
-	subpass.pipelineBindPoint = VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 0;
-	subpass.pColorAttachments = null;
-	subpass.pDepthStencilAttachment = attachmentRef@;
-
-	dependency := VkSubpassDependency();
-	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.dstSubpass = 0;
-	dependency.srcStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-	dependency.srcAccessMask = 0;
-	dependency.dstStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-	dependency.dstAccessMask = VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-	renderPassInfo := VkRenderPassCreateInfo();
-	renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.attachmentCount = 1;
-	renderPassInfo.pAttachments = depthAttachment@;
-	renderPassInfo.subpassCount = 1;
-	renderPassInfo.pSubpasses = subpass@;
-	renderPassInfo.dependencyCount = 1;
-	renderPassInfo.pDependencies = dependency@;
-
-	this.shadowMapPass.Initialize(this@, renderPassInfo);
-	log "Created shadow map pass";
-}
-
 VulkanRenderer::CreateOpaquePass()
 {
 	colorFormat := VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
@@ -207,23 +162,15 @@ VulkanRenderer::CreateOpaquePass()
 
 	colorAttachment := VkAttachmentDescription();
 	colorAttachment.format = colorFormat;
-	colorAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_4_BIT;
+	colorAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
 	colorAttachment.loadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR;
-	colorAttachment.storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colorAttachment.storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_STORE;
 	colorAttachment.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
-	colorAttachment.finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	resolveAttachment := VkAttachmentDescription();
-	resolveAttachment.format = colorFormat;
-	resolveAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
-	resolveAttachment.loadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	resolveAttachment.storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_STORE;
-	resolveAttachment.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
-	resolveAttachment.finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	colorAttachment.finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 	depthAttachment := VkAttachmentDescription();
 	depthAttachment.format = depthFormat;
-	depthAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_4_BIT;
+	depthAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
 	depthAttachment.loadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR;
 	depthAttachment.storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	depthAttachment.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
@@ -233,19 +180,14 @@ VulkanRenderer::CreateOpaquePass()
 	colorAttachmentRef.attachment = 0;
 	colorAttachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	resolveAttachmentRef := VkAttachmentReference();
-	resolveAttachmentRef.attachment = 1;
-	resolveAttachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
 	depthAttachmentRef := VkAttachmentReference();
-	depthAttachmentRef.attachment = 2;
+	depthAttachmentRef.attachment = 1;
 	depthAttachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	subpass := VkSubpassDescription();
 	subpass.pipelineBindPoint = VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = colorAttachmentRef@;
-	subpass.pResolveAttachments = resolveAttachmentRef@;
 	subpass.pDepthStencilAttachment = depthAttachmentRef@;
 
 	dependency := VkSubpassDependency();
@@ -256,10 +198,10 @@ VulkanRenderer::CreateOpaquePass()
 	dependency.dstStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	dependency.dstAccessMask = VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-	attachments := [colorAttachment, resolveAttachment, depthAttachment];
+	attachments := [colorAttachment, depthAttachment];
 	renderPassInfo := VkRenderPassCreateInfo();
 	renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.attachmentCount = 3;
+	renderPassInfo.attachmentCount = 2;
 	renderPassInfo.pAttachments = fixed attachments;
 	renderPassInfo.subpassCount = 1;
 	renderPassInfo.pSubpasses = subpass@;

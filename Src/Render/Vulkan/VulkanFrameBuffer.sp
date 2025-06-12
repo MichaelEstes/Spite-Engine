@@ -2,10 +2,10 @@ package VulkanRenderer
 
 state VulkanFrameBuffer
 {
-	frameBuffers: Allocator<*VkFramebuffer_T>
+	frameBuffer: *VkFramebuffer_T
 }
 
-VulkanFrameBuffer::Initialize(renderer: *VulkanRenderer, renderPass: VulkanRenderPass)
+VulkanFrameBuffer::Initialize(renderer: *VulkanRenderer, renderPass: VulkanRenderPass, attachments: []*VkImageView_T)
 {
 	device := renderer.device.device;
 
@@ -17,17 +17,11 @@ VulkanFrameBuffer::Initialize(renderer: *VulkanRenderer, renderPass: VulkanRende
 	createInfo.height = renderer.swapchain.extent.height;
 	createInfo.layers = 1;
 
-	createInfo.attachmentCount = 1;
+	createInfo.attachmentCount = attachments.count;
+	createInfo.pAttachments = attachments[0]@;
 
-	imageCount := renderer.swapchain.imageCount;
-	this.frameBuffers.Alloc(imageCount);
-
-	for (i .. imageCount)
-	{
-		createInfo.pAttachments = renderer.swapchain.imageViews[i];
-		CheckResult(
-			vkCreateFramebuffer(device, createInfo@, null, this.frameBuffers[i]),
-			"Error creating Vulkan frame buffer"
-		);
-	}
+	CheckResult(
+		vkCreateFramebuffer(device, createInfo@, null, this.frameBuffer@),
+		"Error creating Vulkan frame buffer"
+	);
 }
