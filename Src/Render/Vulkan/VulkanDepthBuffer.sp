@@ -7,7 +7,7 @@ state VulkanDepthBuffer
 	memory: *VkDeviceMemory_T
 }
 
-VulkanDepthBuffer::Initialize(renderer: *VulkanRenderer)
+VulkanDepthBuffer::Create(renderer: *VulkanRenderer)
 {
 	
 }

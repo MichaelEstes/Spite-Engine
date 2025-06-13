@@ -82,12 +82,12 @@ VulkanDevice::SelectDefaultDevice()
 	this.physicalDevice = 0;
 }
 
-VulkanDevice::Initialize(surface: *VkSurfaceKHR_T)
+VulkanDevice::Create(surface: *VkSurfaceKHR_T)
 {
 	this.SelectDefaultDevice();
 	physicalDevice := vulkanInstance.physicalDevices[this.physicalDevice]~;
 
-	this.queues.Initialize(physicalDevice);
+	this.queues.Create(physicalDevice);
 
 	queueCreateInfos := this.queues.DeviceQueueCreateInfo();
 	defer delete queueCreateInfos;

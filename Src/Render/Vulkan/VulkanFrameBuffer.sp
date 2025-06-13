@@ -5,7 +5,7 @@ state VulkanFrameBuffer
 	frameBuffer: *VkFramebuffer_T
 }
 
-VulkanFrameBuffer::Initialize(renderer: *VulkanRenderer, renderPass: VulkanRenderPass, attachments: []*VkImageView_T)
+VulkanFrameBuffer::Create(renderer: *VulkanRenderer, renderPass: VulkanRenderPass, attachments: []*VkImageView_T)
 {
 	device := renderer.device.device;
 

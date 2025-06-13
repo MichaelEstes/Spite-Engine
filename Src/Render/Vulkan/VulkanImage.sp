@@ -7,7 +7,7 @@ state VulkanImage
 	memory: *VkDeviceMemory_T
 }
 
-VulkanImage::Initialize(renderer: *VulkanRenderer)
+VulkanImage::Create(renderer: *VulkanRenderer)
 {
 	
 }

@@ -5,7 +5,7 @@ state VulkanRenderPass
 	renderPass: *VkRenderPass_T,
 }
 
-VulkanRenderPass::Initialize(renderer: *VulkanRenderer, createInfo: VkRenderPassCreateInfo)
+VulkanRenderPass::Create(renderer: *VulkanRenderer, createInfo: VkRenderPassCreateInfo)
 {
 	device := renderer.device.device;
 	CheckResult(

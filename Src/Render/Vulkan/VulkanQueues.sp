@@ -25,7 +25,7 @@ state VulkanQueues
 	presentQueueIndex: uint32,
 }
 
-VulkanQueues::Initialize(physicalDevice: *VkPhysicalDevice_T)
+VulkanQueues::Create(physicalDevice: *VkPhysicalDevice_T)
 {
 	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, this.queueFamilyCount@, null);
 

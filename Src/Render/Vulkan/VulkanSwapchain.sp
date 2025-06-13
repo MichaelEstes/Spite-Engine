@@ -79,7 +79,7 @@ VulkanSwapchain::SelectSwapExtent(renderer: *VulkanRenderer,capabilities: VkSurf
 	}
 }
 
-VulkanSwapchain::Initialize(renderer: *VulkanRenderer)
+VulkanSwapchain::Create(renderer: *VulkanRenderer)
 {
 	surfaceCapabilities := VkSurfaceCapabilitiesKHR();
 	CheckResult(

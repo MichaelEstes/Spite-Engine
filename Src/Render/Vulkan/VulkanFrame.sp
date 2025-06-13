@@ -6,7 +6,7 @@ state VulkanFrame
 	commandBuffer: *VkCommandBuffer_T
 }
 
-VulkanFrame::Initialize(renderer: *VulkanRenderer)
+VulkanFrame::Create(renderer: *VulkanRenderer)
 {
 	commandPoolInfo := VkCommandPoolCreateInfo();
 	commandPoolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;

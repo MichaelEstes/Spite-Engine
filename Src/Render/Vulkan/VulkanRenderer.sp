@@ -86,20 +86,20 @@ VulkanRenderer::Destroy()
 
 	vulkanRenderer.window = window;
 
-	vulkanRenderer.InitializeSurface();
+	vulkanRenderer.CreateSurface();
 
-	vulkanRenderer.device.Initialize(vulkanRenderer.surface);
-	vulkanRenderer.swapchain.Initialize(vulkanRenderer);
+	vulkanRenderer.device.Create(vulkanRenderer.surface);
+	vulkanRenderer.swapchain.Create(vulkanRenderer);
 
 	for (i .. frameCount)
 	{
-		vulkanRenderer.frames[i].Initialize(vulkanRenderer);
+		vulkanRenderer.frames[i].Create(vulkanRenderer);
 	}
 
 	vulkanRenderer.CreateOpaquePass();
 	for (i .. frameCount)
 	{
-		vulkanRenderer.opaqueFrameBuffers[i].Initialize(
+		vulkanRenderer.opaqueFrameBuffers[i].Create(
 			vulkanRenderer,
 			vulkanRenderer.opaquePass,
 			[vulkanRenderer.swapchain.imageViews[i]~,]
@@ -111,7 +111,7 @@ VulkanRenderer::Destroy()
 	return vulkanRenderer;
 }
 
-VulkanRenderer::InitializeSurface()
+VulkanRenderer::CreateSurface()
 {
 	if (!SDL.VulkanCreateSurface(this.window, this.vkInstance.instance, null, this.surface@))
 	{
