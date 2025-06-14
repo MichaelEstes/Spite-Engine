@@ -11,10 +11,10 @@ state VulkanImage
 	format: VkFormat
 }
 
-VulkanImage::Create(renderer: *VulkanRenderer, width: uint32, height: uint32, format: VkFormat, usage: uint32, properties: uint32, 
-					aspectMask: uint32 = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT,
-					tiling: VkImageTiling = VkImageTiling.VK_IMAGE_TILING_OPTIMAL,
-					sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
+VulkanImage::CreateAlloc(renderer: *VulkanRenderer, width: uint32, height: uint32, format: VkFormat, usage: uint32, properties: uint32, 
+						 aspectMask: uint32 = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT,
+						 tiling: VkImageTiling = VkImageTiling.VK_IMAGE_TILING_OPTIMAL,
+						 sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
 {
 	device := renderer.device.device;
 

@@ -62,6 +62,8 @@ state VulkanRenderer
 	surface: *VkSurfaceKHR_T,
 
 	device: VulkanDevice,
+	allocator: VulkanAllocator,
+
 	swapchain: VulkanSwapchain,
 	depthBuffer: VulkanImage,
 	frames: [frameCount]VulkanFrame,
@@ -89,6 +91,8 @@ VulkanRenderer::Destroy()
 	vulkanRenderer.CreateSurface();
 
 	vulkanRenderer.device.Create(vulkanRenderer.surface);
+	vulkanRenderer.allocator.Create(vulkanRenderer);
+
 	vulkanRenderer.swapchain.Create(vulkanRenderer);
 	vulkanRenderer.CreateDepthBuffer();
 
@@ -158,7 +162,7 @@ VkFormat VulkanRenderer::FindDepthFormat()
 
 VulkanRenderer::CreateDepthBuffer()
 {
-	this.depthBuffer.Create(
+	this.depthBuffer.CreateAlloc(
 		this@,
 		this.swapchain.extent.width,
 		this.swapchain.extent.height,
