@@ -63,7 +63,7 @@ state VulkanRenderer
 
 	device: VulkanDevice,
 	swapchain: VulkanSwapchain,
-	depthBuffer: VulkanDepthBuffer,
+	depthBuffer: VulkanImage,
 	frames: [frameCount]VulkanFrame,
 
 	opaquePass: VulkanRenderPass,
@@ -90,6 +90,7 @@ VulkanRenderer::Destroy()
 
 	vulkanRenderer.device.Create(vulkanRenderer.surface);
 	vulkanRenderer.swapchain.Create(vulkanRenderer);
+	vulkanRenderer.CreateDepthBuffer();
 
 	for (i .. frameCount)
 	{
@@ -155,6 +156,36 @@ VkFormat VulkanRenderer::FindDepthFormat()
 	);
 }
 
+VulkanRenderer::CreateDepthBuffer()
+{
+	this.depthBuffer.Create(
+		this@,
+		this.swapchain.extent.width,
+		this.swapchain.extent.height,
+		this.FindDepthFormat(),
+		VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT
+	);
+}
+
+uint32 FindMemoryType(physicalDevice: *VkPhysicalDevice_T, typeFilter: uint32, properties: uint32)
+{
+	memProperties := VkPhysicalDeviceMemoryProperties();
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, memProperties@);
+
+	for (i .. memProperties.memoryTypeCount)
+	{
+		if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+		{
+			return i;
+		}
+	}
+
+	log "Error: no supported memory type found";
+	return -1;
+}
+
 VulkanRenderer::CreateOpaquePass()
 {
 	colorFormat := VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
@@ -208,7 +239,7 @@ VulkanRenderer::CreateOpaquePass()
 	renderPassInfo.dependencyCount = 1;
 	renderPassInfo.pDependencies = dependency@;
 
-	this.opaquePass.Initialize(this@, renderPassInfo);
+	this.opaquePass.Create(this@, renderPassInfo);
 	log "Created opaque pass";
 }
 

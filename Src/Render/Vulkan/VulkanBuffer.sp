@@ -6,7 +6,8 @@ state VulkanBuffer
 	memory: *VkDeviceMemory_T
 }
 
-VulkanBuffer::Create(size: uint64, usage: uint32, sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
+VulkanBuffer::Create(renderer: *VulkanRenderer, size: uint64, usage: uint32, 
+					 sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
 {
 	createInfo := VkBufferCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -14,5 +15,8 @@ VulkanBuffer::Create(size: uint64, usage: uint32, sharingMode: VkSharingMode = V
 	createInfo.usage = usage;
 	createInfo.sharingMode = sharingMode;
 
-
+	CheckResult(
+		vkCreateBuffer(renderer.device.device, createInfo@, null, this.buffer@),
+		"Error creating Vulkan buffer"
+	);
 }
