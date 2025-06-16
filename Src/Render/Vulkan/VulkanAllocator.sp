@@ -1,8 +1,23 @@
 package VulkanRenderer
 
+import Array
+
+state VulkanAllocation
+{
+	index: uint32,
+	offset: uint32,
+	size: uint32
+}
+
+state VulkanBlock
+{
+	size: uint32
+}
+
 state VulkanAllocator
 {
-	memoryProps: VkPhysicalDeviceMemoryProperties
+	memoryProps: VkPhysicalDeviceMemoryProperties,
+	blocks: Array<VulkanBlock>
 }
 
 VulkanAllocator::Create(renderer: *VulkanRenderer)
