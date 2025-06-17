@@ -2,8 +2,7 @@ package VulkanRenderer
 
 state VulkanBuffer
 {
-	buffer: *VkBuffer_T,
-	memory: *VkDeviceMemory_T
+	buffer: *VkBuffer_T
 }
 
 VulkanBuffer::Create(renderer: *VulkanRenderer, size: uint64, usage: uint32, 
