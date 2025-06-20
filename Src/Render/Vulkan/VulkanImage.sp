@@ -16,31 +16,8 @@ VulkanImage::CreateAlloc(renderer: *VulkanRenderer, width: uint32, height: uint3
 						 tiling: VkImageTiling = VkImageTiling.VK_IMAGE_TILING_OPTIMAL,
 						 sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
 {
+	this.Create(renderer, width, height, format, usage, tiling, sharingMode);
 	device := renderer.device.device;
-
-	this.width = width;
-	this.height = height;
-	this.format = format;
-
-	createInfo := VkImageCreateInfo();
-	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	createInfo.imageType = VkImageType.VK_IMAGE_TYPE_2D;
-	createInfo.extent.width = width;
-	createInfo.extent.height = height;
-	createInfo.extent.depth = 1;
-	createInfo.mipLevels = 1;
-	createInfo.arrayLayers = 1;
-	createInfo.format = format;
-	createInfo.tiling = tiling;
-	createInfo.usage = usage;
-	createInfo.sharingMode = sharingMode;
-	createInfo.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
-	createInfo.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
-
-	CheckResult(
-		vkCreateImage(device, createInfo@, null, this.image@),
-		"Error creating Vulkan image"
-	);
 
 	memoryRequirements := VkMemoryRequirements();
 	vkGetImageMemoryRequirements(device, this.image, memoryRequirements@);
@@ -85,4 +62,36 @@ VulkanImage::CreateAlloc(renderer: *VulkanRenderer, width: uint32, height: uint3
 		vkCreateImageView(device, viewCreateInfo@, null, this.imageView@),
 		"Error creating image view"
 	);	
+}
+
+VulkanImage::Create(renderer: *VulkanRenderer, width: uint32, height: uint32, format: VkFormat, usage: uint32, 
+					 aspectMask: uint32 = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT,
+					 tiling: VkImageTiling = VkImageTiling.VK_IMAGE_TILING_OPTIMAL,
+					 sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
+{
+	device := renderer.device.device;
+
+	this.width = width;
+	this.height = height;
+	this.format = format;
+
+	createInfo := VkImageCreateInfo();
+	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	createInfo.imageType = VkImageType.VK_IMAGE_TYPE_2D;
+	createInfo.extent.width = width;
+	createInfo.extent.height = height;
+	createInfo.extent.depth = 1;
+	createInfo.mipLevels = 1;
+	createInfo.arrayLayers = 1;
+	createInfo.format = format;
+	createInfo.tiling = tiling;
+	createInfo.usage = usage;
+	createInfo.sharingMode = sharingMode;
+	createInfo.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
+	createInfo.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+
+	CheckResult(
+		vkCreateImage(device, createInfo@, null, this.image@),
+		"Error creating Vulkan image"
+	);
 }
