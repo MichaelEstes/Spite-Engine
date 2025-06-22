@@ -5,7 +5,7 @@ state VulkanBuffer
 	buffer: *VkBuffer_T
 }
 
-VulkanBuffer::Create(renderer: *VulkanRenderer, size: uint64, usage: uint32, 
+VulkanBuffer::Create(renderer: *VulkanRenderer, size: uint64, usage: uint32, memoryFlags: VulkanMemoryFlags,
 					 sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
 {
 	createInfo := VkBufferCreateInfo();
@@ -18,4 +18,6 @@ VulkanBuffer::Create(renderer: *VulkanRenderer, size: uint64, usage: uint32,
 		vkCreateBuffer(renderer.device.device, createInfo@, null, this.buffer@),
 		"Error creating Vulkan buffer"
 	);
+
+	renderer.allocator.AllocBuffer(this, memoryFlags);
 }

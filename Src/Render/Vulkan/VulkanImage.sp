@@ -4,14 +4,15 @@ state VulkanImage
 {
 	image: *VkImage_T,
 	imageView: *VkImageView_T,
-	memory: *VkDeviceMemory_T,
 
 	width: uint32,
 	height: uint32,
 	format: VkFormat
 }
 
-VulkanImage::CreateAlloc(renderer: *VulkanRenderer, width: uint32, height: uint32, format: VkFormat, usage: uint32, properties: uint32, 
+*VkDeviceMemory_T VulkanImage::CreateDedicated(
+						 renderer: *VulkanRenderer, width: uint32, 
+						 height: uint32, format: VkFormat, usage: uint32, memoryFlags: VulkanMemoryFlags, 
 						 aspectMask: uint32 = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT,
 						 tiling: VkImageTiling = VkImageTiling.VK_IMAGE_TILING_OPTIMAL,
 						 sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
@@ -28,46 +29,30 @@ VulkanImage::CreateAlloc(renderer: *VulkanRenderer, width: uint32, height: uint3
 	allocInfo.memoryTypeIndex = FindMemoryType(
 		renderer.device.GetPhysicalDevice(),
 		memoryRequirements.memoryTypeBits,
-		properties
+		memoryFlags
 	);
 
+	memory: *VkDeviceMemory_T = null;
+
 	CheckResult(
-		vkAllocateMemory(device, allocInfo@, null, this.memory@),
+		vkAllocateMemory(device, allocInfo@, null, memory@),
 		"Error allocating Vulkan image memory"
 	);
 
 	CheckResult(
-		vkBindImageMemory(device, this.image, this.memory, 0),
+		vkBindImageMemory(device, this.image, memory, 0),
 		"Error binding Vulkan image memory"
 	);
 
-	viewCreateInfo := VkImageViewCreateInfo();
-	viewCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	viewCreateInfo.image = this.image;
-	viewCreateInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
-	viewCreateInfo.format = format;
-	
-	viewCreateInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-    viewCreateInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-    viewCreateInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-    viewCreateInfo.components.a = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
-	
-	viewCreateInfo.subresourceRange.aspectMask = aspectMask;
-	viewCreateInfo.subresourceRange.baseMipLevel = 0;
-	viewCreateInfo.subresourceRange.levelCount = 1;
-	viewCreateInfo.subresourceRange.baseArrayLayer = 0;
-	viewCreateInfo.subresourceRange.layerCount = 1;
+	this.CreateView(renderer, aspectMask);
 
-	CheckResult(
-		vkCreateImageView(device, viewCreateInfo@, null, this.imageView@),
-		"Error creating image view"
-	);	
+	return memory;
 }
 
-VulkanImage::Create(renderer: *VulkanRenderer, width: uint32, height: uint32, format: VkFormat, usage: uint32, 
-					 aspectMask: uint32 = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT,
-					 tiling: VkImageTiling = VkImageTiling.VK_IMAGE_TILING_OPTIMAL,
-					 sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
+VulkanImage::Create(renderer: *VulkanRenderer, width: uint32, height: uint32, 
+					format: VkFormat, usage: uint32, 
+					tiling: VkImageTiling = VkImageTiling.VK_IMAGE_TILING_OPTIMAL,
+					sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
 {
 	device := renderer.device.device;
 
@@ -93,5 +78,33 @@ VulkanImage::Create(renderer: *VulkanRenderer, width: uint32, height: uint32, fo
 	CheckResult(
 		vkCreateImage(device, createInfo@, null, this.image@),
 		"Error creating Vulkan image"
+	);
+}
+
+VulkanImage::CreateView(renderer: *VulkanRenderer, aspectMask: uint32 = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT)
+{
+	device := renderer.device.device;
+	format := this.format;
+
+	viewCreateInfo := VkImageViewCreateInfo();
+	viewCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewCreateInfo.image = this.image;
+	viewCreateInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
+	viewCreateInfo.format = format;
+	
+	viewCreateInfo.components.r = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+    viewCreateInfo.components.g = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+    viewCreateInfo.components.b = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+    viewCreateInfo.components.a = VkComponentSwizzle.VK_COMPONENT_SWIZZLE_IDENTITY;
+	
+	viewCreateInfo.subresourceRange.aspectMask = aspectMask;
+	viewCreateInfo.subresourceRange.baseMipLevel = 0;
+	viewCreateInfo.subresourceRange.levelCount = 1;
+	viewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	viewCreateInfo.subresourceRange.layerCount = 1;
+
+	CheckResult(
+		vkCreateImageView(device, viewCreateInfo@, null, this.imageView@),
+		"Error creating image view"
 	);
 }

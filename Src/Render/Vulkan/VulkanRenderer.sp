@@ -65,7 +65,7 @@ state VulkanRenderer
 	allocator: VulkanAllocator,
 
 	swapchain: VulkanSwapchain,
-	depthBuffer: VulkanImage,
+	depthBuffer: VulkanDepthBuffer,
 	frames: [frameCount]VulkanFrame,
 
 	opaquePass: VulkanRenderPass,
@@ -94,7 +94,7 @@ VulkanRenderer::Destroy()
 	vulkanRenderer.allocator.Create(vulkanRenderer);
 
 	vulkanRenderer.swapchain.Create(vulkanRenderer);
-	vulkanRenderer.CreateDepthBuffer();
+	vulkanRenderer.depthBuffer.Create(vulkanRenderer);
 
 	for (i .. frameCount)
 	{
@@ -107,7 +107,7 @@ VulkanRenderer::Destroy()
 		vulkanRenderer.opaqueFrameBuffers[i].Create(
 			vulkanRenderer,
 			vulkanRenderer.opaquePass,
-			[vulkanRenderer.swapchain.imageViews[i]~,]
+			[vulkanRenderer.swapchain.imageViews[i]~, vulkanRenderer.depthBuffer.image.imageView]
 		);
 	}
 
@@ -160,19 +160,6 @@ VkFormat VulkanRenderer::FindDepthFormat()
 	);
 }
 
-VulkanRenderer::CreateDepthBuffer()
-{
-	this.depthBuffer.CreateAlloc(
-		this@,
-		this.swapchain.extent.width,
-		this.swapchain.extent.height,
-		this.FindDepthFormat(),
-		VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-		VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT
-	);
-}
-
 uint32 FindMemoryType(physicalDevice: *VkPhysicalDevice_T, typeFilter: uint32, properties: uint32)
 {
 	memProperties := VkPhysicalDeviceMemoryProperties();
@@ -192,7 +179,7 @@ uint32 FindMemoryType(physicalDevice: *VkPhysicalDevice_T, typeFilter: uint32, p
 
 VulkanRenderer::CreateOpaquePass()
 {
-	colorFormat := VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
+	colorFormat := this.swapchain.imageFormat;
 	depthFormat := this.FindDepthFormat();
 
 	colorAttachment := VkAttachmentDescription();
