@@ -21,6 +21,11 @@ Array::delete
 
 []Type Array::log()
 {
+	return this.AsArray()
+}
+
+[]Type Array::AsArray()
+{
 	arr := []Type;
 	arr.count = this.count;
 	arr.capacity = this.capacity;

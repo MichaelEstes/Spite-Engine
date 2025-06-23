@@ -182,55 +182,47 @@ VulkanRenderer::CreateOpaquePass()
 	colorFormat := this.swapchain.imageFormat;
 	depthFormat := this.FindDepthFormat();
 
-	colorAttachment := VkAttachmentDescription();
-	colorAttachment.format = colorFormat;
-	colorAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
-	colorAttachment.loadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR;
-	colorAttachment.storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_STORE;
-	colorAttachment.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
-	colorAttachment.finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	this.opaquePass
+		.AddAttachment(
+			colorFormat,
+			VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT,
+			VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR,
+			VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_STORE,
+			VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED,
+			VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+			VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		)
+		.AddAttachment(
+			depthFormat,
+			VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT,
+			VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR,
+			VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED,
+			VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+		)
+		.AddSubpass(
+			VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS,
+			uint32:[0,],
+			uint32(1)@
+		)
+		.AddDependency(
+			VK_SUBPASS_EXTERNAL,
+			0,
 
-	depthAttachment := VkAttachmentDescription();
-	depthAttachment.format = depthFormat;
-	depthAttachment.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
-	depthAttachment.loadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthAttachment.storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
-	depthAttachment.finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | 
+			VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+			VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | 
+			VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
 
-	colorAttachmentRef := VkAttachmentReference();
-	colorAttachmentRef.attachment = 0;
-	colorAttachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			0,
+			VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+			VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 
-	depthAttachmentRef := VkAttachmentReference();
-	depthAttachmentRef.attachment = 1;
-	depthAttachmentRef.layout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			0
+		);
 
-	subpass := VkSubpassDescription();
-	subpass.pipelineBindPoint = VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = colorAttachmentRef@;
-	subpass.pDepthStencilAttachment = depthAttachmentRef@;
-
-	dependency := VkSubpassDependency();
-	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.dstSubpass = 0;
-	dependency.srcStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.srcAccessMask = 0;
-	dependency.dstStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.dstAccessMask = VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-	attachments := [colorAttachment, depthAttachment];
-	renderPassInfo := VkRenderPassCreateInfo();
-	renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.attachmentCount = 2;
-	renderPassInfo.pAttachments = fixed attachments;
-	renderPassInfo.subpassCount = 1;
-	renderPassInfo.pSubpasses = subpass@;
-	renderPassInfo.dependencyCount = 1;
-	renderPassInfo.pDependencies = dependency@;
-
-	this.opaquePass.Create(this@, renderPassInfo);
+	this.opaquePass.Create(this@);
 	log "Created opaque pass";
 }
 
