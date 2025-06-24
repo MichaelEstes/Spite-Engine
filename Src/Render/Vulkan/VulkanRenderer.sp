@@ -220,9 +220,9 @@ VulkanRenderer::CreateOpaquePass()
 			VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 
 			0
-		);
+		)
+		.Create(this@);
 
-	this.opaquePass.Create(this@);
 	log "Created opaque pass";
 }
 

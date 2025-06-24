@@ -123,7 +123,7 @@ ref VulkanRenderPass VulkanRenderPass::AddDependency(srcSubpass: uint32, dstSubp
 	return this;
 }
 
-VulkanRenderPass::Create(renderer: *VulkanRenderer)
+ref VulkanRenderPass VulkanRenderPass::Create(renderer: *VulkanRenderer)
 {
 	this.device = renderer.device.device;
 
@@ -140,4 +140,6 @@ VulkanRenderPass::Create(renderer: *VulkanRenderer)
 		vkCreateRenderPass(this.device, createInfo@, null, this.renderPass@),
 		"Error creating Vulkan render pass"
 	);
+
+	return this;
 }
