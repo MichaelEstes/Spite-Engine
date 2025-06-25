@@ -18,6 +18,15 @@ state VulkanPipeline
     dynamicStates: Array<VkDynamicState>
 }
 
+VulkanPipeline::delete
+{
+	delete this.shaders;
+	delete this.dynamicStates;
+
+	vkDestroyPipeline(this.device, this.pipeline, null);
+	vkDestroyPipelineLayout(this.device, this.layout, null);
+}
+
 VulkanPipeline::(renderer: *VulkanRenderer)
 {
     this.device = renderer.device.device;
@@ -127,14 +136,14 @@ ref VulkanPipeline VulkanPipeline::SetMultisampling(rasterizationSamples: VkSamp
 }
 
 ref VulkanPipeline VulkanPipeline::SetDepthStencil(depthTestEnable: uint32 = VkFalse,
-	                                                depthWriteEnable: uint32 = VkFalse,
-	                                                depthCompareOp: VkCompareOp = VkCompareOp.VK_COMPARE_OP_LESS,
-	                                                depthBoundsTestEnable: uint32 = VkFalse,
-	                                                stencilTestEnable: uint32 = VkFalse,
-	                                                front: VkStencilOpState = VkStencilOpState(),
-                                                    back: VkStencilOpState = VkStencilOpState(),
-	                                                minDepthBounds: float32 = 0.0,
-	                                                maxDepthBounds: float32 = 1.0)
+	                                               depthWriteEnable: uint32 = VkFalse,
+	                                               depthCompareOp: VkCompareOp = VkCompareOp.VK_COMPARE_OP_LESS,
+	                                               depthBoundsTestEnable: uint32 = VkFalse,
+	                                               stencilTestEnable: uint32 = VkFalse,
+	                                               front: VkStencilOpState = VkStencilOpState(),
+                                                   back: VkStencilOpState = VkStencilOpState(),
+	                                               minDepthBounds: float32 = 0.0,
+	                                               maxDepthBounds: float32 = 1.0)
 {
 	this.depthStencil.depthTestEnable = depthTestEnable;
     this.depthStencil.depthWriteEnable = depthWriteEnable;
@@ -187,7 +196,8 @@ ref VulkanPipeline VulkanPipeline::CreatePipelineLayout(setLayouts: []*VkDescrip
 	return this;
 }
 
-ref VulkanPipeline VulkanPipeline::Create(renderPass: VulkanRenderPass, subpass: uint32)
+ref VulkanPipeline VulkanPipeline::Create(renderPass: VulkanRenderPass, subpass: uint32,
+										  basePipelineHandle: *VkPipeline_T = null, basePipelineIndex: int32 = -1)
 {
     dynamicState := VkPipelineDynamicStateCreateInfo();
 	dynamicState.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -218,8 +228,8 @@ ref VulkanPipeline VulkanPipeline::Create(renderPass: VulkanRenderPass, subpass:
 	pipelineInfo.layout = this.layout;
 	pipelineInfo.renderPass = renderPass.renderPass;
 	pipelineInfo.subpass = subpass;
-	pipelineInfo.basePipelineHandle = null; // Optional
-	pipelineInfo.basePipelineIndex = int32(-1); // Optiona
+	pipelineInfo.basePipelineHandle = basePipelineHandle; 
+	pipelineInfo.basePipelineIndex = basePipelineIndex;
 
 	CheckResult(
 		vkCreateGraphicsPipelines(this.device, null, uint32(1), pipelineInfo@, null, this.pipeline@),
