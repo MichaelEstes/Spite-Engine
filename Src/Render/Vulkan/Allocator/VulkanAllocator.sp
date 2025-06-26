@@ -1,6 +1,7 @@
 package VulkanRenderer
 
 import Array
+import Resource
 
 enum VulkanMemoryFlags: uint32
 {
@@ -48,7 +49,7 @@ VulkanAllocator::Create(renderer: *VulkanRenderer)
 	log "Found device memory properties";
 }
 
-VulkanAllocator::AllocBuffer(buffer: VulkanBuffer, memoryFlags: uint32)
+ResourceHandle VulkanAllocator::AllocBuffer(buffer: VulkanBuffer, memoryFlags: uint32)
 {
 	memoryRequirements := VkMemoryRequirements();
 	vkGetBufferMemoryRequirements(this.device, buffer.buffer, memoryRequirements@);
@@ -72,6 +73,11 @@ VulkanAllocator::AllocBuffer(buffer: VulkanBuffer, memoryFlags: uint32)
 		vkBindBufferMemory(this.device, buffer.buffer, block.memory, alloc.offset),
 		"Error binding buffer memory"
 	);
+
+	resourceParam := VulkanResource();
+	resourceParam.allocator = this@;
+	resourceParam.allocation = alloc;
+	return VulkanResourceManager.LoadResource(resourceParam, ::(handle: ResourceHandle){});
 }
 
 *VulkanBlock VulkanAllocator::FindBlock(size: uint32, memoryFlags: uint32)
