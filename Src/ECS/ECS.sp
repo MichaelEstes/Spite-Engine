@@ -56,7 +56,7 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 	return component;
 }
 
-{id: uint, step: SystemStep} ECS::RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.OnFrame)
+{id: uint, step: SystemStep} ECS::RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
 {	
 	assert run != null, "Cannot register null systems";
 
@@ -71,12 +71,14 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 {
 	switch (step)
 	{
-		case (SystemStep.OnFixed) return { this.systems.onFixed.Add(system), step };
-		case (SystemStep.OnEarlyFrame) return { this.systems.onEarlyFrame.Add(system), step };
-		case (SystemStep.OnFrame) return { this.systems.onFrame.Add(system), step };
-		case (SystemStep.OnPostFrame) return { this.systems.onPostFrame.Add(system), step };
-		case (SystemStep.OnStart) return { this.systems.onStart.Add(system), step };
-		case (SystemStep.OnStop) return { this.systems.onStop.Add(system), step };
+		case (SystemStep.Fixed) return { this.systems.onFixed.Add(system), step };
+		case (SystemStep.PreFrame) return { this.systems.onPreFrame.Add(system), step };
+		case (SystemStep.Frame) return { this.systems.onFrame.Add(system), step };
+		case (SystemStep.PostFrame) return { this.systems.onPostFrame.Add(system), step };
+		case (SystemStep.PreDraw) return { this.systems.onPreDraw.Add(system), step };
+		case (SystemStep.Draw) return { this.systems.onDraw.Add(system), step };
+		case (SystemStep.Start) return { this.systems.onStart.Add(system), step };
+		case (SystemStep.Stop) return { this.systems.onStop.Add(system), step };
 	}
 
 	return { -1, step };

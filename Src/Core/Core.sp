@@ -18,8 +18,8 @@ Initialize()
 	SDL.Init(SDL.InitFlags.VIDEO);
 	SDL.VulkanLoadLibrary(null);
 
-	VulkanRenderer.InitializeVulkanInstance();
-	//SDLRenderer.InitializeSDLGPUInstance();
+	//VulkanRenderer.InitializeVulkanInstance();
+	SDLRenderer.InitializeSDLGPUInstance();
 
 	SDLEventEmitter.On(SDL.EventType.QUIT, ::(event: SDL.Event) {
 		running = false;
@@ -41,8 +41,8 @@ MainLoop()
 {
 	running = true;
 
-	mainRenderer := VulkanRenderer.CreateVulkanRenderer(Window.CreateMainWindow());
-	//mainRenderer := SDLRenderer.CreateSDLRenderer(Window.CreateMainWindow());
+	//mainRenderer := VulkanRenderer.CreateVulkanRenderer(Window.CreateMainWindow());
+	mainRenderer := SDLRenderer.CreateSDLRenderer(Window.CreateMainWindow());
 
 	currEvent := SDL.Event();
 	while (running)

@@ -400,3 +400,14 @@ bool IsDigit(char: byte)
 
 	return numValue;
 }
+
+Type JSONDeserialize<Type>(file: string)
+{
+	ret := Type();
+	json := ParseJSONFile(file);
+
+	type := #typeof Type;
+
+
+	return ret;
+}

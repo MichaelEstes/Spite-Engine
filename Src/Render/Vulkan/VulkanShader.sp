@@ -10,6 +10,7 @@ state VulkanShader
 
 VulkanShader::Create(renderer: *VulkanRenderer, file: string, stage: VkShaderStageFlagBits, entry: string)
 {
+	log "Loading shader file: ", file;
 	shaderFile := ReadFile(file);
 	device := renderer.device.device;
 

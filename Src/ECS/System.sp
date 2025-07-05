@@ -5,14 +5,15 @@ import Array
 
 enum SystemStep: byte
 {
-	OnFixed,
-	OnEarlyFrame,
-	OnFrame,
-	OnDraw,
-	OnPostFrame,
+	Fixed,
+	PreFrame,
+	Frame,
+	PreDraw
+	Draw,
+	PostFrame,
 	
-	OnStart,
-	OnStop
+	Start,
+	Stop
 }
 
 state System
@@ -23,8 +24,9 @@ state System
 state Systems
 {
 	onFixed: Array<System>,
-	onEarlyFrame: Array<System>,
+	onPreFrame: Array<System>,
 	onFrame: Array<System>,
+	onPreDraw: Array<System>,
 	onDraw: Array<System>,
 	onPostFrame: Array<System>,
 	

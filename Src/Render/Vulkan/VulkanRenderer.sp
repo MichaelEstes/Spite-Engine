@@ -71,6 +71,7 @@ state VulkanRenderer
 	opaquePass: VulkanRenderPass,
 	opaqueFrameBuffers: [frameCount]VulkanFrameBuffer,
 
+	pipeline: VulkanPipeline,
 
 	currentFrame: uint32
 }
@@ -110,6 +111,8 @@ VulkanRenderer::Destroy()
 			[vulkanRenderer.swapchain.imageViews[i]~, vulkanRenderer.depthBuffer.image.imageView]
 		);
 	}
+
+	vulkanRenderer.CreatePipeline();
 
 	//vulkanRenderer.DebugLogExtensions();
 
@@ -224,5 +227,16 @@ VulkanRenderer::CreateOpaquePass()
 		.Create(this@);
 
 	log "Created opaque pass";
+}
+
+VulkanRenderer::CreatePipeline()
+{
+	this.pipeline = VulkanPipeline(this@)
+		.AddShader(this@, "./Resource/Shaders/Compiled/vert.spv", VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT)
+		.AddShader(this@, "./Resource/Shaders/Compiled/frag.spv", VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT)
+		.Create(this.opaquePass, 0);
+
+	log "Created pipeline";
+
 }
 
