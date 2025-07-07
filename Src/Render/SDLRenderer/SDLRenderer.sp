@@ -2,6 +2,7 @@ package SDLRenderer
 
 import SDL
 import OS
+import ArrayView
 
 Check(success: bool, errMsg: string)
 {
@@ -22,6 +23,27 @@ InitializeSDLGPUInstance()
 {
 	Check(ShaderCross_Init(), "Error initializing Shadercross");
 	instance.device = CreateGPUDevice(GPUShaderFormat.SPIRV, true, null);
+
+	metadata := GetMetadataForShader("./Resource/Shaders/Compiled/vert.spv");
+	log "Shader metadata: ", metadata;
+
+	inputArray := ArrayView<IOVarMetadata>(metadata.inputs, metadata.num_inputs);
+	for (input in inputArray)
+	{
+		log "Input: ", input;
+	}
+
+	outputArray := ArrayView<IOVarMetadata>(metadata.outputs, metadata.num_outputs);
+	for (output in outputArray)
+	{
+		log "Output: ", output;
+	}
+}
+
+*GraphicsShaderMetadata GetMetadataForShader(spirvFile: string)
+{
+	shaderFile := ReadFile(spirvFile);
+	return ReflectGraphicsSPIRV(shaderFile[0] as *ubyte, shaderFile.count, 0);
 }
 
 state SDLRenderer

@@ -55,7 +55,7 @@ ref Type Array::current(it: Iterator)
 }
 
 // Returns the index of the item added
-int Array::Add(item: Type)
+uint32 Array::Add(item: Type)
 {
 	if(this.count >= this.capacity) this.Expand();	
 
