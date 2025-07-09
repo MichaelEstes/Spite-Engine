@@ -15,7 +15,7 @@ StableArray::delete
 
 uint StableArray::Add(item: Type)
 {
-	if (this.index >= BlockSize) this.AddBlock();
+	if (!blocks.count || this.index >= BlockSize) this.AddBlock();
 	
 	blockIndex := this.blocks.count - 1
 	currIndex := blockIndex * BlockSize + this.index;
