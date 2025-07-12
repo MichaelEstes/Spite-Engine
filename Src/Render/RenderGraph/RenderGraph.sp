@@ -20,5 +20,10 @@ state RenderGraph
 	
 }
 
-RenderGraph::AddPass(name: string)
+RenderGraph::AddPass<InitData, ExecData>(name: string, 
+										 init: ::(RenderNodeBuilder, *InitData), 
+										 exec: ::(RenderPassContext, *ExecData)
+{
+
+}
 
