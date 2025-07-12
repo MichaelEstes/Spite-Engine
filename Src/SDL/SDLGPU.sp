@@ -161,7 +161,7 @@ enum GPUTextureFormat: uint32
     ASTC_12x12_FLOAT
 }
 
-enum GPUTextureType
+enum GPUTextureType: uint32
 {
     2D,         // The texture is a 2-dimensional image. 
     2D_ARRAY,   // The texture is a 2-dimensional array image. 
