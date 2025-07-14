@@ -12,9 +12,9 @@ state RenderNode
 
 state RenderNodeBuilder
 {
-	reads: Array<RenderResource>,
-	writes: Array<RenderResource>,
-	creates: Array<{name: string, desc: RenderTargetDesc}>,
+	reads: Array<RenderTarget>,
+	writes: Array<RenderTarget>,
+	creates: Array<{name: string, desc: RenderResourceDesc}>,
 	data: *any
 }
 
@@ -28,7 +28,7 @@ RenderNodeBuilder::Write(target: RenderResource)
 	this.writes.Add(target);
 }
 
-RenderNodeBuilder::Create(name: string, desc: RenderTargetDesc)
+RenderNodeBuilder::Create(name: string, desc: RenderResourceDesc)
 {
 	this.creates.Add({
 		name,

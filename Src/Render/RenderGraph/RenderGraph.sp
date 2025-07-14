@@ -1,28 +1,18 @@
 package RenderGraph
 
-state ResourceDesc
-{
-
-}
-
-state RenderResource
-{
-	handle: uint
-}
-
 state RenderPassContext
 {
-
+	context: int
 }
 
 state RenderGraph
 {
-	
+	graph: int
 }
 
 RenderGraph::AddPass<InitData, ExecData>(name: string, 
 										 init: ::(RenderNodeBuilder, *InitData), 
-										 exec: ::(RenderPassContext, *ExecData)
+										 exec: ::(RenderPassContext, *ExecData))
 {
 
 }
