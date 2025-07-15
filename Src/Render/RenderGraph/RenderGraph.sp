@@ -1,19 +1,31 @@
 package RenderGraph
 
+import Array
+
 state RenderPassContext
 {
 	context: int
 }
 
-state RenderGraph
+state RenderGraphPass
 {
-	graph: int
+	name: string,
+	init: ::(RenderNodeBuilder), 
+	exec: ::(RenderPassContext)
 }
 
-RenderGraph::AddPass<InitData, ExecData>(name: string, 
-										 init: ::(RenderNodeBuilder, *InitData), 
-										 exec: ::(RenderPassContext, *ExecData))
+state RenderGraph
 {
+	passes: Array<RenderGraphPass>
+}
 
+RenderGraph::AddPass(name: string, init: ::(RenderNodeBuilder), exec: ::(RenderPassContext))
+{
+	pass := RenderGraphPass()
+	pass.name = name;
+	pass.init = init;
+	pass.exec = exec;
+
+	this.passes.Add(pass);
 }
 

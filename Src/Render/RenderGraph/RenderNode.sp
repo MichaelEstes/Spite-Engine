@@ -2,35 +2,34 @@ package RenderGraph
 
 import Array
 
-
 state RenderNode
 {
 	name: string,
 	reads: Array<RenderResource>,
 	writes: Array<RenderResource>,
-}
-
-state RenderNodeBuilder
-{
-	reads: Array<RenderTarget>,
-	writes: Array<RenderTarget>,
 	creates: Array<{name: string, desc: RenderResourceDesc}>,
 	data: *any
 }
 
+state RenderNodeBuilder
+{
+	renderGraph: *RenderGraph,
+	node: RenderNode
+}
+
 RenderNodeBuilder::Read(target: RenderResource)
 {
-	this.reads.Add(target);
+	this.node.reads.Add(target);
 }
 
 RenderNodeBuilder::Write(target: RenderResource)
 {
-	this.writes.Add(target);
+	this.node.writes.Add(target);
 }
 
-RenderNodeBuilder::Create(name: string, desc: RenderResourceDesc)
+RenderResource RenderNodeBuilder::Create(name: string, desc: RenderResourceDesc)
 {
-	this.creates.Add({
+	this.node.creates.Add({
 		name,
 		desc
 	});
