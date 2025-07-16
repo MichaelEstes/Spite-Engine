@@ -38,3 +38,8 @@ SDLRenderer CreateSDLRenderer(window: *Window)
 
 	return renderer;
 }
+
+SDLRenderer::Draw()
+{
+
+}

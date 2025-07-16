@@ -2,12 +2,6 @@ package RenderGraph
 
 import SDL
 
-enum RenderTargetKind
-{
-	Named,
-	Direct
-}
-
 state RenderResourceHandle
 {
 	handle: uint
@@ -28,11 +22,8 @@ state ResourceDesc
 	kind: ResourceKind
 }
 
-state RenderTarget
+state RenderResource
 {
-	target: ?{
-		name: string,
-		direct: RenderResourceHandle
-	},
-	kind: RenderTargetKind
+	handle: RenderResourceHandle,
+	kind: ResourceKind
 }

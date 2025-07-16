@@ -59,6 +59,11 @@ state ResourceManager<Type, ParamType>
 
 ResourceManager::delete
 {
+	for (kv in this.resourceKeyToHandle)
+	{
+		delete kv.key~;
+	}
+
 	delete this.resourceKeyToHandle;
 	delete this.resources;
 }
@@ -90,6 +95,7 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 	{
 		handle := this.resourceKeyToHandle[resourceKey]~;
 		onLoad(handle);
+		delete resourceKey;
 		return handle;
 	}
 

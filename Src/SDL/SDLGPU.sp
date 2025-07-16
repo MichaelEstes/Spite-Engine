@@ -218,6 +218,11 @@ state GPUShader
 	opaque: *void
 }
 
+state GPUCommandBuffer
+{
+	opaque: *void
+}
+
 state GPUShaderCreateInfo
 {
 	code_size: uint,				// The size in bytes of the code pointed to. 

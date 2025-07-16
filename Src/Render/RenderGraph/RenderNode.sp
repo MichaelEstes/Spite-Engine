@@ -2,12 +2,21 @@ package RenderGraph
 
 import Array
 
+enum ResourceAccess: uint32
+{
+	Read,
+	Write
+}
+
+state RenderResourceUsage
+{
+	resource: RenderResource,
+	access: ResourceAccess
+}
+
 state RenderNode
 {
-	name: string,
-	reads: Array<RenderResource>,
-	writes: Array<RenderResource>,
-	creates: Array<{name: string, desc: RenderResourceDesc}>,
+	resources: Array<RenderResourceUsage>,
 	data: *any
 }
 
@@ -19,18 +28,15 @@ state RenderNodeBuilder
 
 RenderNodeBuilder::Read(target: RenderResource)
 {
-	this.node.reads.Add(target);
+	this.node.resources.Add({ target, ResourceAccess.Read });
 }
 
 RenderNodeBuilder::Write(target: RenderResource)
 {
-	this.node.writes.Add(target);
+	this.node.resources.Add({ target, ResourceAccess.Write });
 }
 
-RenderResource RenderNodeBuilder::Create(name: string, desc: RenderResourceDesc)
+RenderResource RenderNodeBuilder::Create(name: string, desc: ResourceDesc)
 {
-	this.node.creates.Add({
-		name,
-		desc
-	});
+	
 }

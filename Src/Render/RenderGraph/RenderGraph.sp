@@ -1,17 +1,19 @@
 package RenderGraph
 
+import SDL
 import Array
 
 state RenderPassContext
 {
-	context: int
+	commandBuffer: *GPUCommandBuffer
 }
 
 state RenderGraphPass
 {
 	name: string,
-	init: ::(RenderNodeBuilder), 
-	exec: ::(RenderPassContext)
+	node: RenderNode,
+	exec: ::(RenderPassContext, *any),
+	data: *any
 }
 
 state RenderGraph
@@ -19,13 +21,33 @@ state RenderGraph
 	passes: Array<RenderGraphPass>
 }
 
-RenderGraph::AddPass(name: string, init: ::(RenderNodeBuilder), exec: ::(RenderPassContext))
+RenderGraph::AddPass(name: string, init: ::(RenderNodeBuilder), exec: ::(RenderPassContext, *any),
+					 data: *any = null)
 {
 	pass := RenderGraphPass()
 	pass.name = name;
-	pass.init = init;
 	pass.exec = exec;
+	pass.data = data;
+
+	builder := RenderNodeBuilder();
+	builder.pass = this@;
+	init(builder);
+
+	pass.node = builder.node;
 
 	this.passes.Add(pass);
+}
+
+RenderGraph::Compile()
+{
+
+}
+
+RenderGraph::Execute(context: RenderPassContext)
+{
+	for (pass in this.passes)
+	{
+		pass.exec(context, pass.data);
+	}
 }
 

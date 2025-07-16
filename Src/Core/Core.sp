@@ -41,14 +41,15 @@ MainLoop()
 {
 	running = true;
 
-	//mainRenderer := VulkanRenderer.CreateVulkanRenderer(Window.CreateMainWindow());
-	mainRenderer := SDLRenderer.CreateSDLRenderer(Window.CreateMainWindow());
+	//renderer := VulkanRenderer.CreateVulkanRenderer(Window.CreateMainWindow());
+	renderer := SDLRenderer.CreateSDLRenderer(Window.CreateMainWindow());
 
 	currEvent := SDL.Event();
 	while (running)
 	{
 		ECS.instance.Update();
-		//mainRenderer.DrawScenes(ECS.instance.scenes.Values());
+		//renderer.DrawScenes(ECS.instance.scenes.Values());
+		renderer.Draw();
 		
 		while (SDL.PollEvent(currEvent@)) HandleSDLEvent(currEvent);
 	}
