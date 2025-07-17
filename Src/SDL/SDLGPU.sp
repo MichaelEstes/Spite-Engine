@@ -12,6 +12,8 @@ extern
     void SDL_ReleaseGPUShader(device: *GPUDevice, shader: *GPUShader);
 
     *GPUTexture SDL_CreateGPUTexture(device: *GPUDevice, createinfo: *GPUTextureCreateInfo);
+
+    *GPUBuffer SDL_CreateGPUBuffer(device: *GPUDevice, createinfo: *GPUBufferCreateInfo);
 }
 
 enum GPUShaderFormat: uint32
@@ -223,6 +225,16 @@ state GPUCommandBuffer
 	opaque: *void
 }
 
+state GPUTexture
+{
+    opaque: *void
+}
+
+state GPUBuffer
+{
+    opaque: *void
+}
+
 state GPUShaderCreateInfo
 {
 	code_size: uint,				// The size in bytes of the code pointed to. 
@@ -236,11 +248,6 @@ state GPUShaderCreateInfo
     num_uniform_buffers: uint32,	// The number of uniform buffers defined in the shader. 
 
     props: uint32				    // A properties ID for extensions. Should be 0 if no extensions are needed. 
-}
-
-state GPUTexture
-{
-    opaque: *void
 }
 
 state GPUTextureCreateInfo
@@ -276,3 +283,9 @@ bool ClaimWindowForGPUDevice(device: *GPUDevice, window: *Window)
 
 void ReleaseGPUShader(device: *GPUDevice, shader: *GPUShader)
         => SDL_ReleaseGPUShader(device, shader);
+
+*GPUTexture CreateGPUTexture(device: *GPUDevice, createinfo: *GPUTextureCreateInfo)
+        => SDL_CreateGPUTexture(device, createinfo);
+
+*GPUBuffer CreateGPUBuffer(device: *GPUDevice, createinfo: *GPUBufferCreateInfo)
+        => SDL_CreateGPUBuffer(device, createinfo);

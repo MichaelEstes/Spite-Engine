@@ -5,7 +5,8 @@ import Array
 
 state RenderPassContext
 {
-	commandBuffer: *GPUCommandBuffer
+	commandBuffer: *GPUCommandBuffer,
+	device: *GPUDevice
 }
 
 state RenderGraphPass
@@ -18,7 +19,8 @@ state RenderGraphPass
 
 state RenderGraph
 {
-	passes: Array<RenderGraphPass>
+	passes: Array<RenderGraphPass>,
+	device: *GPUDevice
 }
 
 RenderGraph::AddPass(name: string, init: ::(RenderNodeBuilder), exec: ::(RenderPassContext, *any),
@@ -30,7 +32,7 @@ RenderGraph::AddPass(name: string, init: ::(RenderNodeBuilder), exec: ::(RenderP
 	pass.data = data;
 
 	builder := RenderNodeBuilder();
-	builder.pass = this@;
+	builder.renderGraph = this@;
 	init(builder);
 
 	pass.node = builder.node;

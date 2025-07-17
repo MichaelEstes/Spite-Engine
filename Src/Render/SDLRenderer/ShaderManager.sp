@@ -60,7 +60,7 @@ ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderPa
 
 ShaderResourceManagerID := Resource.RegisterResourceManager(ShaderResourceManager@);
 
-ResourceHandle LoadShader(uri: string, stage: GPUShaderStage, entry: string)
+ResourceHandle UseShader(uri: string, stage: GPUShaderStage, entry: string)
 {
 	shaderParam := ShaderParam();
 	shaderParam.uri = uri;

@@ -2,11 +2,6 @@ package RenderGraph
 
 import SDL
 
-state RenderResourceHandle
-{
-	handle: uint
-}
-
 enum ResourceKind: uint32
 {
 	Texture,
@@ -24,6 +19,6 @@ state ResourceDesc
 
 state RenderResource
 {
-	handle: RenderResourceHandle,
+	resource: *void,
 	kind: ResourceKind
 }
