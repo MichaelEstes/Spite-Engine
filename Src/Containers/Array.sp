@@ -13,9 +13,19 @@ Array::(initialCapacity: uint32)
 	this.capacity = initialCapacity;
 }
 
+Array::(arr: []Type)
+{
+	this.mem.Alloc(arr.count);
+	this.capacity = arr.count;
+	for (item in arr)
+	{
+		this.Add(item);
+	}
+}
+
 Array::delete 
 {
-	for (item in this) delete item;
+	for (item in this) delete item~;
 	this.mem.Dealloc(this.count);
 }
 

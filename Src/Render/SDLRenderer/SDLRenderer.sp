@@ -2,7 +2,9 @@ package SDLRenderer
 
 import SDL
 import OS
+import Array
 import ArrayView
+import RenderGraph
 
 Check(success: bool, errMsg: string)
 {
@@ -12,12 +14,18 @@ Check(success: bool, errMsg: string)
 	}
 }
 
+instance := SDLGPUInstance();
+
 state SDLGPUInstance
 {
-	device: *GPUDevice
+	device: *GPUDevice,
+	windowToRenderer: Map<*Window, SDLRenderer>
 }
 
-instance := SDLGPUInstance();
+SDLGPUInstance::AddRenderer(window: *Window, renderer: SDLRenderer)
+{
+	instance.windowToRenderer.Insert(window, renderer);
+}
 
 InitializeSDLGPUInstance()
 {
@@ -25,21 +33,41 @@ InitializeSDLGPUInstance()
 	instance.device = CreateGPUDevice(GPUShaderFormat.SPIRV, true, null);
 }
 
+*GPUDevice GetSDLInstanceDevice() => instance.device;
+
 state SDLRenderer
 {
+	window: *Window,
 	device: *GPUDevice,
+	passes: Array<RenderPass>,
+	renderGraph: RenderGraph
 }
 
-SDLRenderer CreateSDLRenderer(window: *Window)
+SDLRenderer CreateSDLRenderer(window: *Window, device: *GPUDevice, passes: Array<RenderPass>)
 {
 	renderer := SDLRenderer();
+	renderer.window = window;
+	renderer.passes = passes;
+	renderer.device = device;
+	renderer.renderGraph.device = device;
 
-	Check(ClaimWindowForGPUDevice(instance.device, window), "Error claiming window for GPU device");
+	Check(ClaimWindowForGPUDevice(device, window), "Error claiming window for GPU device");
+
+	instance.AddRenderer(window, renderer);
+
+	log "Created SDL Renderer";
 
 	return renderer;
 }
 
 SDLRenderer::Draw()
 {
+	renderGraph := this.renderGraph;
 
+	for (pass in this.passes)
+	{
+		pass.onDraw(renderGraph, this);
+	}
+
+	renderGraph.Compile();
 }

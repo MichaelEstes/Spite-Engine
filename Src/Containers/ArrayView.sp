@@ -12,6 +12,12 @@ ArrayView::(start: *Type, count: uint)
 	this.count = count;
 }
 
+ArrayView::(arr: []Type)
+{
+	this.start = arr[0]@;
+	this.count = arr.count;
+}
+
 ref Type ArrayView::operator::[](index: uint32)
 {
 	return this.start[index]~;

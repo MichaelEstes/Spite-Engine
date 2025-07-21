@@ -36,7 +36,7 @@ RenderNodeBuilder::Write(target: RenderResource)
 	this.node.resources.Add({ target, ResourceAccess.Write });
 }
 
-RenderResource RenderNodeBuilder::Create(name: string, desc: ResourceDesc)
+RenderResourceHandle RenderNodeBuilder::Create(name: string, desc: ResourceDesc)
 {
-	
+	return this.renderGraph.RegisterResourceToCreate(name, desc);
 }

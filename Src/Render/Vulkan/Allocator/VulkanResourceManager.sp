@@ -9,7 +9,7 @@ state VulkanResource
 }
 
 VulkanResourceManager := Resource.CreateResourceManager<VulkanResource, VulkanResource>(
-	['v', 'k', 'a', 'l'],
+	['v', 'u', 'l', 'k'],
 	GetResourceKey, 
 	VulkanManagerLoad,
 	::(handle: ResourceHandle) {

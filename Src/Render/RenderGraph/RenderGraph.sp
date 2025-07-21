@@ -20,10 +20,11 @@ state RenderGraphPass
 state RenderGraph
 {
 	passes: Array<RenderGraphPass>,
-	device: *GPUDevice
+	device: *GPUDevice,
+	handles: RenderResourceHandles
 }
 
-RenderGraph::AddPass(name: string, init: ::(RenderNodeBuilder), exec: ::(RenderPassContext, *any),
+RenderGraph::AddPass(name: string, init: ::(RenderNodeBuilder, *any), exec: ::(RenderPassContext, *any),
 					 data: *any = null)
 {
 	pass := RenderGraphPass()
@@ -33,11 +34,16 @@ RenderGraph::AddPass(name: string, init: ::(RenderNodeBuilder), exec: ::(RenderP
 
 	builder := RenderNodeBuilder();
 	builder.renderGraph = this@;
-	init(builder);
+	init(builder, data);
 
 	pass.node = builder.node;
 
 	this.passes.Add(pass);
+}
+
+RenderResourceHandle RenderGraph::RegisterResourceToCreate(name: string, desc: ResourceDesc)
+{
+	return this.handles.CreateHandle(name, desc);
 }
 
 RenderGraph::Compile()

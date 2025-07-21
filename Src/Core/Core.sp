@@ -7,6 +7,7 @@ import SDL
 import Event
 import VulkanRenderer
 import SDLRenderer
+import SDLRenderPass
 
 running := false;
 
@@ -42,7 +43,13 @@ MainLoop()
 	running = true;
 
 	//renderer := VulkanRenderer.CreateVulkanRenderer(Window.CreateMainWindow());
-	renderer := SDLRenderer.CreateSDLRenderer(Window.CreateMainWindow());
+	renderer := SDLRenderer.CreateSDLRenderer(
+		Window.CreateMainWindow(), 
+		GetSDLInstanceDevice(),
+		Array<RenderPass>([
+			depthPass,
+		])
+	);
 
 	currEvent := SDL.Event();
 	while (running)
