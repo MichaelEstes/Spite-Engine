@@ -8,6 +8,7 @@ import Event
 import VulkanRenderer
 import SDLRenderer
 import SDLRenderPass
+import SceneRegistry
 
 running := false;
 
@@ -34,6 +35,7 @@ Initialize()
 
 Start()
 {
+	SceneRegistry.LoadScene(0);
 	ECS.instance.Start();
 	MainLoop();
 }

@@ -18,3 +18,5 @@ RenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph, SDLRenderer)
 
 	return pass;
 }
+
+RenderPass GetRenderPass(name: string) => nameToRenderPass[name]~;

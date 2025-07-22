@@ -12,6 +12,8 @@ import FileManager
 
 import GLTFManager
 
+import Scenes
+
 state Test
 {
 	i: int
@@ -75,7 +77,7 @@ testSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 	}, data@, Fiber.JobPriority.High, handle@);
 	WaitForHandle(handle);
 
-	scene.GetSingleton<SingletonTest>().myValue += 1;
+	if (scene.HasSingleton<SingletonTest>()) scene.GetSingleton<SingletonTest>().myValue += 1;
 });
 
 Main()

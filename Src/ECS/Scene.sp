@@ -240,7 +240,17 @@ Scene::SetSingleton<Type>(value: Type)
 	this.singletonComponents.Insert<Type>(value);
 }
 
+bool Scene::HasSingleton<Type>()
+{
+	return this.singletonComponents.Has<Type>();
+}
+
 *Type Scene::GetSingleton<Type>()
 {
 	return this.singletonComponents.Get<Type>();
+}
+
+Scene::Unload()
+{
+
 }

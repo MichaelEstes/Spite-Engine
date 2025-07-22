@@ -16,7 +16,7 @@ enum ComponentKind: uint32
 {
 	Common,
 	Sparse,
-	Tag
+	Singleton
 }
 
 state Component

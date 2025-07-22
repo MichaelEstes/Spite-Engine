@@ -28,6 +28,12 @@ SingletonComponentMap::Insert<Type>(value: Type)
 	this.typePtrMap.Insert(type, valuePtr);
 }
 
+bool SingletonComponentMap::Has<Type>()
+{
+	type := #typeof Type;
+	return this.typePtrMap.Has(type);
+}
+
 *Type SingletonComponentMap::Get<Type>()
 {
 	type := #typeof Type;
