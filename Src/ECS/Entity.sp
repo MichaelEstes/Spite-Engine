@@ -1,4 +1,4 @@
-package Entity
+package ECS
 
 nullEntityID := uint32(0);
 invalidEntityID := uint32(-1);

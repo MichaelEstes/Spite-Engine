@@ -1,8 +1,6 @@
-package Query
+package ECS
 
 import BitSet
-import ECS
-import Scene
 
 state QuerySet
 {
@@ -58,7 +56,7 @@ ref Query Query::Scene(scene: *Scene)
 
 ref Query Query::With<Type>()
 {
-	component := ECS.instance.GetComponent<Type>();
+	component := instance.GetComponent<Type>();
 	this.with.Add(component);
 	
 	return this;
@@ -76,7 +74,7 @@ ref Query Query::WithAll(components: []Component)
 
 ref Query Query::Without<Type>()
 {
-	component := ECS.instance.GetComponent<Type>();
+	component := instance.GetComponent<Type>();
 	this.without.Add(component);
 	
 	return this;

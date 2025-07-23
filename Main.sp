@@ -7,7 +7,7 @@ import GLTF
 import File
 import Thread
 
-import Query
+import ECS
 import FileManager
 
 import GLTFManager

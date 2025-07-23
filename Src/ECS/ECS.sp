@@ -1,8 +1,5 @@
 package ECS
 
-import System
-import Entity
-import Scene
 import SparseSet
 import Time
 import Stack
@@ -30,11 +27,11 @@ state SceneSystem { scene: *Scene, system: *System }
 
 Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
 								  onRemove: ::(*Type, Scene) = null, onEnter: ::(*Type, Scene) = null)
-			=> ECS.instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
+			=> instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
 
 {id: uint, step: SystemStep} RegisterSystem(run: ::(Scene, float), 
 												 step: SystemStep = SystemStep.Frame)
-			=> ECS.instance.RegisterSystem(run, step);
+			=> instance.RegisterSystem(run, step);
 
 state ECS
 {
@@ -147,7 +144,9 @@ ECS::OnComponentEnter(id: uint16, componentData: *any, scene: Scene)
 
 ECS::RunSystems(systems: Array<System>)
 {
-	instance.systemFrameCount.Store(this.scenes.count * systems.count);
+	count := this.scenes.count * systems.count
+	if (!count) return;
+	instance.systemFrameCount.Store(count);
 
 	for (scene in this.scenes.Values())
 	{

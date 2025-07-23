@@ -4,8 +4,7 @@ import Resource
 import Fiber
 import ThreadParamAllocator
 import GLTF
-import Scene
-import Entity
+import ECS
 import Render
 import Array
 import URIManager

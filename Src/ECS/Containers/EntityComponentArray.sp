@@ -1,6 +1,5 @@
-package EntityComponentArray
+package ECS
 
-import Entity
 import BitSet
 
 state EntityComponentArray<Component, InitialCapacity = 1024>

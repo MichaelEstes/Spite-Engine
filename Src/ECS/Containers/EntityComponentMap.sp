@@ -1,6 +1,4 @@
-package EntityComponentMap
-
-import Entity
+package ECS
 
 MaxSize := 65535;
 

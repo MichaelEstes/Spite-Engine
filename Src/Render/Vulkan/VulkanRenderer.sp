@@ -13,8 +13,7 @@ import Time
 import FixedArray
 import ArrayView
 
-import Scene
-import Query
+import ECS
 import Render
 
 UINT64_MAX := uint64(-1);

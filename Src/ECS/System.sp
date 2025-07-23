@@ -1,6 +1,5 @@
-package System
+package ECS
 
-import Scene
 import Array
 
 enum SystemStep: byte

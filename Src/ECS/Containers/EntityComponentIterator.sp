@@ -1,9 +1,4 @@
-package EntityComponentIterator
-
-import EntityComponentArray
-import EntityComponentMap
-import Entity
-import ECS
+package ECS
 
 bool _NextArray<Type>(ecIt: EntityComponentIterator<Type>, it: Iterator) => ecIt.container.array.next(it);
 

@@ -1,4 +1,4 @@
-package SingletonComponentMap
+package ECS
 
 import Arena
 

@@ -13,7 +13,7 @@ Mesh::delete
 	delete this.primitives;
 }
 
-meshComponent := ECS.instance.RegisterComponent<Mesh>(
+meshComponent := ECS.RegisterComponent<Mesh>(
 	ComponentKind.Sparse, 
 	::(mesh: *Mesh, scene: Scene) {
 		delete mesh~;
