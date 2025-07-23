@@ -1,16 +1,14 @@
 package SceneDescription
 
 import ECS
-
-enum WindowFlags: uint
-{
-	None = 0
-	Fullscreen = 1
-}
+import Window
+import SDL
+import SDLRenderer
 
 state WindowDesc
 {
-	flags: WindowFlags,
+	title: string,
+	flags: SDL.WindowFlags,
 	width: uint32,
 	height: uint32
 }
@@ -33,9 +31,34 @@ state SceneDesc
 	renderer: RendererDesc
 }
 
-SceneDescComponent := ECS.instance.RegisterComponent<SceneDesc>(
-	ComponentKind.Singleton, 
-	::(sceneDesc: *SceneDesc) {
-		
+SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
+	ComponentKind.Singleton,
+	::(sceneDesc: *SceneDesc, scene: Scene) {
+		log "Scene description removed";
+	},
+	::(sceneDesc: *SceneDesc, scene: Scene) {
+		log "Scene description added";
+
+		windowDesc := sceneDesc.window;
+		rendererDesc := sceneDesc.renderer;
+
+		window := CreateWindow(
+			windowDesc.title[0],
+			windowDesc.width,
+			windowDesc.height,
+			windowDesc.flags,
+		);
+
+		renderPasses := Array<RenderPass>();
+		for (passName in rendererDesc.passes)
+		{
+			renderPasses.Add(GetRenderPass(passName));
+		}
+
+		renderer := SDLRenderer.CreateSDLRenderer(
+			window, 
+			GetSDLInstanceDevice(),
+			renderPasses
+		);
 	}
 );

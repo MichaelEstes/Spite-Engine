@@ -1,27 +1,28 @@
 package Scene0
 
-import SceneRegistry
-import SDLRenderer
-import SceneDescription
 import Array
+import SceneRegistry
+import SDL
+import SDLRenderPass
+import SceneDescription
 
 _ := SceneRegistry.RegisterScene(
 	0,
 	::(scene: *Scene) {
-		log "Loading Main Scene"
+		log "Loading Main Scene";
 
 		scene.SetSingleton<SceneDesc>({
 			{
-				0,
-				1000,
-				1000
+				"Main Window",
+				SDL.WindowFlags.Vulkan | SDL.WindowFlags.Resizable,
+				uint32(1000),
+				uint32(1000)
 			},
 			{
 				Array<string>(["DepthPass",]),
 				RendererFlags.SDL
 			}
 		});
-
 	},
 	"Main Scene"
 )

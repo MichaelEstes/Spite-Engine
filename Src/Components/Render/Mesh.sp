@@ -15,7 +15,7 @@ Mesh::delete
 
 meshComponent := ECS.instance.RegisterComponent<Mesh>(
 	ComponentKind.Sparse, 
-	::(mesh: *Mesh) {
+	::(mesh: *Mesh, scene: Scene) {
 		delete mesh~;
 	}
 );

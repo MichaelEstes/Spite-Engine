@@ -28,13 +28,22 @@ state Component
 
 state SceneSystem { scene: *Scene, system: *System }
 
+Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
+								  onRemove: ::(*Type, Scene) = null, onEnter: ::(*Type, Scene) = null)
+			=> ECS.instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
+
+{id: uint, step: SystemStep} RegisterSystem(run: ::(Scene, float), 
+												 step: SystemStep = SystemStep.Frame)
+			=> ECS.instance.RegisterSystem(run, step);
+
 state ECS
 {
 	scenes := SparseSet<Scene>(),
 	systems: Systems,
 	componentTypeMap := Map<*_Type, Component>(),
 	componentIDMap := SparseSet<Component>(),
-	componentRemoveCallbacks := SparseSet<::(*any)>(),
+	componentRemoveCallbacks := SparseSet<::(*any, Scene)>(),
+	componentEnterCallbacks := SparseSet<::(*any, Scene)>(),
 	recycledScenes := Stack<uint16>(),
 	systemBuffer := RingBuffer<SceneSystem>(),
 	systemFrameCount := Atomic<uint32>(0),
@@ -43,7 +52,7 @@ state ECS
 }
 
 Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
-										onRemove: ::(*Type) = null)
+									   onRemove: ::(*Type, Scene) = null, onEnter: ::(*Type, Scene) = null)
 {
 	type := #typeof Type;
 	assert !this.componentTypeMap.Has(type), "Cannot register a component twice";
@@ -52,6 +61,7 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 	this.componentTypeMap.Insert(type, component);
 	this.componentIDMap.Insert(component.id, component);
 	if (onRemove) this.componentRemoveCallbacks.Insert(component.id, onRemove);
+	if (onEnter) this.componentEnterCallbacks.Insert(component.id, onEnter);
 	this.componentCount += 1;
 	return component;
 }
@@ -109,7 +119,9 @@ Entity ECS::CreateEntity(sceneID: uint) => this.GetScene(sceneID).CreateEntity()
 Component ECS::GetComponent<Type>()
 {
 	type := #typeof Type;
-	return this.componentTypeMap[type]~;
+	componentPtr := this.componentTypeMap[type];
+	assert !!componentPtr, "No component found for type, component is not registered";
+	return componentPtr~;
 }
 
 Component ECS::GetComponentByID(id: uint16)
@@ -117,12 +129,20 @@ Component ECS::GetComponentByID(id: uint16)
 	return this.componentIDMap.Get(id)~;
 }
 
-ECS::OnComponentRemove(id: uint16, componentData: *any)
+ECS::OnComponentRemove(id: uint16, componentData: *any, scene: Scene)
 {
 	if (!this.componentRemoveCallbacks.Has(id)) return;
 
 	callback := this.componentRemoveCallbacks.Get(id)~;
-	callback(componentData);
+	callback(componentData, scene);
+}
+
+ECS::OnComponentEnter(id: uint16, componentData: *any, scene: Scene)
+{
+	if (!this.componentEnterCallbacks.Has(id)) return;
+
+	callback := this.componentEnterCallbacks.Get(id)~;
+	callback(componentData, scene);
 }
 
 ECS::RunSystems(systems: Array<System>)
@@ -161,7 +181,27 @@ ECS::Stop()
 	this.RunSystems(this.systems.onStop);
 }
 
-ECS::Update()
+ECS::PreFrame()
+{
+	this.RunSystems(this.systems.onPreFrame);
+}
+
+ECS::Frame()
 {
 	this.RunSystems(this.systems.onFrame);
+}
+
+ECS::PreDraw()
+{
+	this.RunSystems(this.systems.onPreDraw);
+}
+
+ECS::Draw()
+{
+	this.RunSystems(this.systems.onDraw);
+}
+
+ECS::PostFrame()
+{
+	this.RunSystems(this.systems.onPostFrame);
 }

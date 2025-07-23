@@ -5,6 +5,7 @@ import OS
 import Array
 import ArrayView
 import RenderGraph
+import ECS
 
 Check(success: bool, errMsg: string)
 {
@@ -29,6 +30,7 @@ SDLGPUInstance::AddRenderer(window: *Window, renderer: SDLRenderer)
 
 InitializeSDLGPUInstance()
 {
+	log "Initializing SDL GPU Instance";
 	Check(ShaderCross_Init(), "Error initializing Shadercross");
 	instance.device = CreateGPUDevice(GPUShaderFormat.SPIRV, true, null);
 }

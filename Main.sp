@@ -24,21 +24,25 @@ state SingletonTest
 	myValue: float
 }
 
-transformComponent := ECS.instance.RegisterComponent<Transform>(
+transformComponent := ECS.RegisterComponent<Transform>(
 	ComponentKind.Common, 
-	::(transform: *Transform) {
+	::(transform: *Transform, scene: Scene) {
 		log "Removing transform: ", transform;
 	}
 );
 
-testComponent := ECS.instance.RegisterComponent<Test>(
+testComponent := ECS.RegisterComponent<Test>(
 	ComponentKind.Sparse, 
-	::(test: *Test) {
+	::(test: *Test, scene: Scene) {
 		log "Removing test component: ", test;
 	}
 );
 
-transformSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
+singletonTestComponent := ECS.RegisterComponent<SingletonTest>(
+	ComponentKind.Singleton
+);
+
+transformSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	//log "Transform System called", dt;
 	
 	for (item in scene.Iterate<Transform>())
@@ -59,7 +63,7 @@ transformSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
 	}
 });
 
-testSystem := ECS.instance.RegisterSystem(::(scene: Scene, dt: float) {
+testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	//log "Test System called", dt;
 	
 	for (item in scene.Iterate<Test>())
