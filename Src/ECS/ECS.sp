@@ -43,7 +43,6 @@ state ECS
 	componentEnterCallbacks := SparseSet<::(*any, Scene)>(),
 	recycledScenes := Stack<uint16>(),
 	systemBuffer := RingBuffer<SceneSystem>(),
-	systemFrameCount := Atomic<uint32>(0),
 	componentCount: uint32,
 	sceneCount: uint16
 }
@@ -146,8 +145,8 @@ ECS::RunSystems(systems: Array<System>)
 {
 	count := this.scenes.count * systems.count
 	if (!count) return;
-	instance.systemFrameCount.Store(count);
 
+	handle: *Fiber.JobHandle = null;
 	for (scene in this.scenes.Values())
 	{
 		for (system in systems) 
@@ -162,12 +161,11 @@ ECS::RunSystems(systems: Array<System>)
 				scene.lastFrameTime = currTime;
 				
 				system.run(scene~, dt);
-				instance.systemFrameCount.Sub(1, MemoryOrder.Relaxed);
-			}, sceneSystem);
+			}, sceneSystem, Fiber.JobPriority.High, handle@);
 		}
 	}
 
-	while (instance.systemFrameCount.Load() != 0) {}
+	Fiber.WaitForHandle(handle);
 }
 
 ECS::Start()

@@ -1,14 +1,14 @@
 package ThreadParamAllocator
 
-import SlabAllocator
+import BucketAllocator
 
 state ThreadParamAllocator
 {
 	slabs := [
-		SlabAllocator(32, 64, 4),
-		SlabAllocator(64, 32, 4),
-		SlabAllocator(128, 16, 4),
-		SlabAllocator(256, 8, 4)
+		BucketAllocator(32, 64, 4),
+		BucketAllocator(64, 32, 4),
+		BucketAllocator(128, 16, 4),
+		BucketAllocator(256, 8, 4)
 	]
 }
 

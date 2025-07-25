@@ -79,7 +79,7 @@ testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 			data~ = i;
 		}	
 	}, data@, Fiber.JobPriority.High, handle@);
-	WaitForHandle(handle);
+	Fiber.WaitForHandle(handle);
 
 	if (scene.HasSingleton<SingletonTest>()) scene.GetSingleton<SingletonTest>().myValue += 1;
 });
@@ -87,15 +87,15 @@ testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 Main()
 {
 	scene := ECS.instance.CreateScene();
-
+	
 	scene.SetSingleton<SingletonTest>({9.0});
-
+	
 	for (i .. 10)
 	{
 		entity := scene.CreateEntity();
 		val := i as float;
 		scene.SetComponent<Transform>(entity, Transform(val, val, val));
-
+	
 		if (i > 5)
 		{
 			scene.SetComponent<Test>(entity, i as Test);

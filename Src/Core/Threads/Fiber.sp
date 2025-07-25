@@ -6,7 +6,7 @@ import SystemInfo
 import Queue
 import Atomic
 import SpinLock
-import SlabAllocator
+import BucketAllocator
 
 enum JobPriority: byte
 {
@@ -40,9 +40,9 @@ state Fibers
 	mainThread: uint,
 	jobsMain := Queue<Job>(),
 
-	handleAllocator: SlabAllocator,
+	handleAllocator: BucketAllocator,
 
-	currentProcess := Atomic<uint32>(),
+	currentProcess := Atomic<uint32>(0),
 	processCount: uint32,
 
 	mainLock := SpinLock(),
@@ -58,7 +58,7 @@ InitalizeFibers()
 	sysInfo := GetSystemInfo();
 	// - 2, executable start thread, main (IO) fiber thread
 	fibers.processCount = Math.Max(sysInfo.processorCount - 2, 1);
-	fibers.handleAllocator = SlabAllocator(#sizeof JobHandle, 32, fibers.processCount);
+	fibers.handleAllocator = BucketAllocator(#sizeof JobHandle, 32, fibers.processCount);
 
 	for (i .. fibers.processCount)
 	{
@@ -79,26 +79,42 @@ InitalizeFibers()
 
 *JobHandle CreateJobHandle(count: uint32)
 {
+	//handle := new JobHandle();
+	//handle.counter = Atomic<uint32>(count);
+	//return handle;
 	handle := fibers.handleAllocator.Alloc() as *JobHandle;
 	assert handle != null, "Failed to allocate job handle";
-
+	
 	handle.counter = Atomic<uint32>(count);
 	return handle;
 }
 
+*JobHandle GetJobHandle(count: uint32, handleRef: **JobHandle)
+{
+	if (!handleRef) return null;
+
+	handle := handleRef~;
+	if (handle)
+	{
+		handle.counter.Add(count);
+		return handle;
+	}
+
+	createdHandle := CreateJobHandle(count);
+	handleRef~ = createdHandle;
+	return createdHandle;
+}
+
 DeallocJobHandle(handle: *JobHandle)
 {
+	//delete handle;
 	fibers.handleAllocator.Dealloc(handle);
 }
 
 AddJob(func: ::(*any), data: *any = null, priority: JobPriority = JobPriority.Medium, handle: **JobHandle = null)
 {
-	job := {func, data, null} as Job;
-	if (handle)
-	{
-		job.handle = CreateJobHandle(1);
-		handle~ = job.handle;
-	}
+	jobHandle := GetJobHandle(1, handle);
+	job := {func, data, jobHandle} as Job;
 
 	index := fibers.currentProcess.Add(1) % fibers.processCount;
 	
@@ -112,18 +128,13 @@ AddJob(func: ::(*any), data: *any = null, priority: JobPriority = JobPriority.Me
 AddJobs(funcs: []::(*any), data: []*any, priority: JobPriority = JobPriority.Medium, handle: **JobHandle = null)
 {
 	count := funcs.count;
-	jobHandle: *JobHandle = null;
-	if (handle)
-	{
-		jobHandle = CreateJobHandle(count);
-		handle~ = jobHandle;
-	}	
+	jobHandle := GetJobHandle(count, handle);
 
 	for (i .. count)
 	{
 		func := funcs[i];
-		data := data[i];
-		job := {func, data, jobHandle} as Job;
+		dataItem := data[i];
+		job := {func, dataItem, jobHandle} as Job;
 
 		index := fibers.currentProcess.Add(1) % fibers.processCount;
 
@@ -140,6 +151,7 @@ WaitForHandle(handle: *JobHandle)
 	assert handle != null, "Cannot wait for a null handle";
 
 	defer DeallocJobHandle(handle);
+
 	currThread := GetCurrentThreadID();
 	
 	for (i .. fibers.processCount)
@@ -247,7 +259,7 @@ RunNext(index: uint)
 		job.func(job.data);
 		if (job.handle)
 		{
-			job.handle.counter.Sub(uint32(1), MemoryOrder.Relaxed);
+			job.handle.counter.Sub(1);
 		}
 	}
 }

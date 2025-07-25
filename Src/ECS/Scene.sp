@@ -249,8 +249,3 @@ bool Scene::HasSingleton<Type>()
 {
 	return this.singletonComponents.Get<Type>();
 }
-
-Scene::Unload()
-{
-
-}
