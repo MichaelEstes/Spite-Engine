@@ -20,12 +20,6 @@ instance := SDLGPUInstance();
 state SDLGPUInstance
 {
 	device: *GPUDevice,
-	windowToRenderer: Map<*Window, SDLRenderer>
-}
-
-SDLGPUInstance::AddRenderer(window: *Window, renderer: SDLRenderer)
-{
-	instance.windowToRenderer.Insert(window, renderer);
 }
 
 InitializeSDLGPUInstance()
@@ -45,6 +39,10 @@ state SDLRenderer
 	renderGraph: RenderGraph
 }
 
+sdlRendererComponent := ECS.RegisterComponent<SDLRenderer>(
+	ComponentKind.Singleton
+);
+
 SDLRenderer CreateSDLRenderer(window: *Window, device: *GPUDevice, passes: Array<RenderPass>)
 {
 	renderer := SDLRenderer();
@@ -55,20 +53,28 @@ SDLRenderer CreateSDLRenderer(window: *Window, device: *GPUDevice, passes: Array
 
 	Check(ClaimWindowForGPUDevice(device, window), "Error claiming window for GPU device");
 
-	instance.AddRenderer(window, renderer);
-
 	log "Created SDL Renderer";
 
 	return renderer;
 }
 
-SDLRenderer::Draw()
+sdlDrawSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
+	log "SDL drawing scene", dt;
+	
+	if (scene.HasSingleton<SDLRenderer>())
+	{
+		renderer := scene.GetSingleton<SDLRenderer>();
+		renderer.Draw(scene@);
+	}
+});
+
+SDLRenderer::Draw(scene: *Scene)
 {
 	renderGraph := this.renderGraph;
 
 	for (pass in this.passes)
 	{
-		pass.onDraw(renderGraph, this);
+		pass.onDraw(renderGraph, this, scene);
 	}
 
 	renderGraph.Compile();

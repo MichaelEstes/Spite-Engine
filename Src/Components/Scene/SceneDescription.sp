@@ -4,6 +4,11 @@ import ECS
 import Window
 import SDL
 import SDLRenderer
+import Scene
+
+windowComponent := ECS.RegisterComponent<*SDL.Window>(
+	ComponentKind.Singleton
+);
 
 state WindowDesc
 {
@@ -60,5 +65,8 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 			GetSDLInstanceDevice(),
 			renderPasses
 		);
+
+		scene.SetSingleton<*SDL.Window>(window);
+		scene.SetSingleton<SDLRenderer>(renderer);
 	}
 );

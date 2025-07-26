@@ -1,15 +1,16 @@
 package SDLRenderer
 
 import RenderGraph
+import ECS
 
 state RenderPass
 {
-	onDraw: ::(RenderGraph, SDLRenderer)
+	onDraw: ::(RenderGraph, SDLRenderer, *Scene)
 }
 
 nameToRenderPass := Map<string, RenderPass>();
 
-RenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph, SDLRenderer))
+RenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph, SDLRenderer, *Scene))
 {
 	pass := RenderPass();
 	pass.onDraw = onDraw;

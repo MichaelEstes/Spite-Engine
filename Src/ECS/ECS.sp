@@ -6,6 +6,7 @@ import Stack
 import RingBuffer
 import Fiber
 import Atomic
+import FrameAllocator
 
 instance: ECS = ECS();
 
@@ -23,7 +24,7 @@ state Component
 	size: uint32
 }
 
-state SceneSystem { scene: *Scene, system: *System }
+state SceneSystem { scene: *Scene, system: *System, time: float64 }
 
 Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
 								  onRemove: ::(*Type, Scene) = null, onEnter: ::(*Type, Scene) = null)
@@ -33,8 +34,11 @@ Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.S
 												 step: SystemStep = SystemStep.Frame)
 			=> instance.RegisterSystem(run, step);
 
+*Type FrameAlloc<Type>() => instance.frameAllocator.Alloc<Type>();
+
 state ECS
 {
+	frameAllocator := FrameAllocator(),
 	scenes := SparseSet<Scene>(),
 	systems: Systems,
 	componentTypeMap := Map<*_Type, Component>(),
@@ -146,19 +150,20 @@ ECS::RunSystems(systems: Array<System>)
 	count := this.scenes.count * systems.count
 	if (!count) return;
 
+	time := Time.SecondsSinceStart();
 	handle: *Fiber.JobHandle = null;
 	for (scene in this.scenes.Values())
 	{
 		for (system in systems) 
 		{
-			sceneSystem := instance.systemBuffer.Insert({scene@, system@} as SceneSystem);
+			sceneSystem := instance.systemBuffer.Insert({scene@, system@, time} as SceneSystem);
 			Fiber.AddJob(::(data: *SceneSystem) {
 				scene := data.scene;
 				system := data.system;
+				time := data.time;
 
-				currTime := Time.SecondsSinceStart();
-				dt := currTime - scene.lastFrameTime;
-				scene.lastFrameTime = currTime;
+				dt := time - scene.lastFrameTime;
+				scene.lastFrameTime = time;
 				
 				system.run(scene~, dt);
 			}, sceneSystem, Fiber.JobPriority.High, handle@);
@@ -201,4 +206,6 @@ ECS::Draw()
 ECS::PostFrame()
 {
 	this.RunSystems(this.systems.onPostFrame);
+
+	this.frameAllocator.Clear();
 }
