@@ -3,6 +3,12 @@ package RenderGraph
 import SDL
 import Array
 
+enum RenderPassStage
+{
+	Graphics,
+	Compute
+}
+
 state RenderPassContext
 {
 	commandBuffer: *GPUCommandBuffer,
@@ -25,7 +31,7 @@ state RenderGraph
 }
 
 RenderGraph::AddPass(name: string, init: ::(RenderNodeBuilder, *any), exec: ::(RenderPassContext, *any),
-					 data: *any = null)
+					 stage: RenderPassStage, data: *any = null)
 {
 	pass := RenderGraphPass()
 	pass.name = name;

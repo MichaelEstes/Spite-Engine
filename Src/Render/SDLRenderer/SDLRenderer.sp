@@ -33,7 +33,7 @@ InitializeSDLGPUInstance()
 
 state SDLRenderer
 {
-	window: *Window,
+	window: *SDL.Window,
 	device: *GPUDevice,
 	passes: Array<RenderPass>,
 	renderGraph: RenderGraph
@@ -43,7 +43,7 @@ sdlRendererComponent := ECS.RegisterComponent<SDLRenderer>(
 	ComponentKind.Singleton
 );
 
-SDLRenderer CreateSDLRenderer(window: *Window, device: *GPUDevice, passes: Array<RenderPass>)
+SDLRenderer CreateSDLRenderer(window: *SDL.Window, device: *GPUDevice, passes: Array<RenderPass>)
 {
 	renderer := SDLRenderer();
 	renderer.window = window;

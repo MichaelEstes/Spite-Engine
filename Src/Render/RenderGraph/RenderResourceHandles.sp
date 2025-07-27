@@ -10,10 +10,10 @@ state RenderResourceHandle
 
 state RenderResourceHandles
 {
-	handles: HandleSet<ResourceDesc>,
-	handleToName: SparseSet<string>,
-	nameToHandle: Map<string, uint32>
-	resources: SparseSet<RenderResource>
+	handles := HandleSet<ResourceDesc>(),
+	handleToName := SparseSet<string>(),
+	nameToHandle := Map<string, uint32>(),
+	resources := SparseSet<RenderResource>(),
 }
 
 RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: ResourceDesc)
