@@ -92,3 +92,9 @@ BitSet BitSet::Clone()
 
 	return cloned;
 }
+
+BitSet::ClearAll()
+{
+	byteCount := this.bitCount / bitsInByte;
+	zero_out_bytes(this.alloc[0], byteCount);
+}

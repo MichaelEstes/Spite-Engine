@@ -30,8 +30,7 @@ Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.S
 								  onRemove: ::(*Type, Scene) = null, onEnter: ::(*Type, Scene) = null)
 			=> instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
 
-{id: uint, step: SystemStep} RegisterSystem(run: ::(Scene, float), 
-												 step: SystemStep = SystemStep.Frame)
+{id: uint, step: SystemStep} RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
 			=> instance.RegisterSystem(run, step);
 
 *Type FrameAlloc<Type>() => instance.frameAllocator.Alloc<Type>();
@@ -47,6 +46,7 @@ state ECS
 	componentEnterCallbacks := SparseSet<::(*any, Scene)>(),
 	recycledScenes := Stack<uint16>(),
 	systemBuffer := RingBuffer<SceneSystem>(),
+	frameCount: uint,
 	componentCount: uint32,
 	sceneCount: uint16
 }
@@ -208,4 +208,5 @@ ECS::PostFrame()
 	this.RunSystems(this.systems.onPostFrame);
 
 	this.frameAllocator.Clear();
+	this.frameCount += 1;
 }

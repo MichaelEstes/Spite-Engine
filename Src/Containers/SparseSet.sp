@@ -147,3 +147,9 @@ SparseSet::Remove(key: uint32)
 	this.denseValueArr[index]~ = endValue;
 	this.sparseArr[endKey]~ = index + 1;
 }
+
+SparseSet::Clear()
+{
+	this.count = 0;
+	zero_out_bytes(this.sparseArr[0], this.sparseCapacity);
+}

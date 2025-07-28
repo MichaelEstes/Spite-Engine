@@ -44,6 +44,24 @@ HandleSet::delete
 	return this.denseValueArr[index];
 }
 
+Iterator HandleSet::operator::in()
+{
+	return {null, -1};
+}
+
+bool HandleSet::next(it: Iterator)
+{
+	it.index += 1;
+	while(it.index < this.capacity && !this.Has(it.index)) it.index += 1;
+	return it.index < this.capacity;
+}
+
+HandleValue<Value> HandleSet::current(it: Iterator)
+{
+	handle := (it.index - 1) as uint32;
+	return {handle, this[it.index]} as HandleValue<Value>;
+}
+
 HandleSet::Expand()
 {
 	resizedCapacity := ResizeFactor(this.capacity);
@@ -83,4 +101,10 @@ HandleSet::Remove(key: uint32)
 	
 	if (key < this.next) this.next = key;
 	this.handleFlags.Clear(index);
+}
+
+HandleSet::Clear()
+{
+	this.next = 0;
+	this.handleFlags.ClearAll();
 }

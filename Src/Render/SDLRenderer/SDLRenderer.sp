@@ -58,18 +58,23 @@ SDLRenderer CreateSDLRenderer(window: *SDL.Window, device: *GPUDevice, passes: A
 	return renderer;
 }
 
-sdlDrawSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
-	log "SDL drawing scene", dt;
-	
-	if (scene.HasSingleton<SDLRenderer>())
+sdlDrawSystem := ECS.RegisterSystem(
+	::(scene: Scene, dt: float) 
 	{
-		renderer := scene.GetSingleton<SDLRenderer>();
-		renderer.Draw(scene@);
-	}
-});
+		log "SDL drawing scene", dt;
+		
+		if (scene.HasSingleton<SDLRenderer>())
+		{
+			renderer := scene.GetSingleton<SDLRenderer>();
+			renderer.Draw(scene@);
+		}
+	},
+	SystemStep.Draw
+);
 
 SDLRenderer::Draw(scene: *Scene)
 {
+	device := this.device;
 	renderGraph := this.renderGraph;
 
 	for (pass in this.passes)
@@ -78,4 +83,8 @@ SDLRenderer::Draw(scene: *Scene)
 	}
 
 	renderGraph.Compile();
+	
+	context := renderGraph.CreateContext(SDL.AcquireGPUCommandBuffer(device));
+
+	renderGraph.Execute(context);
 }

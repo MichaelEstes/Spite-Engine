@@ -179,3 +179,8 @@ Array::SizeTo(capacity: uint32)
 	this.mem.Resize(capacity, this.capacity)
 	this.capacity = capacity;
 }
+
+Array::Clear()
+{
+	this.count = 0;
+}

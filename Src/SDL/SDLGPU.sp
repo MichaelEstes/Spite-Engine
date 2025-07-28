@@ -14,6 +14,8 @@ extern
     *GPUTexture SDL_CreateGPUTexture(device: *GPUDevice, createinfo: *GPUTextureCreateInfo);
 
     *GPUBuffer SDL_CreateGPUBuffer(device: *GPUDevice, createinfo: *GPUBufferCreateInfo);
+
+    *GPUCommandBuffer SDL_AcquireGPUCommandBuffer(device: *GPUDevice);
 }
 
 enum GPUShaderFormat: uint32
@@ -289,3 +291,6 @@ void ReleaseGPUShader(device: *GPUDevice, shader: *GPUShader)
 
 *GPUBuffer CreateGPUBuffer(device: *GPUDevice, createinfo: *GPUBufferCreateInfo)
         => SDL_CreateGPUBuffer(device, createinfo);
+
+*GPUCommandBuffer AcquireGPUCommandBuffer(device: *GPUDevice)
+        => SDL_AcquireGPUCommandBuffer(device);

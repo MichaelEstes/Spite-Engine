@@ -17,7 +17,7 @@ TrackedResource::(resource: Type, claimed: bool)
 
 state ResourceTable<Resource, CreateInfo>
 {
-	descToResource: Map<CreateInfo, Array<TrackedResource<Resource>>>,
+	descToResource := Map<CreateInfo, Array<TrackedResource<Resource>>>()
 }
 
 Resource ResourceTable::GetOrCreateResource(createInfo: CreateInfo, device: *GPUDevice,

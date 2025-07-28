@@ -32,3 +32,26 @@ RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: Res
 
 	return handle as RenderResourceHandle;
 }
+
+RenderResource RenderResourceHandles::UseResource(resourceHandle: RenderResourceHandle, device: *GPUDevice)
+{
+	handle := resourceHandle.handle;
+	if (this.resources.Has(handle))
+	{
+		return this.resources.Get(handle)~;
+	}
+
+	desc := this.handles[handle]~;
+	resource := UseResource(desc, device);
+	this.resources.Insert(handle, resource);
+
+	return resource;
+}
+
+RenderResourceHandles::Clear()
+{
+	this.handles.Clear();
+	this.handleToName.Clear();
+	this.nameToHandle.Clear();
+	this.resources.Clear();
+}
