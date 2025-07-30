@@ -19,7 +19,7 @@ _ := SceneRegistry.RegisterScene(
 				uint32(1000)
 			},
 			{
-				Array<string>(["DepthPass",]),
+				Array<string>(["ClearPass", "DepthPass"]),
 				RendererFlags.SDL
 			}
 		});

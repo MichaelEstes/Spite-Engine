@@ -52,6 +52,17 @@ Resource ResourceTable::GetOrCreateResource(createInfo: CreateInfo, device: *GPU
 	return resource;
 }
 
+ResourceTable::ReleaseResources()
+{
+	for (arr in this.descToResource.Values())
+	{
+		for (tracked in arr)
+		{
+			tracked.claimed = false;
+		}
+	}
+}
+
 state ResourceTables
 {
 	textureTable: ResourceTable<*GPUTexture, GPUTextureCreateInfo>,
@@ -103,4 +114,10 @@ RenderResource UseResource(resourceDesc: ResourceDesc, device: *GPUDevice)
 	}
 
 	return RenderResource().Null();
+}
+
+ReleaseTrackedResources()
+{
+	renderResourcesTable.textureTable.ReleaseResources();
+	renderResourcesTable.bufferTable.ReleaseResources();
 }

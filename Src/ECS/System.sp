@@ -15,9 +15,20 @@ enum SystemStep: byte
 	Stop
 }
 
+enum FrameSystemStep: byte
+{
+	Start,
+	End
+}
+
 state System
 {
 	run: ::(Scene, float)
+}
+
+state FrameSystem
+{
+	run: ::(float)
 }
 
 state Systems
@@ -28,6 +39,9 @@ state Systems
 	onPreDraw: Array<System>,
 	onDraw: Array<System>,
 	onPostFrame: Array<System>,
+
+	frameStart: Array<FrameSystem>,
+	frameEnd: Array<FrameSystem>,
 	
 	onStart: Array<System>,
 	onStop: Array<System>

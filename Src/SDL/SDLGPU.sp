@@ -16,6 +16,10 @@ extern
     *GPUBuffer SDL_CreateGPUBuffer(device: *GPUDevice, createinfo: *GPUBufferCreateInfo);
 
     *GPUCommandBuffer SDL_AcquireGPUCommandBuffer(device: *GPUDevice);
+
+    bool SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer: *GPUCommandBuffer, window: *Window,
+                                               swapchain_texture: **GPUTexture,
+                                               swapchain_texture_width: *uint32, swapchain_texture_height: *uint32);
 }
 
 enum GPUShaderFormat: uint32
@@ -294,3 +298,9 @@ void ReleaseGPUShader(device: *GPUDevice, shader: *GPUShader)
 
 *GPUCommandBuffer AcquireGPUCommandBuffer(device: *GPUDevice)
         => SDL_AcquireGPUCommandBuffer(device);
+
+bool WaitAndAcquireGPUSwapchainTexture(command_buffer: *GPUCommandBuffer, window: *Window,
+                                       swapchain_texture: **GPUTexture,
+                                       swapchain_texture_width: *uint32, swapchain_texture_height: *uint32)
+        => SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, window, swapchain_texture, 
+                                                 swapchain_texture_width, swapchain_texture_height);

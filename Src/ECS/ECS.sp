@@ -30,8 +30,11 @@ Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.S
 								  onRemove: ::(*Type, Scene) = null, onEnter: ::(*Type, Scene) = null)
 			=> instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
 
-{id: uint, step: SystemStep} RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
+{id: uint32, step: SystemStep} RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
 			=> instance.RegisterSystem(run, step);
+
+{id: uint32, step: FrameSystemStep} RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
+			=> instance.RegisterFrameSystem(run, step);
 
 *Type FrameAlloc<Type>() => instance.frameAllocator.Alloc<Type>();
 
@@ -47,6 +50,7 @@ state ECS
 	recycledScenes := Stack<uint16>(),
 	systemBuffer := RingBuffer<SceneSystem>(),
 	frameCount: uint,
+	lastFrameTime: float,
 	componentCount: uint32,
 	sceneCount: uint16
 }
@@ -72,12 +76,29 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 
 	system := {run} as System;
 	data := this.AddSystem(system, step);
-	// Make sure systemBuffer is always large enough to hold the largest array of systems
-	this.systemBuffer.Expand(data.id);
+	this.ExpandSystemBuffer(data.id);
 	return data;
 }
 
-{id: uint, step: SystemStep} ECS::AddSystem(system: System, step: SystemStep)
+{id: uint32, step: FrameSystemStep} ECS::RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
+{	
+	assert run != null, "Cannot register null frame systems";
+
+	system := {run} as FrameSystem;
+	id := uint32(0);
+
+	switch (step)
+	{
+		case (FrameSystemStep.Start) id = this.systems.frameStart.Add(system);
+		case (FrameSystemStep.End) id = this.systems.frameEnd.Add(system);
+		default log "Invalid step for frame system";
+	}
+	
+	this.ExpandSystemBuffer(id);
+	return {id, step};
+}
+
+{id: uint32, step: SystemStep} ECS::AddSystem(system: System, step: SystemStep)
 {
 	switch (step)
 	{
@@ -89,9 +110,16 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 		case (SystemStep.Draw) return { this.systems.onDraw.Add(system), step };
 		case (SystemStep.Start) return { this.systems.onStart.Add(system), step };
 		case (SystemStep.Stop) return { this.systems.onStop.Add(system), step };
+		default log "Invalid step for system";
 	}
 
-	return { -1, step };
+	return { uint32(0), step };
+}
+
+ECS::ExpandSystemBuffer(count: uint32)
+{
+	// Make sure systemBuffer is always large enough to hold the largest array of systems
+	this.systemBuffer.Expand(count);
 }
 
 *Scene ECS::CreateScene()
@@ -151,23 +179,42 @@ ECS::RunSystems(systems: Array<System>)
 	if (!count) return;
 
 	time := Time.SecondsSinceStart();
+	dt := time - instance.lastFrameTime;
 	handle: *Fiber.JobHandle = null;
 	for (scene in this.scenes.Values())
 	{
 		for (system in systems) 
 		{
-			sceneSystem := instance.systemBuffer.Insert({scene@, system@, time} as SceneSystem);
+			sceneSystem := instance.systemBuffer.Insert({scene@, system@, dt} as SceneSystem);
 			Fiber.AddJob(::(data: *SceneSystem) {
 				scene := data.scene;
 				system := data.system;
-				time := data.time;
-
-				dt := time - scene.lastFrameTime;
-				scene.lastFrameTime = time;
+				dt := data.time;
 				
 				system.run(scene~, dt);
-			}, sceneSystem, Fiber.JobPriority.High, handle@);
+			}, sceneSystem, handle@, Fiber.JobPriority.High);
 		}
+	}
+
+	Fiber.WaitForHandle(handle);
+}
+
+ECS::RunFrameSystems(systems: Array<FrameSystem>)
+{
+	if (!systems.count) return;
+
+	time := Time.SecondsSinceStart();
+	dt := time - instance.lastFrameTime;
+	handle: *Fiber.JobHandle = null;
+	for (system in systems) 
+	{
+		sceneSystem := instance.systemBuffer.Insert({null, system@, dt} as SceneSystem);
+		Fiber.AddJob(::(data: *SceneSystem) {
+			system := data.system;
+			dt := data.time;
+			
+			(system~ as FrameSystem).run(dt);
+		}, sceneSystem, handle@, Fiber.JobPriority.High);
 	}
 
 	Fiber.WaitForHandle(handle);
@@ -185,6 +232,7 @@ ECS::Stop()
 
 ECS::PreFrame()
 {
+	this.RunFrameSystems(this.systems.frameStart)
 	this.RunSystems(this.systems.onPreFrame);
 }
 
@@ -206,7 +254,9 @@ ECS::Draw()
 ECS::PostFrame()
 {
 	this.RunSystems(this.systems.onPostFrame);
+	this.RunFrameSystems(this.systems.frameEnd)
 
+	this.lastFrameTime = Time.SecondsSinceStart();
 	this.frameAllocator.Clear();
 	this.frameCount += 1;
 }

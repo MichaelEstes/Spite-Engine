@@ -10,7 +10,6 @@ depthPassName := "DepthPass";
 state DepthPassParam
 {
 	scene: *Scene,
-	window: *SDL.Window,
 	depthTextureHandle: RenderResourceHandle
 }
 
@@ -19,15 +18,13 @@ depthPass := RegisterRenderPass(
 	::(graph: RenderGraph, renderer: SDLRenderer, scene: *Scene) {
 		param := ECS.FrameAlloc<DepthPassParam>();
 		param.scene = scene;
-		param.window = renderer.window;
 
 		graph.AddPass(
 			depthPassName,
 			::bool(builder: RenderNodeBuilder, param: *DepthPassParam) {
-				log "Initializing Depth Pass";
 				width := uint32(0);
 				height := uint32(0);
-				SDL.GetWindowSizeInPixels(param.window, width@, height@);
+				SDL.GetWindowSizeInPixels(builder.Window(), width@, height@);
 
 				textureInfo := GPUTextureCreateInfo();
 				textureInfo.width = width;
@@ -42,8 +39,6 @@ depthPass := RegisterRenderPass(
 				return true;
 			},
 			::(context: RenderPassContext, param: *DepthPassParam) {
-				log "Executing Depth Pass";
-
 				depthTexture := context.UseTexture(param.depthTextureHandle);
 			},
 			RenderPassStage.Graphics,

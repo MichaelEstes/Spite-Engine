@@ -11,19 +11,41 @@ enum RenderPassStage
 
 state RenderPassContext
 {
-	commandBuffer: *GPUCommandBuffer,
-	device: *GPUDevice,
+	commandBuffer: *SDL.GPUCommandBuffer,
+	device: *SDL.GPUDevice,
+	window: *SDL.Window,
 	handles: *RenderResourceHandles
 }
 
-*GPUTexture RenderPassContext::UseTexture(handle: RenderResourceHandle)
+*SDL.GPUTexture RenderPassContext::UseTexture(handle: RenderResourceHandle)
 {
 	return this.handles.UseResource(handle, this.device).resource.texture;
 }
 
-*GPUBuffer RenderPassContext::UseBuffer(handle: RenderResourceHandle)
+*SDL.GPUBuffer RenderPassContext::UseBuffer(handle: RenderResourceHandle)
 {
 	return this.handles.UseResource(handle, this.device).resource.buffer;
+}
+
+*SDL.GPUTexture RenderPassContext::WaitAndAcquireSwapchain(outWidth: *uint32 = null, outHeight: *uint32 = null)
+{
+	texture: *SDL.GPUTexture = null;
+	SDL.Check(
+		SDL.WaitAndAcquireGPUSwapchainTexture(
+			this.commandBuffer,
+			this.window,
+			texture@,
+			outWidth,
+			outHeight
+		), 
+		::(err: *byte) 
+		{
+			log "Error acquiring swapchain texture";
+			puts(err);
+		}
+	);
+
+	return texture;
 }
 
 state RenderGraphPass
@@ -38,7 +60,8 @@ state RenderGraphPass
 state RenderGraph
 {
 	passes: Array<RenderGraphPass>,
-	device: *GPUDevice,
+	device: *SDL.GPUDevice,
+	window: *SDL.Window,
 	handles: RenderResourceHandles
 }
 
@@ -69,6 +92,7 @@ RenderPassContext RenderGraph::CreateContext(commandBuffer: *GPUCommandBuffer)
 	context := RenderPassContext();
 	context.commandBuffer = commandBuffer;
 	context.device = this.device;
+	context.window = this.window;
 	context.handles = this.handles@;
 
 	return context;

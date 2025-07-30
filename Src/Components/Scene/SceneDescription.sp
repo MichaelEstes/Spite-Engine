@@ -5,6 +5,8 @@ import Window
 import SDL
 import SDLRenderer
 import Scene
+import ThreadParamAllocator
+import Fiber
 
 windowComponent := ECS.RegisterComponent<*SDL.Window>(
 	ComponentKind.Singleton
@@ -36,6 +38,8 @@ state SceneDesc
 	renderer: RendererDesc
 }
 
+state SceneDescParam { sceneDesc: *SceneDesc, scene: *Scene }
+
 SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 	ComponentKind.Singleton,
 	::(sceneDesc: *SceneDesc, scene: Scene) {
@@ -44,29 +48,40 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 	::(sceneDesc: *SceneDesc, scene: Scene) {
 		log "Scene description added";
 
-		windowDesc := sceneDesc.window;
-		rendererDesc := sceneDesc.renderer;
+		param := AllocThreadParam<SceneDescParam>();
+		param.sceneDesc = sceneDesc;
+		param.scene = scene@;
 
-		window := CreateWindow(
-			windowDesc.title[0],
-			windowDesc.width,
-			windowDesc.height,
-			windowDesc.flags,
-		);
-
-		renderPasses := Array<RenderPass>();
-		for (passName in rendererDesc.passes)
+		Fiber.RunOnMainFiber(::(param: *SceneDescParam) 
 		{
-			renderPasses.Add(GetRenderPass(passName));
-		}
+		    defer DeallocThreadParam<SceneDescParam>(param);
+			sceneDesc := param.sceneDesc;
+			scene := param.scene;
 
-		renderer := SDLRenderer.CreateSDLRenderer(
-			window, 
-			GetSDLInstanceDevice(),
-			renderPasses
-		);
+		    windowDesc := sceneDesc.window;
+			rendererDesc := sceneDesc.renderer;
 
-		scene.SetSingleton<*SDL.Window>(window);
-		scene.SetSingleton<SDLRenderer>(renderer);
+			window := CreateWindow(
+				windowDesc.title[0],
+				windowDesc.width,
+				windowDesc.height,
+				windowDesc.flags,
+			);
+
+			renderPasses := Array<RenderPass>();
+			for (passName in rendererDesc.passes)
+			{
+				renderPasses.Add(GetRenderPass(passName));
+			}
+
+			renderer := SDLRenderer.CreateSDLRenderer(
+				window, 
+				GetSDLInstanceDevice(),
+				renderPasses
+			);
+
+			scene.SetSingleton<*SDL.Window>(window);
+			scene.SetSingleton<SDLRenderer>(renderer);
+		}, param);
 	}
 );

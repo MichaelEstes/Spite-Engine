@@ -78,7 +78,7 @@ testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 		{
 			data~ = i;
 		}	
-	}, data@, Fiber.JobPriority.High, handle@);
+	}, data@, handle@);
 	Fiber.WaitForHandle(handle);
 
 	if (scene.HasSingleton<SingletonTest>()) scene.GetSingleton<SingletonTest>().myValue += 1;

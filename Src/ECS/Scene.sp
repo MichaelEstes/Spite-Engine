@@ -8,7 +8,6 @@ state Scene
 	commonComponents := SparseSet<EntityComponentArray<any>>(),
 	sparseComponents := SparseSet<EntityComponentMap<any>>(),
 	singletonComponents := SingletonComponentMap(),
-	lastFrameTime: float,
 	currEntity: uint32,
 	id: uint16
 }
@@ -237,7 +236,7 @@ Scene::SetSingleton<Type>(value: Type)
 {
 	this.singletonComponents.Insert<Type>(value);
 	component := instance.GetComponent<Type>();
-	instance.OnComponentEnter(component.id, value@, this);
+	instance.OnComponentEnter(component.id, this.GetSingleton<Type>(), this);
 }
 
 bool Scene::HasSingleton<Type>()

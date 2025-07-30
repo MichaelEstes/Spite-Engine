@@ -25,6 +25,9 @@ state RenderNodeBuilder
 	node: RenderNode
 }
 
+*SDL.Window RenderNodeBuilder::Window() => this.renderGraph.window;
+
+
 RenderNodeBuilder::Read(target: RenderResourceHandle)
 {
 	this.node.resources.Add({ target, ResourceAccess.Read });
