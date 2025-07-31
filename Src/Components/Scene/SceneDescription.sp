@@ -52,7 +52,7 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 		param.sceneDesc = sceneDesc;
 		param.scene = scene@;
 
-		Fiber.RunOnMainFiber(::(param: *SceneDescParam) 
+		Fiber.RunOnMainThread(::(param: *SceneDescParam) 
 		{
 		    defer DeallocThreadParam<SceneDescParam>(param);
 			sceneDesc := param.sceneDesc;

@@ -87,13 +87,11 @@ sdlDrawSystem := ECS.RegisterSystem(
 	{
 		if (scene.HasSingleton<SDLRenderer>())
 		{
-			handle: *Fiber.JobHandle = null;
-			Fiber.RunOnMainFiber(::(scene: *Scene) 
+			Fiber.RunOnMainThread(::(scene: *Scene) 
 			{
 				renderer := scene.GetSingleton<SDLRenderer>();
 				renderer.Draw(scene);
-			}, scene@, handle@);
-			Fiber.WaitForHandle(handle);
+			}, scene@);
 		}
 	},
 	SystemStep.Draw
@@ -102,7 +100,7 @@ sdlDrawSystem := ECS.RegisterSystem(
 sdlDrawCleanupSystem := ECS.RegisterFrameSystem(
 	::(dt: float) 
 	{
-		log "Frame end", dt;
+		//log "Frame end", dt;
 		ReleaseTrackedResources();
 	},
 	FrameSystemStep.End

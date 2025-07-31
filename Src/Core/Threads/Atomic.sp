@@ -126,7 +126,7 @@ _CheckValidAtomicType(type: *_Type)
 	assert type.IsInteger() || type.IsPointer(), "Not a valid type for atomic operations";
 }
 
-Atomic::(value: Type)
+Atomic::Init(value: Type)
 {
 	init := #compile ::void(*Type, Type) {
 		type := #typeof Type;

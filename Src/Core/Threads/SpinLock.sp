@@ -4,7 +4,12 @@ import Atomic
 
 state SpinLock
 {
-	lock := Atomic<bool>(false);
+	lock: Atomic<bool>
+}
+
+SpinLock::()
+{
+	this.lock.Init(false);
 }
 
 SpinLock::Lock()

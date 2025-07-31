@@ -44,13 +44,13 @@ MainLoop()
 	currEvent := SDL.Event();
 	while (running)
 	{
+		while (SDL.PollEvent(currEvent@)) HandleSDLEvent(currEvent);
+
 		ECS.instance.PreFrame();
 		ECS.instance.Frame();
 		ECS.instance.PreDraw();
 		ECS.instance.Draw();
 		ECS.instance.PostFrame();
-		
-		while (SDL.PollEvent(currEvent@)) HandleSDLEvent(currEvent);
 	}
 
 	ECS.instance.Stop();

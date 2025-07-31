@@ -197,6 +197,7 @@ ECS::RunSystems(systems: Array<System>)
 	}
 
 	Fiber.WaitForHandle(handle);
+	Fiber.FlushMainThreadJobs();
 }
 
 ECS::RunFrameSystems(systems: Array<FrameSystem>)
@@ -218,6 +219,7 @@ ECS::RunFrameSystems(systems: Array<FrameSystem>)
 	}
 
 	Fiber.WaitForHandle(handle);
+	Fiber.FlushMainThreadJobs();
 }
 
 ECS::Start()
@@ -232,7 +234,7 @@ ECS::Stop()
 
 ECS::PreFrame()
 {
-	this.RunFrameSystems(this.systems.frameStart)
+	this.RunFrameSystems(this.systems.frameStart);
 	this.RunSystems(this.systems.onPreFrame);
 }
 
@@ -254,7 +256,7 @@ ECS::Draw()
 ECS::PostFrame()
 {
 	this.RunSystems(this.systems.onPostFrame);
-	this.RunFrameSystems(this.systems.frameEnd)
+	this.RunFrameSystems(this.systems.frameEnd);
 
 	this.lastFrameTime = Time.SecondsSinceStart();
 	this.frameAllocator.Clear();

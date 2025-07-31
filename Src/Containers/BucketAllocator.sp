@@ -29,7 +29,7 @@ BucketAllocator::(itemSize: uint32, itemCount: uint32, bucketCount: uint32)
 	this.bucketStatus = BitSet(this.bucketCount);
 	this.itemStatus = BitSet(this.itemCount * this.bucketCount);
 	
-	this.currBucket = Atomic<uint32>(0);
+	this.currBucket.Init(0);
 }
 
 BucketAllocator::delete 
@@ -40,7 +40,11 @@ BucketAllocator::delete
 	delete this.itemStatus;
 }
 
-uint32 BucketAllocator::IncCurrBucket() => (this.currBucket.Add(1) + 1) % this.bucketCount;
+uint32 BucketAllocator::IncCurrBucket() => 
+{
+	this.currBucket.Add(1);
+	return this.currBucket.value % this.bucketCount;
+}
 
 int BucketAllocator::GetNextBucketIndex()
 {

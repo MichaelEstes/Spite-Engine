@@ -1,6 +1,6 @@
 package Fiber
 
-import Array
+import FixedArray
 import Thread
 import SystemInfo
 import Queue
@@ -20,6 +20,20 @@ state JobHandle
 	counter: Atomic<uint32>
 }
 
+JobHandle::(count: uint32)
+{
+	this.counter.Init(count);
+}
+
+bool JobHandle::Finished()
+{
+	return this.counter.Load() == uint32(0);
+}
+
+uint32 JobHandle::Add(count: uint32) => this.counter.Add(count);
+
+uint32 JobHandle::Remove() => this.counter.Sub(1);
+
 state Job
 {
 	func: ::(*any),
@@ -29,16 +43,20 @@ state Job
 
 state Fibers
 {
-	threads: Array<uint>,
-	threadIDs: Array<uint32>,
+	threads: FixedArray<uint>,
+	threadIDs: FixedArray<uint32>,
+	locks: FixedArray<Mutex>,
 
 	// Jobs indexed by priority
-	jobs := [Array<Queue<Job>>(), Array<Queue<Job>>(), Array<Queue<Job>>()],
-	locks := Array<Mutex>(),
+	jobs := [FixedArray<Queue<Job>>(), FixedArray<Queue<Job>>(), FixedArray<Queue<Job>>()],
+	
+	// Jobs to run on the main thread
+	mainThreadJobs := Queue<Job>(),
+	mainLock := Mutex(),
 
 	handleAllocator: BucketAllocator,
 
-	currentProcess := Atomic<uint32>(0),
+	currentProcess: Atomic<uint32>,
 	processCount: uint32,
 
 	running := true
@@ -49,6 +67,7 @@ fibers: *Fibers = null;
 InitalizeFibers()
 {
 	fibers = new Fibers();
+	fibers.currentProcess.Init(0);
 
 	sysInfo := GetSystemInfo();
 	// - 2, executable start thread, main (IO) fiber thread
@@ -56,18 +75,25 @@ InitalizeFibers()
 	totalProcessCount := fibers.processCount + 1;
 	fibers.handleAllocator = BucketAllocator(#sizeof JobHandle, 32, totalProcessCount);
 
+	fibers.threads = FixedArray<uint>(totalProcessCount);
+	fibers.threadIDs = FixedArray<uint32>(totalProcessCount);
+	fibers.locks = FixedArray<Mutex>(totalProcessCount);
+
+	for (jobArr in fibers.jobs)
+	{
+		jobArr = FixedArray<Queue<Job>>(totalProcessCount);
+		for (i .. totalProcessCount)
+		{
+			jobArr[i]~ = Queue<Job>();
+		}
+	}
+
 	for (i .. totalProcessCount)
 	{
-		for (jobArr in fibers.jobs)
-		{
-			jobArr.Add(Queue<Job>());
-		}
+		fibers.locks[i]~ = Mutex();
 
-		fibers.locks.Add(Mutex());
-
-		fibers.threadIDs.Add(0);
 		thread := CreateFiberThread(i);
-		fibers.threads.Add(thread);
+		fibers.threads[i]~ = thread;
 	}
 }
 
@@ -76,7 +102,7 @@ InitalizeFibers()
 	handle := fibers.handleAllocator.Alloc() as *JobHandle;
 	assert handle != null, "Failed to allocate job handle";
 	
-	handle.counter = Atomic<uint32>(count);
+	handle~ = JobHandle(count);
 	return handle;
 }
 
@@ -87,7 +113,7 @@ InitalizeFibers()
 	handle := handleRef~;
 	if (handle)
 	{
-		handle.counter.Add(count);
+		handle.Add(count);
 		return handle;
 	}
 
@@ -110,12 +136,15 @@ AddJobForIndex(job: Job, priority: JobPriority, index: uint32)
 	fibers.locks[index].Unlock();
 }
 
+uint32 GetNextFiberIndex() => fibers.currentProcess.Add(1) % fibers.processCount;
+
+
 AddJob(func: ::(*any), data: *any = null, handle: **JobHandle = null, priority: JobPriority = JobPriority.Medium)
 {
 	jobHandle := GetJobHandle(1, handle);
 	job := {func, data, jobHandle} as Job;
 
-	index := fibers.currentProcess.Add(1) % fibers.processCount;
+	index := GetNextFiberIndex();
 	
 	AddJobForIndex(job, priority, index);
 }
@@ -124,6 +153,7 @@ AddJobs(funcs: []::(*any), data: []*any, handle: **JobHandle = null, priority: J
 {
 	count := funcs.count;
 	jobHandle := GetJobHandle(count, handle);
+	index := GetNextFiberIndex();
 
 	for (i .. count)
 	{
@@ -131,9 +161,8 @@ AddJobs(funcs: []::(*any), data: []*any, handle: **JobHandle = null, priority: J
 		dataItem := data[i];
 		job := {func, dataItem, jobHandle} as Job;
 
-		index := fibers.currentProcess.Add(1) % fibers.processCount;
 
-		AddJobForIndex(job, priority, index);
+		AddJobForIndex(job, priority, (index + i) % fibers.processCount);
 	}
 }
 
@@ -145,14 +174,14 @@ WaitForHandle(handle: *JobHandle)
 
 	currThread := GetCurrentThreadID();
 	
-	for (i .. fibers.processCount)
+	for (i .. fibers.processCount + 1)
 	{
 		thread := fibers.threadIDs[i];
 		
 		// Waiting for a job on a fiber thread, continue running jobs
 		if (currThread == thread)
 		{
-			while (handle.counter.Load() != 0)
+			while (!handle.Finished())
 			{
 				RunNext(i);
 			}
@@ -161,12 +190,12 @@ WaitForHandle(handle: *JobHandle)
 	}
 
 	// Waiting on a non fiber thread, spin
-	while (handle.counter.Load() != 0) {}
+	while (!handle.Finished()) {}
 }
 
 uint CreateFiberThread(index: uint)
 {
-	threadID := fibers.threadIDs[index]@;
+	threadID := fibers.threadIDs[index];
 	thread := Thread.Create(::int32(index: *void) {
 		RunFiber(index as uint);
 		return 0;
@@ -182,6 +211,33 @@ RunOnMainFiber(func: ::(*any), data: *any, handle: **JobHandle = null, priority:
 	job := {func, data, jobHandle} as Job;
 
 	AddJobForIndex(job, priority, mainIndex);
+}
+
+RunOnMainThread(func: ::(*any), data: *any)
+{
+	job := {func, data, null} as Job;
+
+	fibers.mainLock.Lock();
+	{
+		fibers.mainThreadJobs.Enqueue(job);
+	}
+	fibers.mainLock.Unlock();
+}
+
+FlushMainThreadJobs()
+{
+	fibers.mainLock.Lock();
+	{
+		while (fibers.mainThreadJobs.count)
+		{
+			job := fibers.mainThreadJobs.Dequeue();
+			if (job.func)
+			{
+				job.func(job.data);
+			}
+		}
+	}
+	fibers.mainLock.Unlock();
 }
 
 Job GetNextJob(index: uint)
@@ -213,7 +269,7 @@ RunNext(index: uint)
 		job.func(job.data);
 		if (job.handle)
 		{
-			job.handle.counter.Sub(1);
+			job.handle.Remove();
 		}
 	}
 }
