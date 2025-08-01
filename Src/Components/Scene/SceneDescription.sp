@@ -4,6 +4,7 @@ import ECS
 import Window
 import SDL
 import SDLRenderer
+import VulkanRenderer
 import Scene
 import ThreadParamAllocator
 import Fiber
@@ -67,21 +68,24 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 				windowDesc.height,
 				windowDesc.flags,
 			);
-
-			renderPasses := Array<RenderPass>();
-			for (passName in rendererDesc.passes)
-			{
-				renderPasses.Add(GetRenderPass(passName));
-			}
-
-			renderer := SDLRenderer.CreateSDLRenderer(
-				window, 
-				GetSDLInstanceDevice(),
-				renderPasses
-			);
-
 			scene.SetSingleton<*SDL.Window>(window);
-			scene.SetSingleton<SDLRenderer>(renderer);
+
+			if (rendererDesc.flags & RendererFlags.Vulkan)
+			{
+				VulkanRenderer.InitializeVulkanInstance();
+				renderer := VulkanRenderer.CreateVulkanRenderer(window, rendererDesc.passes);
+				scene.SetSingleton<VulkanRenderer>(renderer);
+			}
+			else
+			{
+				SDLRenderer.InitializeSDLGPUInstance();
+				renderer := SDLRenderer.CreateSDLRenderer(
+					window, 
+					GetSDLInstanceDevice(),
+					rendererDesc.passes
+				);
+				scene.SetSingleton<SDLRenderer>(renderer);
+			}
 		}, param);
 	}
 );

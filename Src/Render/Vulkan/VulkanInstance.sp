@@ -10,6 +10,7 @@ state VulkanInstance
 
 	physicalDeviceCount: uint32,
 	extensionCount: uint32,
+	initialized := false
 }
 
 ArrayView<*VkPhysicalDevice_T> VulkanInstance::PhysicalDevices()
@@ -21,6 +22,9 @@ vulkanInstance := VulkanInstance();
 
 InitializeVulkanInstance()
 {
+	if (vulkanInstance.initialized) return;
+
+	vulkanInstance.initialized = true;
 	vulkanInstance.extensionNames = SDL.VulkanGetInstanceExtensions(vulkanInstance.extensionCount@);
     instanceCreateInfo := {
         VkStructureType.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, 

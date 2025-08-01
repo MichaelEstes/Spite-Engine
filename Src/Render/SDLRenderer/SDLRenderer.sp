@@ -21,12 +21,16 @@ instance := SDLGPUInstance();
 state SDLGPUInstance
 {
 	device: *SDL.GPUDevice,
+	initialized := false
 }
 
 InitializeSDLGPUInstance()
 {
+	if (instance.initialized) return;
+
 	log "Initializing SDL GPU Instance";
 	Check(ShaderCross_Init(), "Error initializing Shadercross");
+	instance.initialized = true;
 	instance.device = CreateGPUDevice(GPUShaderFormat.SPIRV, true, null);
 }
 
@@ -37,7 +41,7 @@ state SDLRenderer
 	device: *SDL.GPUDevice,
 	window: *SDL.Window,
 	passes: Array<RenderPass>,
-	renderGraph: RenderGraph
+	renderGraph: SDLRenderGraph
 }
 
 SDLRenderer::Draw(scene: *Scene)
@@ -62,14 +66,20 @@ SDLRenderer::Draw(scene: *Scene)
 	renderGraph.Execute(context);
 }
 
-SDLRenderer CreateSDLRenderer(window: *SDL.Window, device: *SDL.GPUDevice, passes: Array<RenderPass>)
+SDLRenderer CreateSDLRenderer(window: *SDL.Window, device: *SDL.GPUDevice, passes: Array<string>)
 {
 	renderer := SDLRenderer();
 	renderer.device = device;
 	renderer.window = window;
-	renderer.passes = passes;
 	renderer.renderGraph.device = device;
 	renderer.renderGraph.window = window;
+
+	renderPasses := Array<RenderPass>();
+	for (passName in passes)
+	{
+		renderPasses.Add(GetRenderPass(passName));
+	}
+	renderer.passes = renderPasses;
 
 	Check(ClaimWindowForGPUDevice(device, window), "Error claiming window for GPU device");
 
@@ -100,7 +110,7 @@ sdlDrawSystem := ECS.RegisterSystem(
 sdlDrawCleanupSystem := ECS.RegisterFrameSystem(
 	::(dt: float) 
 	{
-		//log "Frame end", dt;
+		log "Frame end", dt;
 		ReleaseTrackedResources();
 	},
 	FrameSystemStep.End

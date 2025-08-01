@@ -15,13 +15,13 @@ TrackedResource::(resource: Type, claimed: bool)
 	this.claimed = claimed;
 }
 
-state ResourceTable<Resource, CreateInfo>
+state ResourceTable<Device, Resource, CreateInfo>
 {
 	descToResource := Map<CreateInfo, Array<TrackedResource<Resource>>>()
 }
 
-Resource ResourceTable::GetOrCreateResource(createInfo: CreateInfo, device: *GPUDevice,
-											create: ::Resource(CreateInfo, *GPUDevice))
+Resource ResourceTable::GetOrCreateResource(createInfo: CreateInfo, device: *Device,
+											create: ::Resource(CreateInfo, *Device))
 {
 	if (this.descToResource.Has(createInfo))
 	{
@@ -63,43 +63,39 @@ ResourceTable::ReleaseResources()
 	}
 }
 
-state ResourceTables
+state ResourceTables<Device, Texture, Buffer, TextureInfo, BufferInfo>
 {
-	textureTable: ResourceTable<*GPUTexture, GPUTextureCreateInfo>,
-	bufferTable: ResourceTable<*GPUBuffer, GPUBufferCreateInfo>,
+	textureTable: ResourceTable<Device, *Texture, TextureInfo>,
+	bufferTable: ResourceTable<Device, *Buffer, BufferInfo>,
+	createTexture: ::*Texture(TextureInfo, *Device),
+	createBuffer: ::*Buffer(BufferInfo, *Device),
 }
 
-renderResourcesTable := ResourceTables();
-
-RenderResource UseTexture(createInfo: GPUTextureCreateInfo, device: *GPUDevice)
+RenderResource ResourceTables::UseTexture(createInfo: TextureInfo, device: *Device)
 {
 	table := renderResourcesTable.textureTable;
 	texture := table.GetOrCreateResource(
 		createInfo,
 		device,
-		::*GPUTexture(createInfo: GPUTextureCreateInfo, device: *GPUDevice) {
-			return SDL.CreateGPUTexture(device, createInfo@)
-		}
+		this.createTexture
 	);
 
 	return RenderResource().FromTexture(texture);
 }
 
-RenderResource UseBuffer(createInfo: GPUBufferCreateInfo, device: *GPUDevice)
+RenderResource ResourceTables::UseBuffer(createInfo: BufferInfo, device: *Device)
 {
 	table := renderResourcesTable.bufferTable;
 	buffer := table.GetOrCreateResource(
 		createInfo,
 		device,
-		::*GPUBuffer(createInfo: GPUBufferCreateInfo, device: *GPUDevice) {
-			return SDL.CreateGPUBuffer(device, createInfo@)
-		}
+		this.createBuffer
 	);
 
 	return RenderResource().FromBuffer(buffer);
 }
 
-RenderResource UseResource(resourceDesc: ResourceDesc, device: *GPUDevice)
+RenderResource ResourceTables::UseResource(resourceDesc: ResourceDesc<TextureInfo, BufferInfo>, device: *Device)
 {
 	switch (resourceDesc.kind)
 	{
@@ -116,7 +112,7 @@ RenderResource UseResource(resourceDesc: ResourceDesc, device: *GPUDevice)
 	return RenderResource().Null();
 }
 
-ReleaseTrackedResources()
+ResourceTables::ReleaseTrackedResources()
 {
 	renderResourcesTable.textureTable.ReleaseResources();
 	renderResourcesTable.bufferTable.ReleaseResources();

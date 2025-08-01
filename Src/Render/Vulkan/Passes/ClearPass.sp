@@ -1,26 +1,22 @@
-package SDLRenderPass
+package VulkanRenderPass
 
-import SDLRenderer
+import VulkanRenderer
 import RenderGraph
 import ECS
-import SDL
-
 
 clearPassName := "ClearPass";
 
 clearPass := RegisterRenderPass(
 	clearPassName,
-	::(renderGraph: SDLRenderGraph, renderer: SDLRenderer, scene: *Scene) {
-		graph := renderGraph.graph;
-
+	::(graph: RenderGraph, renderer: *VulkanRenderer, scene: *Scene) {
 		graph.AddPass(
 			clearPassName,
-			::bool(builder: RenderNodeBuilder, param: *void) {
+			::bool(builder: RenderNodeBuilder, param: *void) 
+			{
 				return true;
 			},
 			::(context: RenderPassContext, param: *void) {
 				log "Clearing Screen";
-				//swapchain := context.WaitAndAcquireSwapchain();
 			},
 			RenderPassStage.Graphics,
 			null

@@ -8,15 +8,16 @@ state RenderResourceHandle
 	handle: uint32
 }
 
-state RenderResourceHandles
+state RenderResourceHandles<Device, Texture, Buffer, TextureInfo, BufferInfo>
 {
-	handles := HandleSet<ResourceDesc>(),
+	handles := HandleSet<ResourceDesc<TextureInfo, BufferInfo>>(),
 	handleToName := SparseSet<string>(),
 	nameToHandle := Map<string, uint32>(),
-	resources := SparseSet<RenderResource>(),
+	resources := SparseSet<RenderResource<Texture, Buffer>>(),
+	resourceTables: *ResourceTables<Device, Texture, Buffer, TextureInfo, BufferInfo>
 }
 
-RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: ResourceDesc)
+RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: ResourceDesc<TextureInfo, BufferInfo>)
 {
 	if (this.nameToHandle.Has(name))
 	{
@@ -42,7 +43,7 @@ RenderResource RenderResourceHandles::UseResource(resourceHandle: RenderResource
 	}
 
 	desc := this.handles[handle]~;
-	resource := UseResource(desc, device);
+	resource := this.resourceTables.UseResource(desc, device);
 	this.resources.Insert(handle, resource);
 
 	return resource;

@@ -9,15 +9,15 @@ enum RenderPassStage
 	Compute
 }
 
-state RenderPassContext
+state RenderPassContext<Device, CommandBuffer, Texture, Buffer>
 {
-	commandBuffer: *SDL.GPUCommandBuffer,
-	device: *SDL.GPUDevice,
+	commandBuffer: *CommandBuffer,
+	device: *Device,
 	window: *SDL.Window,
-	handles: *RenderResourceHandles
+	handles: *RenderResourceHandles<Texture, Buffer>
 }
 
-*SDL.GPUTexture RenderPassContext::UseTexture(handle: RenderResourceHandle)
+*Texture RenderPassContext::UseTexture(handle: RenderResourceHandle)
 {
 	return this.handles.UseResource(handle, this.device).resource.texture;
 }
@@ -27,48 +27,29 @@ state RenderPassContext
 	return this.handles.UseResource(handle, this.device).resource.buffer;
 }
 
-*SDL.GPUTexture RenderPassContext::WaitAndAcquireSwapchain(outWidth: *uint32 = null, outHeight: *uint32 = null)
-{
-	texture: *SDL.GPUTexture = null;
-	SDL.Check(
-		SDL.WaitAndAcquireGPUSwapchainTexture(
-			this.commandBuffer,
-			this.window,
-			texture@,
-			outWidth,
-			outHeight
-		), 
-		::(err: *byte) 
-		{
-			log "Error acquiring swapchain texture";
-			puts(err);
-		}
-	);
-
-	return texture;
-}
-
-state RenderGraphPass
+state RenderGraphPass<Device, CommandBuffer, Texture, Buffer>
 {
 	name: string,
 	node: RenderNode,
-	exec: ::(RenderPassContext, *any),
+	exec: ::(RenderPassContext<Device, CommandBuffer, Texture, Buffer>, *any),
 	stage: RenderPassStage,
 	data: *any
 }
 
-state RenderGraph
+state RenderGraph<Device, CommandBuffer, Texture, Buffer, TextureInfo, BufferInfo>
 {
-	passes: Array<RenderGraphPass>,
-	device: *SDL.GPUDevice,
+	passes: Array<RenderGraphPass<Device, CommandBuffer, Texture, Buffer>>,
+	device: *Device,
 	window: *SDL.Window,
-	handles: RenderResourceHandles
+	handles: RenderResourceHandles<Device, Texture, Buffer, TextureInfo, BufferInfo>
 }
 
-RenderGraph::AddPass(name: string, init: ::bool(RenderNodeBuilder, *any), exec: ::(RenderPassContext, *any),
+RenderGraph::AddPass(name: string, 
+					 init: ::bool(RenderNodeBuilder<Device, CommandBuffer, Texture, Buffer, TextureInfo, BufferInfo>, *any), 
+					 exec: ::(RenderPassContext<Device, CommandBuffer, Texture, Buffer>, *any),
 					 stage: RenderPassStage, data: *any = null)
 {
-	builder := RenderNodeBuilder();
+	builder := RenderNodeBuilder<Device, CommandBuffer, Texture, Buffer, TextureInfo, BufferInfo>();
 	builder.renderGraph = this@;
 	if (init(builder, data))
 	{
@@ -82,14 +63,14 @@ RenderGraph::AddPass(name: string, init: ::bool(RenderNodeBuilder, *any), exec: 
 	}
 }
 
-RenderResourceHandle RenderGraph::RegisterResourceToCreate(name: string, desc: ResourceDesc)
+RenderResourceHandle RenderGraph::RegisterResourceToCreate(name: string, desc: ResourceDesc<TextureInfo, BufferInfo>)
 {
 	return this.handles.CreateHandle(name, desc);
 }
 
-RenderPassContext RenderGraph::CreateContext(commandBuffer: *GPUCommandBuffer)
+RenderPassContext<Device, CommandBuffer, Texture, Buffer> RenderGraph::CreateContext(commandBuffer: *CommandBuffer)
 {
-	context := RenderPassContext();
+	context := RenderPassContext<Device, CommandBuffer, Texture, Buffer>();
 	context.commandBuffer = commandBuffer;
 	context.device = this.device;
 	context.window = this.window;
@@ -103,7 +84,7 @@ RenderGraph::Compile()
 
 }
 
-RenderGraph::Execute(context: RenderPassContext)
+RenderGraph::Execute(context: RenderPassContext<Device, CommandBuffer, Texture, Buffer>)
 {
 	for (pass in this.passes)
 	{

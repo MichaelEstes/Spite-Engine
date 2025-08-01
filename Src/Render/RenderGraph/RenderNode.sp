@@ -19,14 +19,13 @@ state RenderNode
 	resources: Array<RenderResourceUsage>,
 }
 
-state RenderNodeBuilder
+state RenderNodeBuilder<Device, CommandBuffer, Texture, Buffer, TextureInfo, BufferInfo>
 {
-	renderGraph: *RenderGraph,
+	renderGraph: *RenderGraph<Device, CommandBuffer, Texture, Buffer, TextureInfo, BufferInfo>,
 	node: RenderNode
 }
 
 *SDL.Window RenderNodeBuilder::Window() => this.renderGraph.window;
-
 
 RenderNodeBuilder::Read(target: RenderResourceHandle)
 {
@@ -38,12 +37,12 @@ RenderNodeBuilder::Write(target: RenderResourceHandle)
 	this.node.resources.Add({ target, ResourceAccess.Write });
 }
 
-RenderResourceHandle RenderNodeBuilder::Create(name: string, desc: ResourceDesc)
+RenderResourceHandle RenderNodeBuilder::Create(name: string, desc: ResourceDesc<TextureInfo, BufferInfo>)
 {
 	return this.renderGraph.RegisterResourceToCreate(name, desc);
 }
 
-RenderResourceHandle RenderNodeBuilder::CreateTexture(name: string, texture: GPUTextureCreateInfo)
+RenderResourceHandle RenderNodeBuilder::CreateTexture(name: string, texture: TextureInfo)
 {
 	desc := ResourceDesc();
 	desc.kind = ResourceKind.Texture;
@@ -52,7 +51,7 @@ RenderResourceHandle RenderNodeBuilder::CreateTexture(name: string, texture: GPU
 	return this.Create(name, desc);
 }
 
-RenderResourceHandle RenderNodeBuilder::CreateBuffer(name: string, buffer: GPUBufferCreateInfo)
+RenderResourceHandle RenderNodeBuilder::CreateBuffer(name: string, buffer: BufferInfo)
 {
 	desc := ResourceDesc();
 	desc.kind = ResourceKind.Buffer;

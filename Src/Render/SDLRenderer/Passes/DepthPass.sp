@@ -15,7 +15,8 @@ state DepthPassParam
 
 depthPass := RegisterRenderPass(
 	depthPassName,
-	::(graph: RenderGraph, renderer: SDLRenderer, scene: *Scene) {
+	::(renderGraph: SDLRenderGraph, renderer: SDLRenderer, scene: *Scene) {
+		graph := renderGraph.graph;
 		param := ECS.FrameAlloc<DepthPassParam>();
 		param.scene = scene;
 

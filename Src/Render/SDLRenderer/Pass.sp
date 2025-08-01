@@ -3,14 +3,20 @@ package SDLRenderer
 import RenderGraph
 import ECS
 
+state SDLRenderGraph
+{
+	graph: RenderGraph<GPUDevice, GPUCommandBuffer, GPUTexture, 
+					   GPUBuffer, GPUTextureCreateInfo, GPUBufferCreateInfo>
+}
+
 state RenderPass
 {
-	onDraw: ::(RenderGraph, SDLRenderer, *Scene)
+	onDraw: ::(VulkanRenderGraph, SDLRenderer, *Scene)
 }
 
 nameToRenderPass := Map<string, RenderPass>();
 
-RenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph, SDLRenderer, *Scene))
+RenderPass RegisterRenderPass(name: string, onDraw: ::(VulkanRenderGraph, SDLRenderer, *Scene))
 {
 	pass := RenderPass();
 	pass.onDraw = onDraw;

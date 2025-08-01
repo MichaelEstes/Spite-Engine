@@ -9,25 +9,25 @@ enum ResourceKind: uint32
 	Null
 }
 
-state ResourceDesc
+state ResourceDesc<TextureInfo, BufferInfo>
 {
 	desc: ?{
-		texture: GPUTextureCreateInfo,
-		buffer: GPUBufferCreateInfo,
+		texture: TextureInfo,
+		buffer: BufferInfo,
 	},
 	kind: ResourceKind
 }
 
-state RenderResource
+state RenderResource<Texture, Buffer>
 {
 	resource: ?{
-		texture: *GPUTexture,
-		buffer: *GPUBuffer
+		texture: *Texture,
+		buffer: *Buffer
 	},
 	kind: ResourceKind
 }
 
-ref RenderResource RenderResource::FromTexture(texture: *GPUTexture)
+ref RenderResource RenderResource::FromTexture(texture: *Texture)
 {
 	this.resource = texture;
 	this.kind = ResourceKind.Texture;
@@ -35,7 +35,7 @@ ref RenderResource RenderResource::FromTexture(texture: *GPUTexture)
 	return this;
 }
 
-ref RenderResource RenderResource::FromBuffer(buffer: *GPUBuffer)
+ref RenderResource RenderResource::FromBuffer(buffer: *Buffer)
 {
 	this.resource = buffer;
 	this.kind = ResourceKind.Buffer;

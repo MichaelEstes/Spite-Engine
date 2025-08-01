@@ -226,6 +226,8 @@ RunOnMainThread(func: ::(*any), data: *any)
 
 FlushMainThreadJobs()
 {
+	if (!fibers.mainThreadJobs.count) return;
+
 	fibers.mainLock.Lock();
 	{
 		while (fibers.mainThreadJobs.count)

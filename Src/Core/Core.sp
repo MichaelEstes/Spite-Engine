@@ -5,7 +5,6 @@ import Time
 import Window
 import SDL
 import Event
-import VulkanRenderer
 import SceneRegistry
 
 running := false;
@@ -17,8 +16,6 @@ Initialize()
 
 	SDL.Init(SDL.InitFlags.VIDEO);
 	SDL.VulkanLoadLibrary(null);
-
-	SDLRenderer.InitializeSDLGPUInstance();
 
 	SDLEventEmitter.On(SDL.EventType.QUIT, ::(event: SDL.Event) {
 		running = false;
