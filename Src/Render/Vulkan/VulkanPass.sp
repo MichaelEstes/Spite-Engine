@@ -3,20 +3,16 @@ package VulkanRenderer
 import RenderGraph
 import ECS
 
-state VulkanRenderGraph
-{
-	graph: RenderGraph<VkDevice_T, VkCommandBuffer_T, VkImage_T, 
-					   VkBuffer_T, VkImageCreateInfo, VkBufferCreateInfo>
-}
+import VulkanRenderPass
 
 state RenderPass
 {
-	onDraw: ::(VulkanRenderGraph, *VulkanRenderer, *Scene)
+	onDraw: ::(RenderGraph<VulkanRenderer>, *Scene)
 }
 
 nameToRenderPass := Map<string, RenderPass>();
 
-RenderPass RegisterRenderPass(name: string, onDraw: ::(VulkanRenderGraph, *VulkanRenderer, *Scene))
+RenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph<VulkanRenderer>, *Scene))
 {
 	pass := RenderPass();
 	pass.onDraw = onDraw;

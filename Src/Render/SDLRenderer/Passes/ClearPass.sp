@@ -10,15 +10,16 @@ clearPassName := "ClearPass";
 
 clearPass := RegisterRenderPass(
 	clearPassName,
-	::(renderGraph: SDLRenderGraph, renderer: SDLRenderer, scene: *Scene) {
-		graph := renderGraph.graph;
-
+	::(graph: RenderGraph<SDLRenderer>, scene: *Scene) 
+	{
 		graph.AddPass(
 			clearPassName,
-			::bool(builder: RenderNodeBuilder, param: *void) {
+			::bool(builder: *RenderPassBuilder<SDLRenderer>, param: *void) 
+			{
 				return true;
 			},
-			::(context: RenderPassContext, param: *void) {
+			::(context: *RenderPassContext<SDLRenderer>, param: *void) 
+			{
 				log "Clearing Screen";
 				//swapchain := context.WaitAndAcquireSwapchain();
 			},

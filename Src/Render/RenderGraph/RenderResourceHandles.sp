@@ -8,16 +8,16 @@ state RenderResourceHandle
 	handle: uint32
 }
 
-state RenderResourceHandles<Device, Texture, Buffer, TextureInfo, BufferInfo>
+state RenderResourceHandles
 {
-	handles := HandleSet<ResourceDesc<TextureInfo, BufferInfo>>(),
+	handles := HandleSet<ResourceDesc>(),
 	handleToName := SparseSet<string>(),
 	nameToHandle := Map<string, uint32>(),
-	resources := SparseSet<RenderResource<Texture, Buffer>>(),
-	resourceTables: *ResourceTables<Device, Texture, Buffer, TextureInfo, BufferInfo>
+	resources := SparseSet<RenderResource>(),
+	resourceTables: *ResourceTables
 }
 
-RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: ResourceDesc<TextureInfo, BufferInfo>)
+RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: ResourceDesc)
 {
 	if (this.nameToHandle.Has(name))
 	{
@@ -34,7 +34,7 @@ RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: Res
 	return handle as RenderResourceHandle;
 }
 
-RenderResource RenderResourceHandles::UseResource(resourceHandle: RenderResourceHandle, device: *GPUDevice)
+RenderResource RenderResourceHandles::UseResource(resourceHandle: RenderResourceHandle, device: *any)
 {
 	handle := resourceHandle.handle;
 	if (this.resources.Has(handle))

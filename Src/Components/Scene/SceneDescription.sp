@@ -23,8 +23,8 @@ state WindowDesc
 
 enum RendererFlags: uint
 {
-	SDL = 0,
-	Vulkan = 1
+	SDL = 1 << 0,
+	Vulkan = 2
 }
 
 state RendererDesc

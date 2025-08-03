@@ -1,33 +1,30 @@
 package RenderGraph
 
-import SDL
+import RenderCommon
 
 enum ResourceKind: uint32
 {
+	Null,
 	Texture,
-	Buffer,
-	Null
+	Buffer
 }
 
-state ResourceDesc<TextureInfo, BufferInfo>
+state ResourceDesc
 {
 	desc: ?{
-		texture: TextureInfo,
-		buffer: BufferInfo,
+		texture: TextureDesc,
+		buffer: BufferDesc,
 	},
 	kind: ResourceKind
 }
 
-state RenderResource<Texture, Buffer>
+state RenderResource
 {
-	resource: ?{
-		texture: *Texture,
-		buffer: *Buffer
-	},
+	resource: *any,
 	kind: ResourceKind
 }
 
-ref RenderResource RenderResource::FromTexture(texture: *Texture)
+ref RenderResource RenderResource::FromTexture(texture: *any)
 {
 	this.resource = texture;
 	this.kind = ResourceKind.Texture;
@@ -35,7 +32,7 @@ ref RenderResource RenderResource::FromTexture(texture: *Texture)
 	return this;
 }
 
-ref RenderResource RenderResource::FromBuffer(buffer: *Buffer)
+ref RenderResource RenderResource::FromBuffer(buffer: *any)
 {
 	this.resource = buffer;
 	this.kind = ResourceKind.Buffer;

@@ -36,8 +36,6 @@ validationCount := #compile uint32 => (#typeof validationLayers).FixedArrayCount
 requiredDeviceExtensions := ["VK_KHR_swapchain"[0],];
 requiredDeviceExtensionCount := #compile uint32 => (#typeof requiredDeviceExtensions).FixedArrayCount();
 
-renderersByWindow := SparseSet<VulkanRenderer>();
-
 CheckResult(result: VkResult, errorMsg: string)
 {
 	if (result != VkResult.VK_SUCCESS)
@@ -48,10 +46,17 @@ CheckResult(result: VkResult, errorMsg: string)
 
 DestroyAll()
 {
-	for (renderer in renderersByWindow.Values()) renderer.Destroy();
+	for (scene in ECS.Scenes())
+	{
+		if (scene.HasSingleton<VulkanRenderer>())
+		{
+			renderer := scene.GetSingleton<VulkanRenderer>();
+			renderer.Destroy();
+		}
+	}
 }
 
-frameCount := 2;
+FrameCount := 2;
 
 state VulkanRenderer
 {
@@ -65,16 +70,14 @@ state VulkanRenderer
 
 	swapchain: VulkanSwapchain,
 	depthBuffer: VulkanDepthBuffer,
-	frames: [frameCount]VulkanFrame,
+	commands: [FrameCount]VulkanCommands,
 
 	passes: Array<RenderPass>,
 
+	renderGraph: RenderGraph<VulkanRenderer>
+	
 	currentFrame: uint32
 }
-
-vulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(
-	ComponentKind.Singleton
-);
 
 VulkanRenderer::Destroy()
 {
@@ -97,13 +100,13 @@ VulkanRenderer::Destroy()
 	vulkanRenderer.swapchain.Create(vulkanRenderer);
 	vulkanRenderer.depthBuffer.Create(vulkanRenderer);
 
-	for (i .. frameCount)
+	for (i .. FrameCount)
 	{
-		vulkanRenderer.frames[i].Create(vulkanRenderer);
+		vulkanRenderer.commands[i].Create(vulkanRenderer);
 	}
 
 	vulkanRenderer.CreateOpaquePass();
-	for (i .. frameCount)
+	for (i .. FrameCount)
 	{
 		vulkanRenderer.opaqueFrameBuffers[i].Create(
 			vulkanRenderer,
@@ -111,6 +114,18 @@ VulkanRenderer::Destroy()
 			[vulkanRenderer.swapchain.imageViews[i]~, vulkanRenderer.depthBuffer.image.imageView]
 		);
 	}
+
+	for (passName in passes)
+	{
+		renderPass := GetRenderPass(passName);
+		if (!renderPass)
+		{
+			log "Unable to find render pass for Vulkan backend with name: ", passName;
+			continue;
+		}
+		renderPasses.Add();
+	}
+	vulkanRenderer.passes = renderPasses;
 
 	return vulkanRenderer;
 }
@@ -123,3 +138,50 @@ VulkanRenderer::CreateSurface()
 		log "Error creating Vulkan surface";
 	}
 }
+
+VulkanRenderer::Draw(scene: *Scene)
+{
+	device := this.device;
+	renderGraph := this.renderGraph;
+
+	for (pass in this.passes)
+	{
+		pass.onDraw(renderGraph, this, scene);
+	}
+
+	renderGraph.Compile();
+	
+	commandBuffer := SDL.AcquireGPUCommandBuffer(device);
+	if (!commandBuffer)
+	{
+		log "Error creating commandBuffer";
+	}
+	context := renderGraph.CreateContext(commandBuffer);
+
+	renderGraph.Execute(context);
+}
+
+vulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(
+	ComponentKind.Singleton
+);
+
+vulkanDrawSystem := ECS.RegisterSystem(
+	::(scene: Scene, dt: float) 
+	{
+		if (scene.HasSingleton<VulkanRenderer>())
+		{
+			renderer := scene.GetSingleton<VulkanRenderer>();
+			renderer.Draw(scene);
+		}
+	},
+	SystemStep.Draw
+);
+
+sdlDrawCleanupSystem := ECS.RegisterFrameSystem(
+	::(dt: float) 
+	{
+		log "Frame end", dt;
+		ReleaseTrackedResources();
+	},
+	FrameSystemStep.End
+);

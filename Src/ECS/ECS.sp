@@ -38,6 +38,8 @@ Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.S
 
 *Type FrameAlloc<Type>() => instance.frameAllocator.Alloc<Type>();
 
+ArrayView<Scene> Scenes() => instance.scenes.Values();
+
 state ECS
 {
 	frameAllocator := FrameAllocator(),

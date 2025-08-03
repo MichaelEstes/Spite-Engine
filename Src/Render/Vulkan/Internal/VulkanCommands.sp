@@ -1,12 +1,12 @@
 package VulkanRenderer
 
-state VulkanFrame
+state VulkanCommands
 {
 	commandPool: *VkCommandPool_T,
 	commandBuffer: *VkCommandBuffer_T
 }
 
-VulkanFrame::Create(renderer: *VulkanRenderer)
+VulkanCommands::Create(renderer: *VulkanRenderer)
 {
 	commandPoolInfo := VkCommandPoolCreateInfo();
 	commandPoolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;

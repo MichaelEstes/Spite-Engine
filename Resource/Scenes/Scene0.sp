@@ -3,7 +3,6 @@ package Scene0
 import Array
 import SceneRegistry
 import SDL
-import SDLRenderPass
 import SceneDescription
 
 _ := SceneRegistry.RegisterScene(
@@ -19,7 +18,8 @@ _ := SceneRegistry.RegisterScene(
 				uint32(1000)
 			},
 			{
-				Array<string>(["ClearPass", "DepthPass"]),
+				Array<string>(["ClearPass",]),
+				//RendererFlags.Vulkan
 				RendererFlags.SDL
 			}
 		});

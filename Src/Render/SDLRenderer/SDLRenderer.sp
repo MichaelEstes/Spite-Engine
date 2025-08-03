@@ -7,6 +7,7 @@ import ArrayView
 import RenderGraph
 import ECS
 import Fiber
+import RenderCommon
 
 Check(success: bool, errMsg: string)
 {
@@ -21,7 +22,32 @@ instance := SDLGPUInstance();
 state SDLGPUInstance
 {
 	device: *SDL.GPUDevice,
+	resourceTables: ResourceTables,
 	initialized := false
+}
+
+GPUTextureCreateInfo TextureDescToCreateInfo(createDesc: TextureDesc)
+{
+	createInfo := GPUTextureCreateInfo();
+	createInfo.type = createDesc.type;
+	createInfo.format = createDesc.format;
+	createInfo.usage = createDesc.usage;
+	createInfo.width = createDesc.width;
+	createInfo.height = createDesc.height;
+	createInfo.layer_count_or_depth = createDesc.layerCount;
+	createInfo.num_levels = createDesc.mipLevels;
+	createInfo.sample_count = createDesc.samples;
+
+	return createInfo;
+}
+
+GPUBufferCreateInfo BufferDescToCreateInfo(createDesc: BufferDesc)
+{
+	createInfo := GPUBufferCreateInfo();
+	createInfo.usage = createDesc.usage;
+	createInfo.size = createDesc.size;
+
+	return createInfo;
 }
 
 InitializeSDLGPUInstance()
@@ -32,6 +58,14 @@ InitializeSDLGPUInstance()
 	Check(ShaderCross_Init(), "Error initializing Shadercross");
 	instance.initialized = true;
 	instance.device = CreateGPUDevice(GPUShaderFormat.SPIRV, true, null);
+	instance.resourceTables = ResourceTables(
+		::*GPUTexture(createDesc: TextureDesc, device: *GPUDevice) {
+			return SDL.CreateGPUTexture(device, TextureDescToCreateInfo(createDesc)@);
+		},
+		::*GPUBuffer(createDesc: BufferDesc, device: *GPUDevice) {
+			return SDL.CreateGPUBuffer(device, BufferDescToCreateInfo(createDesc)@);
+		}
+	)
 }
 
 *SDL.GPUDevice GetSDLInstanceDevice() => instance.device;
@@ -41,13 +75,14 @@ state SDLRenderer
 	device: *SDL.GPUDevice,
 	window: *SDL.Window,
 	passes: Array<RenderPass>,
-	renderGraph: SDLRenderGraph
+	renderGraph: RenderGraph<SDLRenderer>
 }
 
 SDLRenderer::Draw(scene: *Scene)
 {
 	device := this.device;
 	renderGraph := this.renderGraph;
+	renderGraph.SetRenderer(this@);
 
 	for (pass in this.passes)
 	{
@@ -71,13 +106,18 @@ SDLRenderer CreateSDLRenderer(window: *SDL.Window, device: *SDL.GPUDevice, passe
 	renderer := SDLRenderer();
 	renderer.device = device;
 	renderer.window = window;
-	renderer.renderGraph.device = device;
-	renderer.renderGraph.window = window;
+	renderer.renderGraph.handles = instance.resourceTables@;
 
 	renderPasses := Array<RenderPass>();
 	for (passName in passes)
 	{
-		renderPasses.Add(GetRenderPass(passName));
+		renderPass := GetRenderPass(passName);
+		if (!renderPass)
+		{
+			log "Unable to find render pass for SDL backend with name: ", passName;
+			continue;
+		}
+		renderPasses.Add();
 	}
 	renderer.passes = renderPasses;
 
@@ -111,7 +151,7 @@ sdlDrawCleanupSystem := ECS.RegisterFrameSystem(
 	::(dt: float) 
 	{
 		log "Frame end", dt;
-		ReleaseTrackedResources();
+		instance.resourceTables.ReleaseTrackedResources();
 	},
 	FrameSystemStep.End
 );

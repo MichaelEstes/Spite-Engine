@@ -7,6 +7,7 @@ state VulkanInstance
 	instance: *VkInstance_T,
 	extensionNames: **byte,
 	physicalDevices: Allocator<*VkPhysicalDevice_T>,
+	resourceTables: ResourceTables,
 
 	physicalDeviceCount: uint32,
 	extensionCount: uint32,
@@ -53,9 +54,29 @@ InitializeVulkanInstance()
 		"Error finding device for Vulkan"
 	);
 
+	vulkanInstance.resourceTables = ResourceTables(
+		::*VkImage_T(createDesc: TextureDesc, device: *VkDevice_T) {
+			return SDL.CreateGPUTexture(device, TextureDescToCreateInfo(createDesc)@);
+		},
+		::*VkBuffer_T(createDesc: BufferDesc, device: *VkDevice_T) {
+			return SDL.CreateGPUBuffer(device, BufferDescToCreateInfo(createDesc)@);
+		}
+	)
+
 	SDLEventEmitter.On(SDL.EventType.WINDOW_RESIZED, ::(event: SDL.Event) {
 		windowID := event.data.window.windowID;
 		renderer := renderersByWindow.Get(windowID);
-		//renderer.RecreateSwapchain();
+		for (scene in ECS.Scenes())
+		{
+			if (scene.HasSingleton<VulkanRenderer>())
+			{
+				renderer := scene.GetSingleton<VulkanRenderer>();
+				if (renderer.window.id == windowID)
+				{
+					//renderer.RecreateSwapchain();
+					break;
+				}
+			}
+		}
 	});
 }

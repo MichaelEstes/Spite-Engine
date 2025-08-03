@@ -8,14 +8,16 @@ clearPassName := "ClearPass";
 
 clearPass := RegisterRenderPass(
 	clearPassName,
-	::(graph: RenderGraph, renderer: *VulkanRenderer, scene: *Scene) {
+	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene) 
+	{
 		graph.AddPass(
 			clearPassName,
-			::bool(builder: RenderNodeBuilder, param: *void) 
+			::bool(builder: *RenderPassBuilder<VulkanRenderer>, param: *void) 
 			{
 				return true;
 			},
-			::(context: RenderPassContext, param: *void) {
+			::(context: *RenderPassContext<VulkanRenderer>, param: *void) 
+			{
 				log "Clearing Screen";
 			},
 			RenderPassStage.Graphics,

@@ -3,59 +3,46 @@ package RenderGraph
 import SDL
 import Array
 
-enum RenderPassStage
+state RenderPassContext<Renderer>
 {
-	Graphics,
-	Compute
+	renderer: *Renderer,
+	handles: *RenderResourceHandles
 }
 
-state RenderPassContext<Device, CommandBuffer, Texture, Buffer>
+*Texture RenderPassContext::UseTexture<Texture>(handle: RenderResourceHandle)
 {
-	commandBuffer: *CommandBuffer,
-	device: *Device,
-	window: *SDL.Window,
-	handles: *RenderResourceHandles<Texture, Buffer>
+	return this.handles.UseResource(handle, this.device).resource as *Texture;
 }
 
-*Texture RenderPassContext::UseTexture(handle: RenderResourceHandle)
+*Buffer RenderPassContext::UseBuffer<Buffer>(handle: RenderResourceHandle)
 {
-	return this.handles.UseResource(handle, this.device).resource.texture;
+	return this.handles.UseResource(handle, this.device).resource as *Buffer;
 }
 
-*SDL.GPUBuffer RenderPassContext::UseBuffer(handle: RenderResourceHandle)
+state RenderGraph<Renderer>
 {
-	return this.handles.UseResource(handle, this.device).resource.buffer;
+	passes: Array<RenderGraphPass<Renderer>>,
+	renderer: *Renderer,
+	handles: RenderResourceHandles
 }
 
-state RenderGraphPass<Device, CommandBuffer, Texture, Buffer>
+RenderGraph::SetRenderer(renderer: *Renderer)
 {
-	name: string,
-	node: RenderNode,
-	exec: ::(RenderPassContext<Device, CommandBuffer, Texture, Buffer>, *any),
-	stage: RenderPassStage,
-	data: *any
-}
-
-state RenderGraph<Device, CommandBuffer, Texture, Buffer, TextureInfo, BufferInfo>
-{
-	passes: Array<RenderGraphPass<Device, CommandBuffer, Texture, Buffer>>,
-	device: *Device,
-	window: *SDL.Window,
-	handles: RenderResourceHandles<Device, Texture, Buffer, TextureInfo, BufferInfo>
+	this.renderer = renderer;
 }
 
 RenderGraph::AddPass(name: string, 
-					 init: ::bool(RenderNodeBuilder<Device, CommandBuffer, Texture, Buffer, TextureInfo, BufferInfo>, *any), 
-					 exec: ::(RenderPassContext<Device, CommandBuffer, Texture, Buffer>, *any),
+					 init: ::bool(*RenderPassBuilder<Renderer>, *any), 
+					 exec: ::(*RenderPassContext<Renderer>, *any),
 					 stage: RenderPassStage, data: *any = null)
 {
-	builder := RenderNodeBuilder<Device, CommandBuffer, Texture, Buffer, TextureInfo, BufferInfo>();
+	builder := RenderPassBuilder<Renderer>();
 	builder.renderGraph = this@;
-	if (init(builder, data))
+	if (init(builder@, data))
 	{
 		pass := RenderGraphPass()
 		pass.name = name;
-		pass.node = builder.node;
+		pass.resources = builder.resources;
 		pass.exec = exec;
 		pass.stage = stage;
 		pass.data = data;
@@ -63,17 +50,16 @@ RenderGraph::AddPass(name: string,
 	}
 }
 
-RenderResourceHandle RenderGraph::RegisterResourceToCreate(name: string, desc: ResourceDesc<TextureInfo, BufferInfo>)
+RenderResourceHandle RenderGraph::RegisterResourceToCreate(name: string, desc: ResourceDesc)
 {
 	return this.handles.CreateHandle(name, desc);
 }
-
-RenderPassContext<Device, CommandBuffer, Texture, Buffer> RenderGraph::CreateContext(commandBuffer: *CommandBuffer)
+ 
+RenderPassContext<Renderer> RenderGraph::CreateContext(commandBuffer: *any)
 {
-	context := RenderPassContext<Device, CommandBuffer, Texture, Buffer>();
+	context := RenderPassContext<Renderer>();
 	context.commandBuffer = commandBuffer;
-	context.device = this.device;
-	context.window = this.window;
+	context.renderer = this.renderer;
 	context.handles = this.handles@;
 
 	return context;
@@ -84,11 +70,11 @@ RenderGraph::Compile()
 
 }
 
-RenderGraph::Execute(context: RenderPassContext<Device, CommandBuffer, Texture, Buffer>)
+RenderGraph::Execute(context: RenderPassContext<Renderer>)
 {
 	for (pass in this.passes)
 	{
-		pass.exec(context, pass.data);
+		pass.exec(context@, pass.data);
 	}
 
 	this.Clear();
