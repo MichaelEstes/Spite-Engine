@@ -19,7 +19,7 @@ VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)
 	surfaceFormats := Allocator<VkSurfaceFormatKHR>();
 	surfaceFormatCount := uint32(0);
 	vkGetPhysicalDeviceSurfaceFormatsKHR(
-		renderer.device.GetPhysicalDevice(), 
+		renderer.deviceProps.GetPhysicalDevice(), 
 		renderer.surface,
 		surfaceFormatCount@, 
 		null
@@ -28,7 +28,7 @@ VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)
 	{
 		surfaceFormats.Alloc(surfaceFormatCount);
 		vkGetPhysicalDeviceSurfaceFormatsKHR(
-			renderer.device.GetPhysicalDevice(), 
+			renderer.deviceProps.GetPhysicalDevice(), 
 			renderer.surface,
 			surfaceFormatCount@, 
 			surfaceFormats[0]
@@ -54,7 +54,7 @@ VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)
 	this.colorSpace = VkColorSpaceKHR.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 }
 
-VulkanSwapchain::SelectSwapExtent(renderer: *VulkanRenderer,capabilities: VkSurfaceCapabilitiesKHR)
+VulkanSwapchain::SelectSwapExtent(renderer: *VulkanRenderer, capabilities: VkSurfaceCapabilitiesKHR)
 {
 	if(capabilities.currentExtent.width != uint32(-1))
 	{
@@ -84,7 +84,7 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 	surfaceCapabilities := VkSurfaceCapabilitiesKHR();
 	CheckResult(
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-			renderer.device.GetPhysicalDevice(),
+			renderer.deviceProps.GetPhysicalDevice(),
 			renderer.surface,
 			surfaceCapabilities@
 		),
@@ -102,7 +102,7 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 		this.imageCount = surfaceCapabilities.maxImageCount;
 	}
 
-	queueFamilyIndices := [renderer.device.queues.presentQueueIndex, renderer.device.queues.graphicsQueueIndex];
+	queueFamilyIndices := [renderer.deviceProps.queues.presentQueueIndex, renderer.deviceProps.queues.graphicsQueueIndex];
 
 	createInfo := VkSwapchainCreateInfoKHR();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -114,7 +114,7 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 	createInfo.imageArrayLayers = 1;
 	createInfo.imageUsage = VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-	if (renderer.device.queues.presentQueueIndex == renderer.device.queues.graphicsQueueIndex)
+	if (renderer.deviceProps.queues.presentQueueIndex == renderer.deviceProps.queues.graphicsQueueIndex)
 	{
 		createInfo.imageSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
 	}
@@ -131,14 +131,14 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 	createInfo.clipped = VkTrue;
 
 	CheckResult(
-		vkCreateSwapchainKHR(renderer.device.device, createInfo@, null, this.swapchain@),
+		vkCreateSwapchainKHR(renderer.device, createInfo@, null, this.swapchain@),
 		"Error creating swapchain"
 	);
 	log "Created swapchain";
 
-	vkGetSwapchainImagesKHR(renderer.device.device, this.swapchain, this.imageCount@, null);
+	vkGetSwapchainImagesKHR(renderer.device, this.swapchain, this.imageCount@, null);
 	this.images.Alloc(this.imageCount);
-	vkGetSwapchainImagesKHR(renderer.device.device, this.swapchain, this.imageCount@, this.images[0]);
+	vkGetSwapchainImagesKHR(renderer.device, this.swapchain, this.imageCount@, this.images[0]);
 
 	this.imageViews.Alloc(this.imageCount);
 	for (i .. this.imageCount)
@@ -163,9 +163,10 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 		viewInfo.subresourceRange.layerCount = 1;
 
 		CheckResult(
-			vkCreateImageView(renderer.device.device, viewInfo@, null, this.imageViews[i]),
+			vkCreateImageView(renderer.device, viewInfo@, null, this.imageViews[i]),
 			"Error creating image view"
 		);
 	}
-	log "Created image views";
+
+	log "Created swapchain image views";
 }

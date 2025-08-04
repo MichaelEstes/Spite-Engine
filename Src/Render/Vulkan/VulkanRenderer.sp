@@ -65,7 +65,8 @@ state VulkanRenderer
 	window: *SDL.Window,
 	surface: *VkSurfaceKHR_T,
 
-	device: VulkanDevice,
+	device: *VkDevice_T,
+	deviceProps: VulkanDeviceProps,
 	allocator: VulkanAllocator,
 
 	swapchain: VulkanSwapchain,
@@ -92,14 +93,17 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>)
 	vulkanRenderer.window = window;
 	vulkanRenderer.CreateSurface();
 
-	vulkanRenderer.device.Create(vulkanRenderer.surface);
-	vulkanRenderer.allocator.Create(vulkanRenderer@);
+	vulkanRenderer.device = vulkanRenderer.deviceProps.Create(vulkanRenderer.surface);
+	vulkanRenderer.allocator.Create(vulkanRenderer.device, vulkanRenderer.deviceProps.GetPhysicalDevice());
 
 	vulkanRenderer.swapchain.Create(vulkanRenderer@);
 
 	for (i .. FrameCount)
 	{
-		vulkanRenderer.commands[i].Create(vulkanRenderer@);
+		vulkanRenderer.commands[i].Create(
+			vulkanRenderer.device, 
+			vulkanRenderer.deviceProps.queues.graphicsQueueIndex
+		);
 	}
 
 	for (passName in passes)

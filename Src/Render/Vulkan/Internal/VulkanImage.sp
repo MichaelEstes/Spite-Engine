@@ -12,9 +12,9 @@ package VulkanRenderer
 	return image;
 }
 
-*VkDeviceMemory_T CreateDedicatedVkImage(vulkanDevice: VulkanDevice, createInfo: VkImageCreateInfo, memoryFlags: uint32)
+*VkDeviceMemory_T CreateDedicatedVkImage(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T, 
+										 createInfo: VkImageCreateInfo, memoryFlags: uint32)
 {
-	device := vulkanDevice.device;
 	image := CreateVkImage(device, createInfo);
 
 	memoryRequirements := VkMemoryRequirements();
@@ -24,7 +24,7 @@ package VulkanRenderer
 	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.allocationSize = memoryRequirements.size;
 	allocInfo.memoryTypeIndex = FindMemoryType(
-		vulkanDevice.GetPhysicalDevice(),
+		physicalDevice,
 		memoryRequirements.memoryTypeBits,
 		memoryFlags
 	);

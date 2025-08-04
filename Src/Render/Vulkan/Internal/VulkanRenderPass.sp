@@ -30,9 +30,9 @@ VulkanRenderPass::delete
 }
 
 ref VulkanRenderPass VulkanRenderPass::AddAttachment(format: VkFormat, samples: VkSampleCountFlagBits,
-									loadOp: VkAttachmentLoadOp, storeOp: VkAttachmentStoreOp,
-									initialLayout: VkImageLayout, finalLayout: VkImageLayout,
-									refLayout: VkImageLayout)
+													 loadOp: VkAttachmentLoadOp, storeOp: VkAttachmentStoreOp,
+													 initialLayout: VkImageLayout, finalLayout: VkImageLayout,
+													 refLayout: VkImageLayout)
 {
 	attachment := VkAttachmentDescription();
 	attachment.format = format;
@@ -54,11 +54,11 @@ ref VulkanRenderPass VulkanRenderPass::AddAttachment(format: VkFormat, samples: 
 }
 
 ref VulkanRenderPass VulkanRenderPass::AddSubpass(pipelineBindPoint: VkPipelineBindPoint, 
-								 colorAttachmentIndicies: []uint32,
-								 depthAttachmentIndex: *uint32 = null,
-								 inputAttachmentIndicies: []uint32 = []uint32,
-								 resolveAttachmentIndicies: []uint32 = []uint32,
-								 preserveAttachmentIndicies: []uint32 = []uint32)
+												  colorAttachmentIndicies: []uint32,
+												  depthAttachmentIndex: *uint32 = null,
+												  inputAttachmentIndicies: []uint32 = []uint32,
+												  resolveAttachmentIndicies: []uint32 = []uint32,
+												  preserveAttachmentIndicies: []uint32 = []uint32)
 {
 	subpass := VkSubpassDescription();
 	subpass.pipelineBindPoint = pipelineBindPoint;
@@ -105,9 +105,9 @@ ref VulkanRenderPass VulkanRenderPass::AddSubpass(pipelineBindPoint: VkPipelineB
 }
 
 ref VulkanRenderPass VulkanRenderPass::AddDependency(srcSubpass: uint32, dstSubpass: uint32,
-								 	srcStageMask: uint32, dstStageMask: uint32,
-								 	srcAccessMask: uint32, dstAccessMask: uint32,
-								 	dependencyFlags: uint32)
+								 					 srcStageMask: uint32, dstStageMask: uint32,
+								 					 srcAccessMask: uint32, dstAccessMask: uint32,
+								 					 dependencyFlags: uint32)
 {
 	dependency := VkSubpassDependency();
 	dependency.srcSubpass = srcSubpass;
@@ -123,9 +123,9 @@ ref VulkanRenderPass VulkanRenderPass::AddDependency(srcSubpass: uint32, dstSubp
 	return this;
 }
 
-ref VulkanRenderPass VulkanRenderPass::Create(renderer: *VulkanRenderer)
+ref VulkanRenderPass VulkanRenderPass::Create(device: *VkDevice_T)
 {
-	this.device = renderer.device.device;
+	this.device = device;
 
 	createInfo := VkRenderPassCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;

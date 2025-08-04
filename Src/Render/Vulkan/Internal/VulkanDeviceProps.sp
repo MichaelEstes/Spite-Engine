@@ -1,6 +1,6 @@
 package VulkanRenderer
 
-state VulkanDevice
+state VulkanDeviceProps
 {
 	deviceFeatures: VkPhysicalDeviceFeatures,
 	device: *VkDevice_T,
@@ -8,7 +8,7 @@ state VulkanDevice
 	physicalDevice: uint32
 }
 
-VulkanDevice::DebugLogExtensions()
+VulkanDeviceProps::DebugLogExtensions()
 {
 	physicalDevice := vulkanInstance.physicalDevices[this.physicalDevice]~;
 	extCount := uint32(0);
@@ -36,7 +36,7 @@ VulkanDevice::DebugLogExtensions()
 	log "End instance ext";
 }
 
-VulkanDevice::SelectDefaultDevice()
+VulkanDeviceProps::SelectDefaultDevice()
 {
 	if (vulkanInstance.physicalDeviceCount == 1)
 	{
@@ -82,7 +82,7 @@ VulkanDevice::SelectDefaultDevice()
 	this.physicalDevice = 0;
 }
 
-VulkanDevice::Create(surface: *VkSurfaceKHR_T)
+*VkDevice_T VulkanDeviceProps::Create(surface: *VkSurfaceKHR_T)
 {
 	this.SelectDefaultDevice();
 	physicalDevice := vulkanInstance.physicalDevices[this.physicalDevice]~;
@@ -100,14 +100,17 @@ VulkanDevice::Create(surface: *VkSurfaceKHR_T)
 	createInfo.ppEnabledExtensionNames = requiredDeviceExtensions[0]@;
 	createInfo.pEnabledFeatures = this.deviceFeatures@;
 
+
+	device: *VkDevice_T = null;
 	CheckResult(
-		vkCreateDevice(physicalDevice, createInfo@, null, this.device@),
+		vkCreateDevice(physicalDevice, createInfo@, null, device@),
 		"Error creating Vulkan device"
 	);
 
-	this.queues.GetQueues(this.device, physicalDevice, surface);
+	this.queues.GetQueues(device, physicalDevice, surface);
 
 	log "Initialized Vulkan device";
+	return device;
 }
 
-*VkPhysicalDevice_T VulkanDevice::GetPhysicalDevice() => vulkanInstance.physicalDevices[this.physicalDevice]~;
+*VkPhysicalDevice_T VulkanDeviceProps::GetPhysicalDevice() => vulkanInstance.physicalDevices[this.physicalDevice]~;

@@ -1,12 +1,16 @@
 package VulkanRenderer
 
+import Resource
+import SDL
+
 state VulkanPipeline
 {
 	device: *VkDevice_T,
 	pipeline: *VkPipeline_T,
 	layout: *VkPipelineLayout_T,
 
-    shaders: Array<VulkanShader>,
+    vertexShaderHandle: ResourceHandle,
+	fragmentShaderHandle: ResourceHandle,
 
     vertexInput: VkPipelineVertexInputStateCreateInfo,
     inputAssembly: VkPipelineInputAssemblyStateCreateInfo,
@@ -20,16 +24,15 @@ state VulkanPipeline
 
 VulkanPipeline::delete
 {
-	delete this.shaders;
 	delete this.dynamicStates;
 
 	vkDestroyPipeline(this.device, this.pipeline, null);
 	vkDestroyPipelineLayout(this.device, this.layout, null);
 }
 
-VulkanPipeline::(renderer: *VulkanRenderer)
+VulkanPipeline::(device: *VkDevice_T)
 {
-    this.device = renderer.device.device;
+    this.device = device;
 
 	this.vertexInput = VkPipelineVertexInputStateCreateInfo();
 	this.vertexInput.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -53,12 +56,12 @@ VulkanPipeline::(renderer: *VulkanRenderer)
 	this.colorBlend.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 }
 
-ref VulkanPipeline VulkanPipeline::AddShader(renderer: *VulkanRenderer, file: string, stage: VkShaderStageFlagBits,
-					                         entry: string = "main")
+ref VulkanPipeline VulkanPipeline::AddShader(path: string, stage: VkShaderStageFlagBits, 
+											 entry: string = "main")
 {
-	shader := VulkanShader();
-	shader.Create(renderer, file, stage, entry);
-	this.shaders.Add(shader);
+	//shader := VulkanShader();
+	//shader.Create(renderer, file, stage, entry);
+	//this.shaders.Add(shader);
 
 	return this;
 }
@@ -206,10 +209,10 @@ ref VulkanPipeline VulkanPipeline::Create(renderPass: VulkanRenderPass, subpass:
 	
     shaderStages := Array<VkPipelineShaderStageCreateInfo>();
 	defer delete shaderStages;
-	for (shader in this.shaders)
-	{
-		shaderStages.Add(shader.shaderCreateInfo);
-	}
+	//for (shader in this.shaders)
+	//{
+	//	shaderStages.Add(shader.shaderCreateInfo);
+	//}
 
 	pipelineInfo := VkGraphicsPipelineCreateInfo();
 	pipelineInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;

@@ -213,7 +213,11 @@ enum GPUBufferUsageFlags: uint32
 enum GPUShaderStage: uint32
 {
 	VERTEX,
-	FRAGMENT
+	FRAGMENT,
+
+    // Non SDL fields
+    COMPUTE,
+    GEOMETRY
 }
 
 state GPUDevice

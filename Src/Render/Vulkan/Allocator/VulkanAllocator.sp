@@ -42,10 +42,10 @@ state VulkanAllocator
 	blocks: Array<VulkanBlock>
 }
 
-VulkanAllocator::Create(renderer: *VulkanRenderer)
+VulkanAllocator::Create(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T)
 {
-	this.device = renderer.device.device;
-	vkGetPhysicalDeviceMemoryProperties(renderer.device.GetPhysicalDevice(), this.memoryProps@);
+	this.device = device;
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, this.memoryProps@);
 	log "Found device memory properties";
 }
 

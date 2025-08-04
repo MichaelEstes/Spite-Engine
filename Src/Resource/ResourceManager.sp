@@ -2,6 +2,7 @@ package Resource
 
 import HandleSet
 import ThreadParamAllocator
+import Atomic
 
 enum ResourceResult: uint32
 {
@@ -38,7 +39,7 @@ state Resource<Type>
 	parent: ResourceHandle,
 	result: ResourceResult,
 
-	refCount: int,
+	refCount: Atomic<int>,
 	
 	//Data needs to be last in so the other fields can be accessed in a type erased context
 	data: Type
@@ -144,7 +145,7 @@ ref Resource<Type> ResourceManager::GetResource(handle: ResourceHandle)
 ref Resource<Type> ResourceManager::TakeResourceRef(handle: ResourceHandle)
 {
     resource := this.resources[handle.id];
-	resource.refCount += 1;
+	resource.refCount.Add(1);
 	return resource~;
 }
 
@@ -154,8 +155,8 @@ ResourceManager::ReleaseResourceRef(handle: ResourceHandle)
     if (!this.resources.Has(id)) return;
 
     resource := this.resources[id];
-	resource.refCount -= 1;
-    if (resource.refCount <= 0)
+	resource.refCount.Sub(1);
+    if (resource.refCount.Load() <= 0)
     {
 		if (resource.parent.id) ChildResourceReleased(resource.parent, handle);
         this.RemoveResource(handle);

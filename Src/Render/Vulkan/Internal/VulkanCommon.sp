@@ -1,11 +1,12 @@
 package VulkanRenderer
 
-VkFormat VulkanRenderer::FindSupportedFormat(candidates: []VkFormat, tiling: VkImageTiling, features: uint32)
+VkFormat FindSupportedFormat(physicalDevice: *VkPhysicalDevice_T, candidates: []VkFormat, 
+                             tiling: VkImageTiling, features: uint32)
 {
 	for (format in candidates)
 	{
 		props := VkFormatProperties();
-		vkGetPhysicalDeviceFormatProperties(this.device.GetPhysicalDevice(), format, props@);
+		vkGetPhysicalDeviceFormatProperties(physicalDevice, format, props@);
 		if (tiling == VkImageTiling.VK_IMAGE_TILING_LINEAR && 
 			(props.linearTilingFeatures & features) == features) 
 		{
@@ -22,9 +23,10 @@ VkFormat VulkanRenderer::FindSupportedFormat(candidates: []VkFormat, tiling: VkI
 	return -1
 }
 
-VkFormat VulkanRenderer::FindDepthFormat()
+VkFormat FindDepthFormat(physicalDevice: *VkPhysicalDevice_T)
 {
-	return this.FindSupportedFormat(
+	return FindSupportedFormat(
+        physicalDevice,
 		[
 			VkFormat.VK_FORMAT_D32_SFLOAT, 
 			VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT, 
