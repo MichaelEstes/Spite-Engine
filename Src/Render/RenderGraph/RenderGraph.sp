@@ -11,19 +11,24 @@ state RenderPassContext<Renderer>
 
 *Texture RenderPassContext::UseTexture<Texture>(handle: RenderResourceHandle)
 {
-	return this.handles.UseResource(handle, this.device).resource as *Texture;
+	return this.handles.UseResource(handle, this.renderer.device).resource as *Texture;
 }
 
 *Buffer RenderPassContext::UseBuffer<Buffer>(handle: RenderResourceHandle)
 {
-	return this.handles.UseResource(handle, this.device).resource as *Buffer;
+	return this.handles.UseResource(handle, this.renderer.device).resource as *Buffer;
 }
 
-state RenderGraph<Renderer>
+state RenderGraph<Renderer : where(renderer: Renderer) { renderer.device; }>
 {
 	passes: Array<RenderGraphPass<Renderer>>,
 	renderer: *Renderer,
 	handles: RenderResourceHandles
+}
+
+RenderGraph::SetResourceTables(resourceTables: *ResourceTables)
+{
+	this.handles.resourceTables = resourceTables;
 }
 
 RenderGraph::SetRenderer(renderer: *Renderer)
@@ -40,7 +45,7 @@ RenderGraph::AddPass(name: string,
 	builder.renderGraph = this@;
 	if (init(builder@, data))
 	{
-		pass := RenderGraphPass()
+		pass := RenderGraphPass<Renderer>()
 		pass.name = name;
 		pass.resources = builder.resources;
 		pass.exec = exec;
@@ -55,10 +60,9 @@ RenderResourceHandle RenderGraph::RegisterResourceToCreate(name: string, desc: R
 	return this.handles.CreateHandle(name, desc);
 }
  
-RenderPassContext<Renderer> RenderGraph::CreateContext(commandBuffer: *any)
+RenderPassContext<Renderer> RenderGraph::CreateContext()
 {
 	context := RenderPassContext<Renderer>();
-	context.commandBuffer = commandBuffer;
 	context.renderer = this.renderer;
 	context.handles = this.handles@;
 

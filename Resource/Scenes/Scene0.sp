@@ -5,6 +5,9 @@ import SceneRegistry
 import SDL
 import SceneDescription
 
+import SDLRenderPass
+import VulkanRenderPass
+
 _ := SceneRegistry.RegisterScene(
 	0,
 	::(scene: *Scene) {
@@ -19,8 +22,8 @@ _ := SceneRegistry.RegisterScene(
 			},
 			{
 				Array<string>(["ClearPass",]),
-				//RendererFlags.Vulkan
-				RendererFlags.SDL
+				RendererFlags.Vulkan
+				//RendererFlags.SDL
 			}
 		});
 	},

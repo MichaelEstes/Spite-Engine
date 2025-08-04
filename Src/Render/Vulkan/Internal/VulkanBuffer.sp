@@ -1,23 +1,12 @@
 package VulkanRenderer
 
-state VulkanBuffer
+*VkBuffer_T CreateVkBuffer(device: *VkDevice_T, createInfo: VkBufferCreateInfo)
 {
-	buffer: *VkBuffer_T
-}
-
-VulkanBuffer::Create(renderer: *VulkanRenderer, size: uint64, usage: uint32, memoryFlags: VulkanMemoryFlags,
-					 sharingMode: VkSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE)
-{
-	createInfo := VkBufferCreateInfo();
-	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	createInfo.size = size;
-	createInfo.usage = usage;
-	createInfo.sharingMode = sharingMode;
-
+	buffer: *VkBuffer_T = null;
 	CheckResult(
-		vkCreateBuffer(renderer.device.device, createInfo@, null, this.buffer@),
+		vkCreateBuffer(device, createInfo@, null, buffer@),
 		"Error creating Vulkan buffer"
 	);
 
-	renderer.allocator.AllocBuffer(this, memoryFlags);
+	return buffer;
 }

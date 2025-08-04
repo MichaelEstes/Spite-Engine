@@ -25,7 +25,7 @@ state RenderGraphPass<Renderer>
 {
 	name: string,
 	resources: Array<RenderResourceUsage>,
-	exec: ::(RenderPassContext<Renderer>, *any),
+	exec: ::(*RenderPassContext<Renderer>, *any),
 	stage: RenderPassStage,
 	data: *any
 }

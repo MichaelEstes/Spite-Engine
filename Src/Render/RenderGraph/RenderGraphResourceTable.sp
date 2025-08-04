@@ -38,7 +38,7 @@ state ResourceTable<CreateDesc>
 	}
 
 	resource := create(createDesc, device)
-	trackedResource := TrackedResource<Resource>(resource, true);
+	trackedResource := TrackedResource(resource, true);
 	if (this.descToResource.Has(createDesc))
 	{
 		trackedArr := this.descToResource[createDesc];
@@ -46,7 +46,7 @@ state ResourceTable<CreateDesc>
 	}
 	else
 	{
-		trackedArr := Array<TrackedResource<Resource>>();
+		trackedArr := Array<TrackedResource>();
 		trackedArr.Add(trackedResource);
 		this.descToResource.Insert(createDesc, trackedArr);
 	}
@@ -80,7 +80,7 @@ ResourceTables::(createTexture: ::*any(TextureDesc, *any), createBuffer: ::*any(
 
 RenderResource ResourceTables::UseTexture(createInfo: TextureDesc, device: *any)
 {
-	table := renderResourcesTable.textureTable;
+	table := this.textureTable;
 	texture := table.GetOrCreateResource(
 		createInfo,
 		device,
@@ -92,7 +92,7 @@ RenderResource ResourceTables::UseTexture(createInfo: TextureDesc, device: *any)
 
 RenderResource ResourceTables::UseBuffer(createInfo: BufferDesc, device: *any)
 {
-	table := renderResourcesTable.bufferTable;
+	table := this.bufferTable;
 	buffer := table.GetOrCreateResource(
 		createInfo,
 		device,
@@ -108,11 +108,11 @@ RenderResource ResourceTables::UseResource(resourceDesc: ResourceDesc, device: *
 	{
 		case (ResourceKind.Texture)
 		{
-			return UseTexture(resourceDesc.desc.texture, device);
+			return this.UseTexture(resourceDesc.desc.texture, device);
 		}
 		case (ResourceKind.Buffer)
 		{
-			return UseBuffer(resourceDesc.desc.buffer, device);
+			return this.UseBuffer(resourceDesc.desc.buffer, device);
 		}
 	}
 
@@ -121,6 +121,6 @@ RenderResource ResourceTables::UseResource(resourceDesc: ResourceDesc, device: *
 
 ResourceTables::ReleaseTrackedResources()
 {
-	renderResourcesTable.textureTable.ReleaseResources();
-	renderResourcesTable.bufferTable.ReleaseResources();
+	this.textureTable.ReleaseResources();
+	this.bufferTable.ReleaseResources();
 }

@@ -3,8 +3,6 @@ package SDLRenderPass
 import SDLRenderer
 import RenderGraph
 import ECS
-import SDL
-
 
 clearPassName := "ClearPass";
 
@@ -16,11 +14,12 @@ clearPass := RegisterRenderPass(
 			clearPassName,
 			::bool(builder: *RenderPassBuilder<SDLRenderer>, param: *void) 
 			{
+				log "Clear pass init";
 				return true;
 			},
 			::(context: *RenderPassContext<SDLRenderer>, param: *void) 
 			{
-				log "Clearing Screen";
+				log "Clear pass exec";
 				//swapchain := context.WaitAndAcquireSwapchain();
 			},
 			RenderPassStage.Graphics,

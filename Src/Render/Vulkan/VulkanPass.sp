@@ -3,8 +3,6 @@ package VulkanRenderer
 import RenderGraph
 import ECS
 
-import VulkanRenderPass
-
 state RenderPass
 {
 	onDraw: ::(RenderGraph<VulkanRenderer>, *Scene)

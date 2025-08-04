@@ -69,7 +69,6 @@ state VulkanRenderer
 	allocator: VulkanAllocator,
 
 	swapchain: VulkanSwapchain,
-	depthBuffer: VulkanDepthBuffer,
 	commands: [FrameCount]VulkanCommands,
 
 	passes: Array<RenderPass>,
@@ -84,35 +83,23 @@ VulkanRenderer::Destroy()
 
 }
 
-*VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>)
+VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>)
 {
 	log "Creating Vulkan renderer";
-	vulkanRenderer := renderersByWindow.Emplace(window.id);
+	vulkanRenderer := VulkanRenderer();
 	vulkanRenderer.vkInstance = vulkanInstance@;
 
 	vulkanRenderer.window = window;
-
 	vulkanRenderer.CreateSurface();
 
 	vulkanRenderer.device.Create(vulkanRenderer.surface);
-	vulkanRenderer.allocator.Create(vulkanRenderer);
+	vulkanRenderer.allocator.Create(vulkanRenderer@);
 
-	vulkanRenderer.swapchain.Create(vulkanRenderer);
-	vulkanRenderer.depthBuffer.Create(vulkanRenderer);
+	vulkanRenderer.swapchain.Create(vulkanRenderer@);
 
 	for (i .. FrameCount)
 	{
-		vulkanRenderer.commands[i].Create(vulkanRenderer);
-	}
-
-	vulkanRenderer.CreateOpaquePass();
-	for (i .. FrameCount)
-	{
-		vulkanRenderer.opaqueFrameBuffers[i].Create(
-			vulkanRenderer,
-			vulkanRenderer.opaquePass,
-			[vulkanRenderer.swapchain.imageViews[i]~, vulkanRenderer.depthBuffer.image.imageView]
-		);
+		vulkanRenderer.commands[i].Create(vulkanRenderer@);
 	}
 
 	for (passName in passes)
@@ -123,9 +110,10 @@ VulkanRenderer::Destroy()
 			log "Unable to find render pass for Vulkan backend with name: ", passName;
 			continue;
 		}
-		renderPasses.Add();
+		vulkanRenderer.passes.Add(renderPass~);
 	}
-	vulkanRenderer.passes = renderPasses;
+
+	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables@);
 
 	return vulkanRenderer;
 }
@@ -141,23 +129,19 @@ VulkanRenderer::CreateSurface()
 
 VulkanRenderer::Draw(scene: *Scene)
 {
+	frame := this.currentFrame % FrameCount;
 	device := this.device;
 	renderGraph := this.renderGraph;
+	renderGraph.SetRenderer(this@);
 
 	for (pass in this.passes)
 	{
-		pass.onDraw(renderGraph, this, scene);
+		pass.onDraw(renderGraph, scene);
 	}
 
 	renderGraph.Compile();
 	
-	commandBuffer := SDL.AcquireGPUCommandBuffer(device);
-	if (!commandBuffer)
-	{
-		log "Error creating commandBuffer";
-	}
-	context := renderGraph.CreateContext(commandBuffer);
-
+	context := renderGraph.CreateContext();
 	renderGraph.Execute(context);
 }
 
@@ -171,7 +155,7 @@ vulkanDrawSystem := ECS.RegisterSystem(
 		if (scene.HasSingleton<VulkanRenderer>())
 		{
 			renderer := scene.GetSingleton<VulkanRenderer>();
-			renderer.Draw(scene);
+			renderer.Draw(scene@);
 		}
 	},
 	SystemStep.Draw
@@ -180,8 +164,7 @@ vulkanDrawSystem := ECS.RegisterSystem(
 sdlDrawCleanupSystem := ECS.RegisterFrameSystem(
 	::(dt: float) 
 	{
-		log "Frame end", dt;
-		ReleaseTrackedResources();
+		vulkanInstance.resourceTables.ReleaseTrackedResources();
 	},
 	FrameSystemStep.End
 );

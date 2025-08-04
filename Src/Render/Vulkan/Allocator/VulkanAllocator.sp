@@ -49,10 +49,10 @@ VulkanAllocator::Create(renderer: *VulkanRenderer)
 	log "Found device memory properties";
 }
 
-ResourceHandle VulkanAllocator::AllocBuffer(buffer: VulkanBuffer, memoryFlags: uint32)
+ResourceHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags: uint32)
 {
 	memoryRequirements := VkMemoryRequirements();
-	vkGetBufferMemoryRequirements(this.device, buffer.buffer, memoryRequirements@);
+	vkGetBufferMemoryRequirements(this.device, buffer, memoryRequirements@);
 
 	block := this.FindBlock(memoryRequirements.size, memoryFlags);
 	if (!block)
@@ -70,7 +70,7 @@ ResourceHandle VulkanAllocator::AllocBuffer(buffer: VulkanBuffer, memoryFlags: u
 	block.allocations.Add(alloc);
 
 	CheckResult(
-		vkBindBufferMemory(this.device, buffer.buffer, block.memory, alloc.offset),
+		vkBindBufferMemory(this.device, buffer, block.memory, alloc.offset),
 		"Error binding buffer memory"
 	);
 

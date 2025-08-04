@@ -86,18 +86,12 @@ SDLRenderer::Draw(scene: *Scene)
 
 	for (pass in this.passes)
 	{
-		pass.onDraw(renderGraph, this, scene);
+		pass.onDraw(renderGraph, scene);
 	}
 
 	renderGraph.Compile();
 	
-	commandBuffer := SDL.AcquireGPUCommandBuffer(device);
-	if (!commandBuffer)
-	{
-		log "Error creating commandBuffer";
-	}
-	context := renderGraph.CreateContext(commandBuffer);
-
+	context := renderGraph.CreateContext();
 	renderGraph.Execute(context);
 }
 
@@ -106,9 +100,8 @@ SDLRenderer CreateSDLRenderer(window: *SDL.Window, device: *SDL.GPUDevice, passe
 	renderer := SDLRenderer();
 	renderer.device = device;
 	renderer.window = window;
-	renderer.renderGraph.handles = instance.resourceTables@;
+	renderer.renderGraph.SetResourceTables(instance.resourceTables@);
 
-	renderPasses := Array<RenderPass>();
 	for (passName in passes)
 	{
 		renderPass := GetRenderPass(passName);
@@ -117,9 +110,8 @@ SDLRenderer CreateSDLRenderer(window: *SDL.Window, device: *SDL.GPUDevice, passe
 			log "Unable to find render pass for SDL backend with name: ", passName;
 			continue;
 		}
-		renderPasses.Add();
+		renderer.passes.Add(renderPass~);
 	}
-	renderer.passes = renderPasses;
 
 	Check(ClaimWindowForGPUDevice(device, window), "Error claiming window for GPU device");
 

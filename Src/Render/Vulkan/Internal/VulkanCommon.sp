@@ -54,14 +54,9 @@ uint32 FindMemoryType(physicalDevice: *VkPhysicalDevice_T, typeFilter: uint32, p
 
 VkImageType GPUTextureTypeToVkImageType(type: GPUTextureType)
 {
-	switch (type)
-	{
-		case (GPUTextureType.TEX_2D) return VkImageType.VK_IMAGE_TYPE_1D;
-		case (GPUTextureType.TEX_2D_ARRAY) return VkImageType.VK_IMAGE_TYPE_2D;
-		case (GPUTextureType.TEX_3D) return VkImageType.VK_IMAGE_TYPE_3D;
-	}
-	
-	return VkImageType.VK_IMAGE_TYPE_MAX_ENUM;
+    if (type == GPUTextureType.TEX_3D) return VkImageType.VK_IMAGE_TYPE_3D;
+    
+	return VkImageType.VK_IMAGE_TYPE_2D;
 }
 
 formatTable := [
@@ -177,24 +172,58 @@ VkFormat GPUTextureFormatToVkFormat(format: GPUTextureFormat)
     return formatTable[format];
 }
 
+VkImageUsageFlagBits GPUTextureUsageToVkUsage(usage: GPUTextureUsageFlags)
+{
+    usageFlags := VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                  VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    
+    if (usage & (GPUTextureUsageFlags.SAMPLER |
+                 GPUTextureUsageFlags.GRAPHICS_STORAGE_READ |
+                 GPUTextureUsageFlags.COMPUTE_STORAGE_READ)) 
+    {
+        usageFlags |= VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT;
+    }
+    if (usage & GPUTextureUsageFlags.COLOR_TARGET) 
+    {
+        usageFlags |= VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    }
+    if (usage & GPUTextureUsageFlags.DEPTH_STENCIL_TARGET) 
+    {
+        usageFlags |= VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    }
+    if (usage & (GPUTextureUsageFlags.COMPUTE_STORAGE_WRITE |
+                 GPUTextureUsageFlags.COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE)) 
+    {
+        usageFlags |= VkImageUsageFlagBits.VK_IMAGE_USAGE_STORAGE_BIT;
+    }
+
+    return usageFlags;
+}
+
 VkImageCreateInfo TextureDescToCreateInfo(createDesc: TextureDesc)
 {
 	createInfo := VkImageCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	createInfo.imageType = GPUTextureTypeToVkImageType(createDesc.type);
 	createInfo.format = GPUTextureFormatToVkFormat(createDesc.format);
-	createInfo.tiling = tiling;
-	createInfo.usage = usage;
-	createInfo.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
-	
 	createInfo.extent.width = createDesc.width;
 	createInfo.extent.height = createDesc.height;
 	createInfo.extent.depth = createDesc.depth;
 	createInfo.mipLevels = createDesc.mipLevels;
 	createInfo.arrayLayers = createDesc.layerCount;
+	createInfo.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
+	createInfo.tiling = createDesc.tiling as VkImageTiling;
+	createInfo.usage = GPUTextureUsageToVkUsage(createDesc.usage);
 
+    if (createDesc.shared)
+    {
+        createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_CONCURRENT;
+    }
+    else
+    {
+        createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+    }
 	
-	createInfo.sharingMode = sharingMode;
 	createInfo.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
 
 	return createInfo;
@@ -206,6 +235,15 @@ VkBufferCreateInfo BufferDescToCreateInfo(createDesc: BufferDesc)
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	createInfo.usage = createDesc.size;
 	createInfo.size = createDesc.usage;
+
+    if (createDesc.shared)
+    {
+        createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_CONCURRENT;
+    }
+    else
+    {
+        createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+    }
 
 	return createInfo;
 }

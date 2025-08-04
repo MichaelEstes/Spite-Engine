@@ -56,16 +56,16 @@ InitializeVulkanInstance()
 
 	vulkanInstance.resourceTables = ResourceTables(
 		::*VkImage_T(createDesc: TextureDesc, device: *VkDevice_T) {
-			return SDL.CreateGPUTexture(device, TextureDescToCreateInfo(createDesc)@);
+			return CreateVkImage(device, TextureDescToCreateInfo(createDesc));
 		},
 		::*VkBuffer_T(createDesc: BufferDesc, device: *VkDevice_T) {
-			return SDL.CreateGPUBuffer(device, BufferDescToCreateInfo(createDesc)@);
+			return CreateVkBuffer(device, BufferDescToCreateInfo(createDesc));
 		}
 	)
 
 	SDLEventEmitter.On(SDL.EventType.WINDOW_RESIZED, ::(event: SDL.Event) {
 		windowID := event.data.window.windowID;
-		renderer := renderersByWindow.Get(windowID);
+
 		for (scene in ECS.Scenes())
 		{
 			if (scene.HasSingleton<VulkanRenderer>())
@@ -74,7 +74,6 @@ InitializeVulkanInstance()
 				if (renderer.window.id == windowID)
 				{
 					//renderer.RecreateSwapchain();
-					break;
 				}
 			}
 		}
