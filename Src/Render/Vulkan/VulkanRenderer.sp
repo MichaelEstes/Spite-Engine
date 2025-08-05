@@ -70,12 +70,17 @@ state VulkanRenderer
 	allocator: VulkanAllocator,
 
 	swapchain: VulkanSwapchain,
-	commands: [FrameCount]VulkanCommands,
+	graphicsCommands: VulkanCommands,
+	computeCommands: VulkanCommands,
+	
+	frameFences: [FrameCount]*VkFence_T,
+	frameEndSemaphores: [FrameCount]*VkFence_T,
 
 	passes: Array<RenderPass>,
 
-	renderGraph: RenderGraph<VulkanRenderer>
+	renderGraph: RenderGraph<VulkanRenderer>,
 	
+	swapchainImageIndex: uint32,
 	currentFrame: uint32
 }
 
@@ -98,11 +103,24 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>)
 
 	vulkanRenderer.swapchain.Create(vulkanRenderer@);
 
+	vulkanRenderer.graphicsCommands.Create(
+		vulkanRenderer.device, 
+		vulkanRenderer.deviceProps.queues.graphicsQueueIndex,
+		FrameCount
+	);
+
 	for (i .. FrameCount)
 	{
-		vulkanRenderer.commands[i].Create(
+		vulkanRenderer.frameFences[i] = CreateFence(vulkanRenderer.device);
+		vulkanRenderer.frameEndSemaphores[i] = CreateSemaphore(vulkanRenderer.device);
+	}
+
+	if (vulkanRenderer.deviceProps.queues.HasUniqueComputeQueue())
+	{
+		vulkanRenderer.computeCommands.Create(
 			vulkanRenderer.device, 
-			vulkanRenderer.deviceProps.queues.graphicsQueueIndex
+			vulkanRenderer.deviceProps.queues.computeQueueIndex,
+			FrameCount
 		);
 	}
 
@@ -131,12 +149,62 @@ VulkanRenderer::CreateSurface()
 	}
 }
 
+uint32 VulkanRenderer::Frame() => this.currentFrame % FrameCount;
+
+enum CommandBufferKind: uint32
+{
+	Graphics,
+	Compute
+}
+
+*VkCommandBuffer_T VulkanRenderer::GetCommandBuffer(kind: CommandBufferKind)
+{
+	frame := this.Frame();
+	if (kind == CommandBufferKind.Compute && this.computeCommands.bufferCount)
+	{
+		return this.computeCommands.commandBuffers[frame]~;
+	}
+
+	return this.graphicsCommands.commandBuffers[frame]~;
+}
+
+VkResult VulkanRenderer::WaitAndAcquireSwapchain(frame: uint32)
+{
+	fence := this.frameFences[frame]@;
+	vkWaitForFences(this.device, 1, fence, VkTrue, UINT64_MAX);
+	vkResetFences(this.device, 1, fence);
+
+	return this.swapchain.AcquireNext(this.device, frame);
+}
+
+*VkImage_T VulkanRenderer::GetSwapchainImage() => this.swapchain.GetCurrentSwapchainImage();
+
+VulkanRenderer::Begin(commandBuffer: *VkCommandBuffer_T)
+{
+	CheckResult(vkResetCommandBuffer(commandBuffer, 0), "Error resetting Vulkan command buffer");
+
+	beginInfo := VkCommandBufferBeginInfo();
+	beginInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VkCommandBufferUsageFlagBits.VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+	CheckResult(
+		vkBeginCommandBuffer(commandBuffer, beginInfo@), 
+		"Error beginning Vulkan command buffer recording"
+	);
+}
+
+VulkanRenderer::End(commandBuffer: *VkCommandBuffer_T)
+{
+	vkEndCommandBuffer(commandBuffer);
+}
+
 VulkanRenderer::Draw(scene: *Scene)
 {
-	frame := this.currentFrame % FrameCount;
+	frame := this.Frame();
 	device := this.device;
 	renderGraph := this.renderGraph;
 	renderGraph.SetRenderer(this@);
+
+	this.WaitAndAcquireSwapchain(frame);
 
 	for (pass in this.passes)
 	{
@@ -145,8 +213,37 @@ VulkanRenderer::Draw(scene: *Scene)
 
 	renderGraph.Compile();
 	
-	context := renderGraph.CreateContext();
-	renderGraph.Execute(context);
+	graphicsCommandBuffer := this.GetCommandBuffer(CommandBufferKind.Graphics);
+	this.Begin(graphicsCommandBuffer);
+	{
+		context := renderGraph.CreateContext();
+		renderGraph.Execute(context);
+	}
+	this.End(graphicsCommandBuffer);
+
+	waitSemaphores := [this.swapchain.imageSemaphores[frame],];
+	waitStages := [VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,];
+	signalSemaphores := [this.frameEndSemaphores[frame],];
+	fence := this.frameFences[frame];
+
+	submitInfo := VkSubmitInfo();
+	submitInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = fixed waitSemaphores;
+	submitInfo.pWaitDstStageMask = fixed waitStages;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = graphicsCommandBuffer@;
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = fixed signalSemaphores;
+
+	CheckResult(
+		vkQueueSubmit(this.deviceProps.queues.graphicsQueue, 1, submitInfo@, fence),
+		"Error submitting Vulkan draw command buffer"
+	);
+
+	this.swapchain.Present(this.deviceProps.queues.presentQueue, frame);
+
+	this.currentFrame += 1;
 }
 
 vulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(

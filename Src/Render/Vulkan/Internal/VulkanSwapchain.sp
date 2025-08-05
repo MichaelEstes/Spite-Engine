@@ -1,10 +1,14 @@
 package VulkanRenderer
 
+InvalidSwapchainIndex := uint32(-1);
+
 state VulkanSwapchain
 {
 	swapchain: *VkSwapchainKHR_T,
 	images: Allocator<*VkImage_T>,
 	imageViews: Allocator<*VkImageView_T>,
+
+	imageSemaphores: [FrameCount]*VkSemaphore_T,
 
 	extent: VkExtent2D,
 
@@ -12,6 +16,7 @@ state VulkanSwapchain
 	colorSpace: VkColorSpaceKHR,
 
 	imageCount: uint32
+	currentImage: uint32
 }
 
 VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)
@@ -47,7 +52,6 @@ VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)
 			return;
 		}
 	}
-
 
 	log "Using default swapchain format";
 	this.imageFormat = VkFormat.VK_FORMAT_B8G8R8A8_UNORM;
@@ -91,15 +95,14 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 		"Error querying physical device surface capabilities"
 	);
 
-	log "Surface capabilities: ", surfaceCapabilities;
+	//log "Surface capabilities: ", surfaceCapabilities;
 
 	this.SelectFormat(renderer);
 	this.SelectSwapExtent(renderer, surfaceCapabilities);
 
-	this.imageCount = surfaceCapabilities.minImageCount;
-	if (surfaceCapabilities.maxImageCount && this.imageCount > surfaceCapabilities.maxImageCount)
+	for (i .. FrameCount)
 	{
-		this.imageCount = surfaceCapabilities.maxImageCount;
+		this.imageSemaphores[i] = CreateSemaphore(renderer.device);
 	}
 
 	queueFamilyIndices := [renderer.deviceProps.queues.presentQueueIndex, renderer.deviceProps.queues.graphicsQueueIndex];
@@ -107,12 +110,13 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 	createInfo := VkSwapchainCreateInfoKHR();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	createInfo.surface = renderer.surface;
-	createInfo.minImageCount = this.imageCount;
+	createInfo.minImageCount = FrameCount;
 	createInfo.imageFormat = this.imageFormat;
 	createInfo.imageColorSpace = this.colorSpace;
 	createInfo.imageExtent = this.extent;
 	createInfo.imageArrayLayers = 1;
-	createInfo.imageUsage = VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	createInfo.imageUsage = VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | 
+							VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 	if (renderer.deviceProps.queues.presentQueueIndex == renderer.deviceProps.queues.graphicsQueueIndex)
 	{
@@ -169,4 +173,35 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 	}
 
 	log "Created swapchain image views";
+}
+
+VkResult VulkanSwapchain::AcquireNext(device: *VkDevice_T, frame: uint32)
+{
+	return vkAcquireNextImageKHR(
+		device, 
+		this.swapchain, 
+		UINT64_MAX, 
+		this.imageSemaphores[frame], 
+		null, 
+		this.currentImage@
+	);
+}
+
+*VkImage_T VulkanSwapchain::GetCurrentSwapchainImage()
+{
+	return this.images[this.currentImage]~;
+}
+
+VkResult VulkanSwapchain::Present(presentQueue: *VkQueue_T, frame: uint32)
+{
+	presentInfo := VkPresentInfoKHR();
+	presentInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = this.imageSemaphores[frame]@;
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = this.swapchain@;
+	presentInfo.pImageIndices = this.currentImage@;
+	presentInfo.pResults = null; 
+
+	return vkQueuePresentKHR(presentQueue, presentInfo@);
 }

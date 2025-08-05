@@ -22,6 +22,8 @@ state VulkanQueues
 	createQueueCount: uint32,
 
 	graphicsQueueIndex: uint32,
+	computeQueueIndex: uint32,
+	transferQueueIndex: uint32,
 	presentQueueIndex: uint32,
 }
 
@@ -151,11 +153,16 @@ VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T
 		{
 			vkGetDeviceQueue(device, computeQueueIndex, 0, this.computeQueue@);
 			dedicatedQueueIndicies.Add(computeQueueIndex);
+			this.computeQueueIndex = computeQueueIndex;
 			log "Found dedicated compute queue";
 			break;
 		}
 	}
-	if (!this.computeQueue) vkGetDeviceQueue(device, this.computeQueueIndicies[0]~, 0, this.computeQueue@);
+	if (!this.computeQueue) 
+	{
+		this.computeQueueIndex = this.computeQueueIndicies[0]~;
+		vkGetDeviceQueue(device, this.computeQueueIndex, 0, this.computeQueue@);
+	}
 
 	for (i .. this.transferQueueCount)
 	{
@@ -164,11 +171,16 @@ VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T
 		{
 			vkGetDeviceQueue(device, transferQueueIndex, 0, this.transferQueue@);
 			dedicatedQueueIndicies.Add(transferQueueIndex);
+			this.transferQueueIndex = transferQueueIndex;
 			log "Found dedicated transfer queue";
 			break;
 		}
 	}
-	if (!this.transferQueue) vkGetDeviceQueue(device, this.transferQueueIndicies[0]~, 0, this.computeQueue@);
+	if (!this.transferQueue)
+	{
+		this.transferQueueIndex = this.transferQueueIndicies[0]~;
+		vkGetDeviceQueue(device, this.transferQueueIndex, 0, this.computeQueue@);
+	}
 
 	for (i .. this.queueFamilyCount)
 	{
@@ -195,3 +207,5 @@ VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T
 
 	log "Got device queues";
 }
+
+bool VulkanQueues::HasUniqueComputeQueue() => this.graphicsQueueIndex != this.computeQueueIndex;

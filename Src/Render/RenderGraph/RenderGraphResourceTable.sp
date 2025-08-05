@@ -16,13 +16,13 @@ TrackedResource::(resource: *any, claimed: bool)
 	this.claimed = claimed;
 }
 
-state ResourceTable<CreateDesc>
+state ResourceTable<Renderer, CreateDesc>
 {
 	descToResource := Map<CreateDesc, Array<TrackedResource>>()
 }
 
-*any ResourceTable::GetOrCreateResource(createDesc: CreateDesc, device: *any,
-											create: ::*any(CreateDesc, *any))
+*any ResourceTable::GetOrCreateResource(createDesc: CreateDesc, renderer: *Renderer,
+										create: ::*any(CreateDesc, *Renderer))
 {
 	if (this.descToResource.Has(createDesc))
 	{
@@ -37,7 +37,7 @@ state ResourceTable<CreateDesc>
 		}
 	}
 
-	resource := create(createDesc, device)
+	resource := create(createDesc, renderer)
 	trackedResource := TrackedResource(resource, true);
 	if (this.descToResource.Has(createDesc))
 	{
@@ -64,55 +64,55 @@ ResourceTable::ReleaseResources()
 	}
 }
 
-state ResourceTables
+state ResourceTables<Renderer>
 {
-	textureTable: ResourceTable<TextureDesc>,
-	bufferTable: ResourceTable<BufferDesc>,
-	createTexture: ::*any(TextureDesc, *any),
-	createBuffer: ::*any(BufferDesc, *any)
+	textureTable: ResourceTable<Renderer, TextureDesc>,
+	bufferTable: ResourceTable<Renderer, BufferDesc>,
+	createTexture: ::*any(TextureDesc, *Renderer),
+	createBuffer: ::*any(BufferDesc, *Renderer)
 }
 
-ResourceTables::(createTexture: ::*any(TextureDesc, *any), createBuffer: ::*any(BufferDesc, *any))
+ResourceTables::(createTexture: ::*any(TextureDesc, *any), createBuffer: ::*any(BufferDesc, *Renderer))
 {
 	this.createTexture = createTexture;
 	this.createBuffer = createBuffer;
 }
 
-RenderResource ResourceTables::UseTexture(createInfo: TextureDesc, device: *any)
+RenderResource ResourceTables::UseTexture(createInfo: TextureDesc, renderer: *Renderer)
 {
 	table := this.textureTable;
 	texture := table.GetOrCreateResource(
 		createInfo,
-		device,
+		renderer,
 		this.createTexture
 	);
 
 	return RenderResource().FromTexture(texture);
 }
 
-RenderResource ResourceTables::UseBuffer(createInfo: BufferDesc, device: *any)
+RenderResource ResourceTables::UseBuffer(createInfo: BufferDesc, renderer: *Renderer)
 {
 	table := this.bufferTable;
 	buffer := table.GetOrCreateResource(
 		createInfo,
-		device,
+		renderer,
 		this.createBuffer
 	);
 
 	return RenderResource().FromBuffer(buffer);
 }
 
-RenderResource ResourceTables::UseResource(resourceDesc: ResourceDesc, device: *any)
+RenderResource ResourceTables::UseResource(resourceDesc: ResourceDesc, renderer: *Renderer)
 {
 	switch (resourceDesc.kind)
 	{
 		case (ResourceKind.Texture)
 		{
-			return this.UseTexture(resourceDesc.desc.texture, device);
+			return this.UseTexture(resourceDesc.desc.texture, renderer);
 		}
 		case (ResourceKind.Buffer)
 		{
-			return this.UseBuffer(resourceDesc.desc.buffer, device);
+			return this.UseBuffer(resourceDesc.desc.buffer, renderer);
 		}
 	}
 

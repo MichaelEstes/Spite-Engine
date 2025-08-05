@@ -8,13 +8,13 @@ state RenderResourceHandle
 	handle: uint32
 }
 
-state RenderResourceHandles
+state RenderResourceHandles<Renderer>
 {
 	handles := HandleSet<ResourceDesc>(),
 	handleToName := SparseSet<string>(),
 	nameToHandle := Map<string, uint32>(),
 	resources := SparseSet<RenderResource>(),
-	resourceTables: *ResourceTables
+	resourceTables: *ResourceTables<Renderer>
 }
 
 RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: ResourceDesc)

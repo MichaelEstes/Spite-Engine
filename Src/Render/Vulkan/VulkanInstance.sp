@@ -7,7 +7,7 @@ state VulkanInstance
 	instance: *VkInstance_T,
 	extensionNames: **byte,
 	physicalDevices: Allocator<*VkPhysicalDevice_T>,
-	resourceTables: ResourceTables,
+	resourceTables: ResourceTables<VulkanRenderer>,
 
 	physicalDeviceCount: uint32,
 	extensionCount: uint32,
@@ -54,12 +54,12 @@ InitializeVulkanInstance()
 		"Error finding device for Vulkan"
 	);
 
-	vulkanInstance.resourceTables = ResourceTables(
-		::*VkImage_T(createDesc: TextureDesc, device: *VkDevice_T) {
-			return CreateVkImage(device, TextureDescToCreateInfo(createDesc));
+	vulkanInstance.resourceTables = ResourceTables<VulkanRenderer>(
+		::*VkImage_T(createDesc: TextureDesc, renderer: *VulkanRenderer) {
+			return CreateVkImage(renderer.device, TextureDescToCreateInfo(createDesc, renderer));
 		},
-		::*VkBuffer_T(createDesc: BufferDesc, device: *VkDevice_T) {
-			return CreateVkBuffer(device, BufferDescToCreateInfo(createDesc));
+		::*VkBuffer_T(createDesc: BufferDesc, renderer: *VulkanRenderer) {
+			return CreateVkBuffer(renderer.device, BufferDescToCreateInfo(createDesc));
 		}
 	)
 

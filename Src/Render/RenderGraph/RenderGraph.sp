@@ -6,27 +6,27 @@ import Array
 state RenderPassContext<Renderer>
 {
 	renderer: *Renderer,
-	handles: *RenderResourceHandles
+	handles: *RenderResourceHandles<Renderer>
 }
 
 *Texture RenderPassContext::UseTexture<Texture>(handle: RenderResourceHandle)
 {
-	return this.handles.UseResource(handle, this.renderer.device).resource as *Texture;
+	return this.handles.UseResource(handle, this.renderer).resource as *Texture;
 }
 
 *Buffer RenderPassContext::UseBuffer<Buffer>(handle: RenderResourceHandle)
 {
-	return this.handles.UseResource(handle, this.renderer.device).resource as *Buffer;
+	return this.handles.UseResource(handle, this.renderer).resource as *Buffer;
 }
 
-state RenderGraph<Renderer : where(renderer: Renderer) { renderer.device; }>
+state RenderGraph<Renderer>
 {
 	passes: Array<RenderGraphPass<Renderer>>,
 	renderer: *Renderer,
-	handles: RenderResourceHandles
+	handles: RenderResourceHandles<Renderer>
 }
 
-RenderGraph::SetResourceTables(resourceTables: *ResourceTables)
+RenderGraph::SetResourceTables(resourceTables: *ResourceTables<Renderer>)
 {
 	this.handles.resourceTables = resourceTables;
 }

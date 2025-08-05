@@ -202,15 +202,25 @@ VkImageUsageFlagBits GPUTextureUsageToVkUsage(usage: GPUTextureUsageFlags)
     return usageFlags;
 }
 
-VkImageCreateInfo TextureDescToCreateInfo(createDesc: TextureDesc)
+VkImageCreateInfo TextureDescToCreateInfo(createDesc: TextureDesc, renderer: *VulkanRenderer)
 {
 	createInfo := VkImageCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	createInfo.imageType = GPUTextureTypeToVkImageType(createDesc.type);
 	createInfo.format = GPUTextureFormatToVkFormat(createDesc.format);
-	createInfo.extent.width = createDesc.width;
-	createInfo.extent.height = createDesc.height;
+
+    if (createDesc.flags & GPUTextureFlags.SizeSwapchainRelative)
+    {
+        createInfo.extent.width = renderer.swapchain.extent.width;
+        createInfo.extent.height = renderer.swapchain.extent.height;
+    }
+    else
+    {
+	    createInfo.extent.width = createDesc.width;
+	    createInfo.extent.height = createDesc.height;
+    }
 	createInfo.extent.depth = createDesc.depth;
+
 	createInfo.mipLevels = createDesc.mipLevels;
 	createInfo.arrayLayers = createDesc.layerCount;
 	createInfo.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
@@ -248,4 +258,25 @@ VkBufferCreateInfo BufferDescToCreateInfo(createDesc: BufferDesc)
     }
 
 	return createInfo;
+}
+
+*VkFence_T CreateFence(device: *VkDevice_T)
+{
+    createInfo := VkFenceCreateInfo();
+    createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    createInfo.flags = VkFenceCreateFlagBits.VK_FENCE_CREATE_SIGNALED_BIT;
+
+    fence: *VkFence_T = null;
+    CheckResult(vkCreateFence(device, createInfo@, null, fence@), "Error creating Vulkan fence");
+    return fence;
+}
+
+*VkSemaphore_T CreateSemaphore(device: *VkDevice_T)
+{
+    createInfo := VkSemaphoreCreateInfo();
+    createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    semaphore: *VkSemaphore_T = null;
+    CheckResult(vkCreateSemaphore(device, createInfo@, null, semaphore@), "Error creating Vulkan semaphore");
+    return semaphore;
 }

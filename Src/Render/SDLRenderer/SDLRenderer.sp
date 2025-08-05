@@ -22,7 +22,7 @@ instance := SDLGPUInstance();
 state SDLGPUInstance
 {
 	device: *SDL.GPUDevice,
-	resourceTables: ResourceTables,
+	resourceTables: ResourceTables<SDLRenderer>,
 	initialized := false
 }
 
@@ -58,12 +58,12 @@ InitializeSDLGPUInstance()
 	Check(ShaderCross_Init(), "Error initializing Shadercross");
 	instance.initialized = true;
 	instance.device = CreateGPUDevice(GPUShaderFormat.SPIRV, true, null);
-	instance.resourceTables = ResourceTables(
-		::*GPUTexture(createDesc: TextureDesc, device: *GPUDevice) {
-			return SDL.CreateGPUTexture(device, TextureDescToCreateInfo(createDesc)@);
+	instance.resourceTables = ResourceTables<SDLRenderer>(
+		::*GPUTexture(createDesc: TextureDesc, renderer: *SDLRenderer) {
+			return SDL.CreateGPUTexture(renderer.device, TextureDescToCreateInfo(createDesc)@);
 		},
-		::*GPUBuffer(createDesc: BufferDesc, device: *GPUDevice) {
-			return SDL.CreateGPUBuffer(device, BufferDescToCreateInfo(createDesc)@);
+		::*GPUBuffer(createDesc: BufferDesc, renderer: *SDLRenderer) {
+			return SDL.CreateGPUBuffer(renderer.device, BufferDescToCreateInfo(createDesc)@);
 		}
 	)
 }
