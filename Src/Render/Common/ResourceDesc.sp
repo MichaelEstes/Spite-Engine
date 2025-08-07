@@ -13,6 +13,18 @@ enum GPUTextureTiling: uint32
 	Linear
 }
 
+enum GPUTextureLayout: uint32
+{
+	Undefined,
+	RenderTarget,
+	DepthStencilTarget,
+	ShaderRead,
+    ShaderWrite,
+    TransferSrc,
+    TransferDst,
+    Present
+}
+
 state TextureDesc
 {
 	type: GPUTextureType,
@@ -26,6 +38,7 @@ state TextureDesc
 	samples: GPUSampleCount,
 	tiling: GPUTextureTiling,
 	flags: GPUTextureFlags,
+	layout: GPUTextureLayout,
 	shared: bool,
 
 	extension: *any

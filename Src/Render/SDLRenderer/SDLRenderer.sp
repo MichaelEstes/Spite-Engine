@@ -66,6 +66,34 @@ InitializeSDLGPUInstance()
 			return SDL.CreateGPUBuffer(renderer.device, BufferDescToCreateInfo(createDesc)@);
 		}
 	)
+
+	sdlRendererComponent := ECS.RegisterComponent<SDLRenderer>(
+		ComponentKind.Singleton
+	);
+
+	sdlDrawSystem := ECS.RegisterSystem(
+		::(scene: Scene, dt: float) 
+		{
+			if (scene.HasSingleton<SDLRenderer>())
+			{
+				Fiber.RunOnMainThread(::(scene: *Scene) 
+				{
+					renderer := scene.GetSingleton<SDLRenderer>();
+					renderer.Draw(scene);
+				}, scene@);
+			}
+		},
+		SystemStep.Draw
+	);
+
+	sdlDrawCleanupSystem := ECS.RegisterFrameSystem(
+		::(dt: float) 
+		{
+			log "Frame end", dt;
+			instance.resourceTables.ReleaseTrackedResources();
+		},
+		FrameSystemStep.End
+	);
 }
 
 *SDL.GPUDevice GetSDLInstanceDevice() => instance.device;
@@ -119,31 +147,3 @@ SDLRenderer CreateSDLRenderer(window: *SDL.Window, device: *SDL.GPUDevice, passe
 
 	return renderer;
 }
-
-sdlRendererComponent := ECS.RegisterComponent<SDLRenderer>(
-	ComponentKind.Singleton
-);
-
-sdlDrawSystem := ECS.RegisterSystem(
-	::(scene: Scene, dt: float) 
-	{
-		if (scene.HasSingleton<SDLRenderer>())
-		{
-			Fiber.RunOnMainThread(::(scene: *Scene) 
-			{
-				renderer := scene.GetSingleton<SDLRenderer>();
-				renderer.Draw(scene);
-			}, scene@);
-		}
-	},
-	SystemStep.Draw
-);
-
-sdlDrawCleanupSystem := ECS.RegisterFrameSystem(
-	::(dt: float) 
-	{
-		log "Frame end", dt;
-		instance.resourceTables.ReleaseTrackedResources();
-	},
-	FrameSystemStep.End
-);

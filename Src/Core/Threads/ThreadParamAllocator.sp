@@ -2,13 +2,22 @@ package ThreadParamAllocator
 
 import BucketAllocator
 
+BucketCount := 4;
+
 state ThreadParamAllocator
 {
 	slabs := [
-		BucketAllocator(32, 64, 4),
-		BucketAllocator(64, 32, 4),
-		BucketAllocator(128, 16, 4),
-		BucketAllocator(256, 8, 4)
+		BucketAllocator(32,  64,  BucketCount),
+		BucketAllocator(64,  32,  BucketCount),
+		BucketAllocator(128, 16,  BucketCount),
+		BucketAllocator(256, 8,   BucketCount)
+	],
+	
+	indices := uint32:[
+		0,
+		0,
+		0,
+		0
 	]
 }
 
@@ -42,9 +51,11 @@ int GetSlabIndex<Type>()
 *Type AllocThreadParam<Type>()
 {
 	index := GetSlabIndex<Type>();
+	bucketIndex := paramAllocator.indices[index] + 1;
+	paramAllocator.indices[index] = bucketIndex;
 
 	slab := paramAllocator.slabs[index];
-	return slab.Alloc() as *Type;
+	return slab.Alloc(bucketIndex) as *Type;
 }
 
 DeallocThreadParam<Type>(value: *Type)

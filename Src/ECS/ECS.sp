@@ -36,7 +36,8 @@ Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.S
 {id: uint32, step: FrameSystemStep} RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
 			=> instance.RegisterFrameSystem(run, step);
 
-*Type FrameAlloc<Type>() => instance.frameAllocator.Alloc<Type>();
+*void FrameAlloc<Type>(size: uint32) => instance.frameAllocator.Alloc(size);
+*Type FrameAllocType<Type>() => instance.frameAllocator.AllocType<Type>();
 
 ArrayView<Scene> Scenes() => instance.scenes.Values();
 

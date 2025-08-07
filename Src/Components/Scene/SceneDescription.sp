@@ -47,8 +47,7 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 		log "Scene description removed";
 	},
 	::(sceneDesc: *SceneDesc, scene: Scene) {
-		log "Scene description added";
-
+		log "Adding scene description";
 		param := AllocThreadParam<SceneDescParam>();
 		param.sceneDesc = sceneDesc;
 		param.scene = scene@;
@@ -86,6 +85,8 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 				);
 				scene.SetSingleton<SDLRenderer>(renderer);
 			}
+			
+			log "Scene description added";
 		}, param);
 	}
 );

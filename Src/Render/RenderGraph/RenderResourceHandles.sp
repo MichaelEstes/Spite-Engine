@@ -34,7 +34,43 @@ RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: Res
 	return handle as RenderResourceHandle;
 }
 
-RenderResource RenderResourceHandles::UseResource(resourceHandle: RenderResourceHandle, device: *any)
+RenderResourceHandle RenderResourceHandles::AddExternalResource(name: string, resource: *any, kind: ResourceKind
+																resourceDesc: *ResourceDesc = null)
+{
+	handle := RenderResourceHandle();
+
+	if (resourceDesc)
+	{
+		handle = this.CreateHandle(name, resourceDesc~);
+	}
+	else
+	{
+		desc := ResourceDesc();
+		desc.kind = kind;
+		handle = this.CreateHandle(name, desc);
+	}
+
+	renderResource := RenderResource();
+	renderResource.resource = resource;
+	renderResource.kind = kind;
+
+	this.resources.Insert(handle.handle, renderResource);
+	return handle;
+}
+
+RenderResourceHandle RenderResourceHandles::AddExternalTextureResource(name: string, texture: *any, 
+																	   resourceDesc: *ResourceDesc = null)
+{
+	return this.AddExternalResource(name, texture, ResourceKind.Texture, resourceDesc);
+}
+
+RenderResourceHandle RenderResourceHandles::AddExternalBufferResource(name: string, buffer: *any, 
+																	  resourceDesc: *ResourceDesc = null)
+{
+	return this.AddExternalResource(name, buffer, ResourceKind.Buffer, resourceDesc);
+}
+
+RenderResource RenderResourceHandles::UseResource(resourceHandle: RenderResourceHandle, renderer: *any)
 {
 	handle := resourceHandle.handle;
 	if (this.resources.Has(handle))
@@ -43,7 +79,7 @@ RenderResource RenderResourceHandles::UseResource(resourceHandle: RenderResource
 	}
 
 	desc := this.handles[handle]~;
-	resource := this.resourceTables.UseResource(desc, device);
+	resource := this.resourceTables.UseResource(desc, renderer);
 	this.resources.Insert(handle, resource);
 
 	return resource;

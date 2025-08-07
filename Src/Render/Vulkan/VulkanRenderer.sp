@@ -80,6 +80,7 @@ state VulkanRenderer
 
 	renderGraph: RenderGraph<VulkanRenderer>,
 	
+	swapchainHandle: RenderResourceHandle,
 	swapchainImageIndex: uint32,
 	currentFrame: uint32
 }
@@ -172,9 +173,10 @@ VkResult VulkanRenderer::WaitAndAcquireSwapchain(frame: uint32)
 {
 	fence := this.frameFences[frame]@;
 	vkWaitForFences(this.device, 1, fence, VkTrue, UINT64_MAX);
+	result := this.swapchain.AcquireNext(this.device, frame);
 	vkResetFences(this.device, 1, fence);
 
-	return this.swapchain.AcquireNext(this.device, frame);
+	return result;
 }
 
 *VkImage_T VulkanRenderer::GetSwapchainImage() => this.swapchain.GetCurrentSwapchainImage();
@@ -205,6 +207,10 @@ VulkanRenderer::Draw(scene: *Scene)
 	renderGraph.SetRenderer(this@);
 
 	this.WaitAndAcquireSwapchain(frame);
+	this.swapchainHandle = renderGraph.handles.AddExternalTextureResource(
+		"swapchain", 
+		this.swapchain.GetCurrentSwapchainImage()
+	);
 
 	for (pass in this.passes)
 	{

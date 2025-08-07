@@ -97,16 +97,16 @@ InitalizeFibers()
 	}
 }
 
-*JobHandle CreateJobHandle(count: uint32)
+*JobHandle CreateJobHandle(count: uint32, index: uint32)
 {
-	handle := fibers.handleAllocator.Alloc() as *JobHandle;
+	handle := fibers.handleAllocator.Alloc(index) as *JobHandle;
 	assert handle != null, "Failed to allocate job handle";
 	
 	handle~ = JobHandle(count);
 	return handle;
 }
 
-*JobHandle GetJobHandle(count: uint32, handleRef: **JobHandle)
+*JobHandle GetJobHandle(count: uint32, handleRef: **JobHandle, index: uint32)
 {
 	if (!handleRef) return null;
 
@@ -117,7 +117,7 @@ InitalizeFibers()
 		return handle;
 	}
 
-	createdHandle := CreateJobHandle(count);
+	createdHandle := CreateJobHandle(count, index);
 	handleRef~ = createdHandle;
 	return createdHandle;
 }
@@ -138,22 +138,21 @@ AddJobForIndex(job: Job, priority: JobPriority, index: uint32)
 
 uint32 GetNextFiberIndex() => fibers.currentProcess.Add(1) % fibers.processCount;
 
-
 AddJob(func: ::(*any), data: *any = null, handle: **JobHandle = null, priority: JobPriority = JobPriority.Medium)
 {
-	jobHandle := GetJobHandle(1, handle);
+	index := GetNextFiberIndex();
+	jobHandle := GetJobHandle(1, handle, index);
 	job := {func, data, jobHandle} as Job;
 
-	index := GetNextFiberIndex();
 	
 	AddJobForIndex(job, priority, index);
 }
 
 AddJobs(funcs: []::(*any), data: []*any, handle: **JobHandle = null, priority: JobPriority = JobPriority.Medium)
 {
-	count := funcs.count;
-	jobHandle := GetJobHandle(count, handle);
 	index := GetNextFiberIndex();
+	count := funcs.count;
+	jobHandle := GetJobHandle(count, handle, index);
 
 	for (i .. count)
 	{
@@ -207,7 +206,7 @@ uint CreateFiberThread(index: uint)
 RunOnMainFiber(func: ::(*any), data: *any, handle: **JobHandle = null, priority: JobPriority = JobPriority.Medium)
 {
 	mainIndex := fibers.threads.count - 1;
-	jobHandle := GetJobHandle(1, handle);
+	jobHandle := GetJobHandle(1, handle, mainIndex);
 	job := {func, data, jobHandle} as Job;
 
 	AddJobForIndex(job, priority, mainIndex);
@@ -226,8 +225,6 @@ RunOnMainThread(func: ::(*any), data: *any)
 
 FlushMainThreadJobs()
 {
-	if (!fibers.mainThreadJobs.count) return;
-
 	fibers.mainLock.Lock();
 	{
 		while (fibers.mainThreadJobs.count)

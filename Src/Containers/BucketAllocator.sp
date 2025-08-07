@@ -12,7 +12,6 @@ state BucketAllocator
 	bucketStatus: BitSet,
 	itemStatus: BitSet,
 	
-	currBucket: Atomic<uint32>,
 	itemSize: uint32,
 	itemCount: uint32,
 	bucketCount: uint32,
@@ -28,8 +27,6 @@ BucketAllocator::(itemSize: uint32, itemCount: uint32, bucketCount: uint32)
 
 	this.bucketStatus = BitSet(this.bucketCount);
 	this.itemStatus = BitSet(this.itemCount * this.bucketCount);
-	
-	this.currBucket.Init(0);
 }
 
 BucketAllocator::delete 
@@ -40,32 +37,11 @@ BucketAllocator::delete
 	delete this.itemStatus;
 }
 
-uint32 BucketAllocator::IncCurrBucket() => 
-{
-	this.currBucket.Add(1);
-	return this.currBucket.value % this.bucketCount;
-}
-
-int BucketAllocator::GetNextBucketIndex()
-{
-	start := this.currBucket.Load();
-
-	curr := this.IncCurrBucket();
-	while (curr != start)
-	{
-		if (!this.bucketStatus[curr]) return curr;
-		curr = this.IncCurrBucket();
-	}
-
-	return -1;	
-}
-
 *byte BucketAllocator::Alloc(bucketIndex: int = -1)
 {
-	if (bucketIndex == -1) bucketIndex = this.GetNextBucketIndex();
-	if (bucketIndex == -1) 
+	if (this.bucketStatus[bucketIndex]) 
 	{
-		log "Bucket allocator full";
+		log "BucketAllocator: Bucket for index full";
 		return null;
 	}
 

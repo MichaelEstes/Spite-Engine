@@ -14,12 +14,15 @@ clearPass := RegisterRenderPass(
 			clearPassName,
 			::bool(builder: *RenderPassBuilder<VulkanRenderer>, param: *void) 
 			{
-				log "Vulkan Clear pass init";
+				//log "Vulkan Clear pass init";
+				renderer := builder.Renderer();
+				builder.Write(renderer.swapchainHandle);
+
 				return true;
 			},
 			::(context: *RenderPassContext<VulkanRenderer>, param: *void) 
 			{
-				log "Vulkan Clear pass exec";
+				//log "Vulkan Clear pass exec";
 				renderer := context.renderer;
 				commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 				image := renderer.GetSwapchainImage();

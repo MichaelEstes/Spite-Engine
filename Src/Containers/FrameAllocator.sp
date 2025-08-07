@@ -22,7 +22,17 @@ FrameAllocator::(blockSize: uint32)
 	this.Expand();
 }
 
-*Type FrameAllocator::Alloc<Type>()
+*void FrameAllocator::Alloc(size: uint32)
+{
+	if (this.currIndex + size > this.blockSize) this.NextOrExpand();
+	
+	block := this.mem[this.currBlock];
+	ptr := block + this.currIndex;
+	this.currIndex += size;
+	return ptr;
+}
+
+*Type FrameAllocator::AllocType<Type>()
 {
 	size := #sizeof Type;
 	if (this.currIndex + size > this.blockSize) this.NextOrExpand();
