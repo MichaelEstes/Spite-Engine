@@ -36,11 +36,19 @@ state RenderGraph<Renderer>
 	readersByPass := SparseSet<PassResourceArray>(),
 	writersByResource := SparseSet<PassResourceArray>(),
 	passOrder: Array<uint32>,
+
+	transitionTexture: ::(*any, GPUTextureLayout, GPUTextureLayout, GPUTextureFormat, *Renderer)
 }
 
 RenderGraph::SetResourceTables(resourceTables: *ResourceTables<Renderer>)
 {
 	this.handles.resourceTables = resourceTables;
+}
+
+RenderGraph::SetTransitionTextureFunc(transitionTexture: ::(*any, GPUTextureLayout, GPUTextureLayout, 
+															GPUTextureFormat, *Renderer))
+{
+	this.transitionTexture = transitionTexture;
 }
 
 RenderGraph::SetRenderer(renderer: *Renderer)
@@ -159,11 +167,41 @@ RenderGraph::WalkResources(resourceHandle: uint32, passes: PassResourceArray)
 	}
 }
 
+RenderGraph::HandlePassTransitions(pass: RenderGraphPass<Renderer>)
+{
+	for (i .. pass.count)
+	{
+		resourceUsage := pass.resources[i];
+		handle := resourceUsage.handle;
+		resourceDesc := this.handles.GetResourceDesc(handle);
+		if (!resourceDesc)
+		{
+			log "RenderGraph::HandlePassTransitions No resource description found for handle";
+			continue;
+		}
+
+		if (resourceDesc.kind == ResourceKind.Texture)
+		{
+			textureDesc := resourceDesc.desc.texture
+			renderResource := this.handles.UseResource(handle, this.renderer);
+			texture := renderResource.resource;
+			currLayout := this.handles.resourceTables.GetCurrentTextureLayout(texture);
+			targetLayout := resourceUsage.layout;
+			if (currLayout != targetLayout)
+			{
+				this.transitionTexture(texture, currLayout, targetLayout, textureDesc.format, this.renderer);
+				this.handles.resourceTables.SetCurrentTextureLayout(texture, targetLayout);
+			}
+		}
+	}
+}
+
 RenderGraph::Execute(context: RenderPassContext<Renderer>)
 {
 	for (passIndex in this.passOrder)
 	{
 		pass := this.passes[passIndex];
+		this.HandlePassTransitions(pass);
 		pass.exec(context@, pass.data);
 	}
 

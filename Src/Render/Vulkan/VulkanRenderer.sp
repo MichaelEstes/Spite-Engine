@@ -137,6 +137,25 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>)
 	}
 
 	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables@);
+	vulkanRenderer.renderGraph.SetTransitionTextureFunc(
+		::(image: *VkImage_T, currentLayout: GPUTextureLayout, targetLayout: GPUTextureLayout, 
+		   format: GPUTextureFormat, renderer: *VulkanRenderer)
+		{
+			oldLayout := GPUTextureLayoutToVkLayout(currentLayout);
+			newLayout := GPUTextureLayoutToVkLayout(targetLayout);
+			vkFormat := GPUTextureFormatToVkFormat(format);
+			//log "Transitioning image: ", oldLayout, newLayout, vkFormat;
+
+			commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
+			TransitionImageLayout(
+				commandBuffer,
+				image,
+				oldLayout,
+				newLayout,
+				vkFormat
+			);
+		}
+	);
 
 	return vulkanRenderer;
 }
@@ -205,11 +224,16 @@ VulkanRenderer::Draw(scene: *Scene)
 	device := this.device;
 	renderGraph := this.renderGraph;
 	renderGraph.SetRenderer(this@);
+	resourceTables := renderGraph.handles.resourceTables;
 
 	this.WaitAndAcquireSwapchain(frame);
+
+	swapchainImage := this.swapchain.GetCurrentSwapchainImage();
+	swapchainDesc := this.swapchain.GetSwapchainDesc();
 	this.swapchainHandle = renderGraph.handles.AddExternalTextureResource(
 		"swapchain", 
-		this.swapchain.GetCurrentSwapchainImage()
+		swapchainImage,
+		swapchainDesc
 	);
 
 	for (pass in this.passes)
@@ -224,6 +248,18 @@ VulkanRenderer::Draw(scene: *Scene)
 	{
 		context := renderGraph.CreateContext();
 		renderGraph.Execute(context);
+
+		currentSwapchainLayout := resourceTables.GetCurrentTextureLayout(swapchainImage);
+		if (currentSwapchainLayout != GPUTextureLayout.Present)
+		{
+			renderGraph.transitionTexture(
+				swapchainImage,
+				currentSwapchainLayout,
+				GPUTextureLayout.Present,
+				swapchainDesc.format,
+				this@
+			);
+		}
 	}
 	this.End(graphicsCommandBuffer);
 
@@ -248,7 +284,6 @@ VulkanRenderer::Draw(scene: *Scene)
 	);
 
 	this.swapchain.Present(this.deviceProps.queues.presentQueue, frame);
-
 	this.currentFrame += 1;
 }
 

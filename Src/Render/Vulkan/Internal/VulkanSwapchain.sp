@@ -1,5 +1,7 @@
 package VulkanRenderer
 
+import RenderCommon
+
 InvalidSwapchainIndex := uint32(-1);
 
 state VulkanSwapchain
@@ -107,6 +109,8 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 
 	queueFamilyIndices := [renderer.deviceProps.queues.presentQueueIndex, renderer.deviceProps.queues.graphicsQueueIndex];
 
+	log "Swapchain Image format: ", this.imageFormat;
+
 	createInfo := VkSwapchainCreateInfoKHR();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	createInfo.surface = renderer.surface;
@@ -204,4 +208,17 @@ VkResult VulkanSwapchain::Present(presentQueue: *VkQueue_T, frame: uint32)
 	presentInfo.pResults = null; 
 
 	return vkQueuePresentKHR(presentQueue, presentInfo@);
+}
+
+TextureDesc VulkanSwapchain::GetSwapchainDesc()
+{
+	desc := TextureDesc();
+	desc.format = VkFormatToGPUTextureFormat(this.imageFormat);
+	desc.usage = GPUTextureUsageFlags.COLOR_TARGET;
+	desc.width = this.extent.width;
+	desc.height = this.extent.height;
+	desc.layerCount = 1;
+	desc.layout = GPUTextureLayout.Undefined;
+
+	return desc;
 }

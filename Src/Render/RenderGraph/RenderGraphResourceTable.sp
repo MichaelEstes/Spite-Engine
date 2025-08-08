@@ -22,7 +22,7 @@ state ResourceTable<Renderer, CreateDesc>
 }
 
 *any ResourceTable::GetOrCreateResource(createDesc: CreateDesc, renderer: *Renderer,
-										create: ::*any(CreateDesc, *Renderer))
+										create: ::*any(CreateDesc, *Renderer), created: *bool = null)
 {
 	if (this.descToResource.Has(createDesc))
 	{
@@ -37,7 +37,9 @@ state ResourceTable<Renderer, CreateDesc>
 		}
 	}
 
-	resource := create(createDesc, renderer)
+	resource := create(createDesc, renderer);
+	if (created) created~ = true;
+
 	trackedResource := TrackedResource(resource, true);
 	if (this.descToResource.Has(createDesc))
 	{
@@ -68,6 +70,7 @@ state ResourceTables<Renderer>
 {
 	textureTable: ResourceTable<Renderer, TextureDesc>,
 	bufferTable: ResourceTable<Renderer, BufferDesc>,
+	textureToLayout: Map<*any, GPUTextureLayout>,
 	createTexture: ::*any(TextureDesc, *Renderer),
 	createBuffer: ::*any(BufferDesc, *Renderer)
 }
@@ -78,13 +81,14 @@ ResourceTables::(createTexture: ::*any(TextureDesc, *any), createBuffer: ::*any(
 	this.createBuffer = createBuffer;
 }
 
-RenderResource ResourceTables::UseTexture(createInfo: TextureDesc, renderer: *Renderer)
+RenderResource ResourceTables::UseTexture(createInfo: TextureDesc, renderer: *Renderer, created: *bool)
 {
 	table := this.textureTable;
 	texture := table.GetOrCreateResource(
 		createInfo,
 		renderer,
-		this.createTexture
+		this.createTexture,
+		created
 	);
 
 	return RenderResource().FromTexture(texture);
@@ -108,7 +112,13 @@ RenderResource ResourceTables::UseResource(resourceDesc: ResourceDesc, renderer:
 	{
 		case (ResourceKind.Texture)
 		{
-			return this.UseTexture(resourceDesc.desc.texture, renderer);
+			created := false;
+			texture := this.UseTexture(resourceDesc.desc.texture, renderer, created@);
+			if (created)
+			{
+				this.SetCurrentTextureLayout(texture.resource, resourceDesc.desc.texture.layout);
+			}
+			return texture;
 		}
 		case (ResourceKind.Buffer)
 		{
@@ -117,6 +127,19 @@ RenderResource ResourceTables::UseResource(resourceDesc: ResourceDesc, renderer:
 	}
 
 	return RenderResource().Null();
+}
+
+ResourceTables::SetCurrentTextureLayout(texture: *any, layout: GPUTextureLayout)
+{
+	this.textureToLayout.Insert(texture, layout);
+}
+
+GPUTextureLayout ResourceTables::GetCurrentTextureLayout(texture: *any)
+{
+	layout := this.textureToLayout[texture];
+	if (layout) return layout~;
+
+	return GPUTextureLayout.Undefined;
 }
 
 ResourceTables::ReleaseTrackedResources()

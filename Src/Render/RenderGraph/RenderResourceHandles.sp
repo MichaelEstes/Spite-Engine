@@ -17,6 +17,11 @@ state RenderResourceHandles<Renderer>
 	resourceTables: *ResourceTables<Renderer>
 }
 
+*ResourceDesc RenderResourceHandles::GetResourceDesc(resourceHandle: RenderResourceHandle)
+{
+	return this.handles[resourceHandle.handle];
+}
+
 RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: ResourceDesc)
 {
 	if (this.nameToHandle.Has(name))
@@ -34,21 +39,11 @@ RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: Res
 	return handle as RenderResourceHandle;
 }
 
-RenderResourceHandle RenderResourceHandles::AddExternalResource(name: string, resource: *any, kind: ResourceKind
-																resourceDesc: *ResourceDesc = null)
+RenderResourceHandle RenderResourceHandles::AddExternalResource(name: string, resource: *any,
+																resourceDesc: ResourceDesc)
 {
-	handle := RenderResourceHandle();
-
-	if (resourceDesc)
-	{
-		handle = this.CreateHandle(name, resourceDesc~);
-	}
-	else
-	{
-		desc := ResourceDesc();
-		desc.kind = kind;
-		handle = this.CreateHandle(name, desc);
-	}
+	kind := resourceDesc.kind;
+	handle := this.CreateHandle(name, resourceDesc);
 
 	renderResource := RenderResource();
 	renderResource.resource = resource;
@@ -59,15 +54,26 @@ RenderResourceHandle RenderResourceHandles::AddExternalResource(name: string, re
 }
 
 RenderResourceHandle RenderResourceHandles::AddExternalTextureResource(name: string, texture: *any, 
-																	   resourceDesc: *ResourceDesc = null)
+																	   textureDesc: TextureDesc)
 {
-	return this.AddExternalResource(name, texture, ResourceKind.Texture, resourceDesc);
+	resourceDesc := ResourceDesc();
+	resourceDesc.kind = ResourceKind.Texture;
+	resourceDesc.desc.texture = textureDesc;
+
+	handle := this.AddExternalResource(name, texture, resourceDesc);
+	this.resourceTables.SetCurrentTextureLayout(texture, textureDesc.layout);
+
+	return handle;
 }
 
 RenderResourceHandle RenderResourceHandles::AddExternalBufferResource(name: string, buffer: *any, 
-																	  resourceDesc: *ResourceDesc = null)
+																	  bufferDesc: BufferDesc)
 {
-	return this.AddExternalResource(name, buffer, ResourceKind.Buffer, resourceDesc);
+	resourceDesc := ResourceDesc();
+	resourceDesc.kind = ResourceKind.Buffer;
+	resourceDesc.desc.buffer = bufferDesc;
+
+	return this.AddExternalResource(name, buffer, resourceDesc);
 }
 
 RenderResource RenderResourceHandles::UseResource(resourceHandle: RenderResourceHandle, renderer: *any)

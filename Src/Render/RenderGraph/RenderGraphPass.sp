@@ -53,14 +53,16 @@ RenderPassBuilder::Add(usage: RenderResourceUsage)
 	this.index += 1;
 }
 
-RenderPassBuilder::Read(target: RenderResourceHandle)
+RenderPassBuilder::Read(target: RenderResourceHandle,
+						layout: GPUTextureLayout = GPUTextureLayout.ShaderRead)
 {
-	this.Add({ target, ResourceAccess.Read });
+	this.Add({ target, ResourceAccess.Read, layout });
 }
 
-RenderPassBuilder::Write(target: RenderResourceHandle)
+RenderPassBuilder::Write(target: RenderResourceHandle,
+						 layout: GPUTextureLayout = GPUTextureLayout.ShaderWrite)
 {
-	this.Add({ target, ResourceAccess.Write });
+	this.Add({ target, ResourceAccess.Write, layout });
 }
 
 RenderResourceHandle RenderPassBuilder::Create(name: string, desc: ResourceDesc)

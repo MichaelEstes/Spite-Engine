@@ -54,6 +54,11 @@ uint32 FindMemoryType(physicalDevice: *VkPhysicalDevice_T, typeFilter: uint32, p
 	return -1;
 }
 
+bool HasStencilComponent(format: VkFormat) {
+    return format == VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT || 
+	       format == VkFormat.VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
 VkImageType GPUTextureTypeToVkImageType(type: GPUTextureType)
 {
     if (type == GPUTextureType.TEX_3D) return VkImageType.VK_IMAGE_TYPE_3D;
@@ -167,11 +172,19 @@ formatTable := [
     VkFormat.VK_FORMAT_ASTC_10x10_SFLOAT_BLOCK_EXT, // ASTC_10x10_FLOAT
     VkFormat.VK_FORMAT_ASTC_12x10_SFLOAT_BLOCK_EXT, // ASTC_12x10_FLOAT
     VkFormat.VK_FORMAT_ASTC_12x12_SFLOAT_BLOCK      // ASTC_12x12_FLOAT
-]
+];
+formatCount := #compile uint32 => (#typeof formatTable).FixedArrayCount();
 
-VkFormat GPUTextureFormatToVkFormat(format: GPUTextureFormat)
+VkFormat GPUTextureFormatToVkFormat(format: GPUTextureFormat) => formatTable[format];
+
+GPUTextureFormat VkFormatToGPUTextureFormat(format: VkFormat)
 {
-    return formatTable[format];
+    for (i .. formatCount)
+    {
+        if (formatTable[i] == format) return i as GPUTextureFormat;
+    }
+
+    return GPUTextureFormat.INVALID;
 }
 
 VkImageUsageFlagBits GPUTextureUsageToVkUsage(usage: GPUTextureUsageFlags)
@@ -201,6 +214,19 @@ VkImageUsageFlagBits GPUTextureUsageToVkUsage(usage: GPUTextureUsageFlags)
 
     return usageFlags;
 }
+
+layoutTable := [
+    VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED,
+    VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    VkImageLayout.VK_IMAGE_LAYOUT_GENERAL,
+    VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+];
+
+VkImageLayout GPUTextureLayoutToVkLayout(layout: GPUTextureLayout) => layoutTable[layout];
 
 VkImageCreateInfo TextureDescToCreateInfo(createDesc: TextureDesc, renderer: *VulkanRenderer)
 {
@@ -236,7 +262,7 @@ VkImageCreateInfo TextureDescToCreateInfo(createDesc: TextureDesc, renderer: *Vu
         createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
     }
 	
-	createInfo.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+	createInfo.initialLayout = GPUTextureLayoutToVkLayout(createDesc.layout);
 
 	return createInfo;
 }

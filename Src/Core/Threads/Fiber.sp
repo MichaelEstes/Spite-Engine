@@ -221,6 +221,8 @@ RunOnMainThread(func: ::(*any), data: *any)
 		fibers.mainThreadJobs.Enqueue(job);
 	}
 	fibers.mainLock.Unlock();
+
+	log "Added main thread job";
 }
 
 FlushMainThreadJobs()

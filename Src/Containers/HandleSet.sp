@@ -94,6 +94,11 @@ bool HandleSet::Has(key: uint32)
 	return this.handleFlags[index];
 }
 
+*Value HandleSet::Get(key: uint32)
+{
+	return this[key];
+}
+
 HandleSet::Remove(key: uint32)
 {
 	index := key - 1;
