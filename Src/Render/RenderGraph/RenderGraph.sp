@@ -2,8 +2,11 @@ package RenderGraph
 
 import SDL
 import Array
+import BitSet
+import SparseSet
+import RenderCommon
 
-MaxPassCountForResource := 32
+MaxPassCountForResource := 32;
 
 state PassResourceArray
 {
@@ -32,10 +35,13 @@ state RenderGraph<Renderer>
 	passes: Array<RenderGraphPass<Renderer>>,
 	renderer: *Renderer,
 	handles: RenderResourceHandles<Renderer>,
-	readersByResource := SparseSet<PassResourceArray>(),
-	readersByPass := SparseSet<PassResourceArray>(),
-	writersByResource := SparseSet<PassResourceArray>(),
+	readerResourceToPasses := SparseSet<PassResourceArray>(),
+	readerPassToResources := SparseSet<PassResourceArray>(),
+	writerResourceToPasses := SparseSet<PassResourceArray>(),
+	writerPassToResources := SparseSet<PassResourceArray>(),
 	passOrder: Array<uint32>,
+	passSet := BitSet(MaxPassCountForResource),
+	renderPassPool: RenderPassPool,
 
 	transitionTexture: ::(*any, GPUTextureLayout, GPUTextureLayout, GPUTextureFormat, *Renderer)
 }
@@ -69,7 +75,7 @@ RenderGraph::AddPass(name: string,
 		pass := RenderGraphPass<Renderer>()
 		pass.name = name;
 		pass.resources = builder.resources;
-		pass.count = builder.index;
+		pass.resourceCount = builder.index;
 		pass.exec = exec;
 		pass.stage = stage;
 		pass.data = data;
@@ -112,22 +118,23 @@ RenderGraph::Compile()
 	for (i .. this.passes.count)
 	{
 		pass := this.passes[i];
-		for (ix .. pass.count)
+		for (ix .. pass.resourceCount)
 		{
 			resource := pass.resources[ix]
-			if (resource.access == ResourceAccess.Read)
+			if (resource.IsRead())
 			{
-				this.AddHandleToPassIndexSet(resource.handle.handle, i, this.readersByResource);
-				this.AddHandleToPassIndexSet(i, resource.handle.handle, this.readersByPass);
+				this.AddHandleToPassIndexSet(resource.handle.handle, i, this.readerResourceToPasses);
+				this.AddHandleToPassIndexSet(i, resource.handle.handle, this.readerPassToResources);
 			}
 			else
 			{
-				this.AddHandleToPassIndexSet(resource.handle.handle, i, this.writersByResource);
+				this.AddHandleToPassIndexSet(resource.handle.handle, i, this.writerResourceToPasses);
+				this.AddHandleToPassIndexSet(i, resource.handle.handle, this.writerPassToResources);
 			}
 		}
 	}
 
-	for (readerKV in this.readersByResource)
+	for (readerKV in this.readerResourceToPasses)
 	{
 		resourceHandle := readerKV.key~;
 		passes := readerKV.value~;
@@ -136,7 +143,7 @@ RenderGraph::Compile()
 
 	for (i .. this.passes.count)
 	{
-		if (!this.passOrder.Has(i))
+		if (!this.passSet[i])
 		{
 			this.passOrder.Add(i);
 		}
@@ -149,59 +156,110 @@ RenderGraph::WalkResources(resourceHandle: uint32, passes: PassResourceArray)
 	{
 		passIndex := passes.values[i];
 		if (this.passOrder.Has(passIndex)) continue;
-		if (this.readersByPass.Has(passIndex))
+		if (this.readerPassToResources.Has(passIndex))
 		{
-			resourcesRead := this.readersByPass.Get(passIndex);
+			resourcesRead := this.readerPassToResources.Get(passIndex);
 			for (ix .. resourcesRead.count)
 			{
 				readResourceHandle := resourcesRead.values[ix];
-				if (this.writersByResource.Has(readResourceHandle))
+				if (this.writerResourceToPasses.Has(readResourceHandle))
 				{
-					passesWritingResource := this.writersByResource.Get(readResourceHandle)~;
+					passesWritingResource := this.writerResourceToPasses.Get(readResourceHandle)~;
 					this.WalkResources(readResourceHandle, passesWritingResource);
 				}
 			}
 		}
 
+		this.passSet.Set(i);
 		this.passOrder.Add(i);
 	}
 }
 
-RenderGraph::HandlePassTransitions(pass: RenderGraphPass<Renderer>)
+bool RenderGraph::HasPreviousWrite(resourceHandle: RenderResourceHandle, passOrderIndex: uint32)
 {
-	for (i .. pass.count)
-	{
-		resourceUsage := pass.resources[i];
-		handle := resourceUsage.handle;
-		resourceDesc := this.handles.GetResourceDesc(handle);
-		if (!resourceDesc)
-		{
-			log "RenderGraph::HandlePassTransitions No resource description found for handle";
-			continue;
-		}
+	handle := resourceHandle.handle;
+	currIndex := passOrderIndex - 1;
 
-		if (resourceDesc.kind == ResourceKind.Texture)
+	while (currIndex != uint32(-1))
+	{
+		prevPassIndex := this.passOrder[currIndex];
+		if (this.writerPassToResources.Has(prevPassIndex))
 		{
-			textureDesc := resourceDesc.desc.texture
-			renderResource := this.handles.UseResource(handle, this.renderer);
-			texture := renderResource.resource;
-			currLayout := this.handles.resourceTables.GetCurrentTextureLayout(texture);
-			targetLayout := resourceUsage.layout;
-			if (currLayout != targetLayout)
+			passResourceArr := this.writerPassToResources.Get(handle);
+			for (i .. passResourceArr.count)
 			{
-				this.transitionTexture(texture, currLayout, targetLayout, textureDesc.format, this.renderer);
-				this.handles.resourceTables.SetCurrentTextureLayout(texture, targetLayout);
+				if (passResourceArr.values[i] == handle) return true;
 			}
 		}
+
+		currIndex -= 1;
 	}
+
+	return false;
+}
+
+LoadOp RenderGraph::GetLoadOpForResource(resourceUsage: RenderResourceUsage, passOrderIndex: uint32)
+{
+	if (resourceUsage.usage & ResourceUsageFlags.Load) return LoadOp.Load;
+	else if (resourceUsage.usage & ResourceUsageFlags.Clear) return LoadOp.Clear;
+	else if (resourceUsage.usage & ResourceUsageFlags.LoadUndefined) return LoadOp.Undefined;
+
+	if (resourceUsage.IsRead() && 
+		this.HasPreviousWrite(resourceUsage.handle, passOrderIndex))
+	{
+		return LoadOp.Load;
+	}
+
+	return LoadOp.Undefined;
+}
+
+StoreOp RenderGraph::GetStoreOpForResource(resourceUsage: RenderResourceUsage)
+{
+	if (resourceUsage.usage & ResourceUsageFlags.Store) return StoreOp.Store;
+	else if (resourceUsage.usage & ResourceUsageFlags.StoreUndefined) return StoreOp.Undefined;
+
+	if (resourceUsage.IsWrite())
+	{
+		return StoreOp.Store;
+	}
+
+	return StoreOp.Undefined;
+}
+
+RenderPass RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOrderIndex: uint32)
+{
+	renderPassIndex := this.renderPassPool.GetNextIndex();
+	renderPass := this.renderPassPool[renderPassIndex];
+
+	for (i .. pass.resourceCount)
+	{
+		resourceUsage := pass.resources[i];
+		resourceHandle := resourceUsage.handle;
+		resourceDesc := this.handles.GetResourceDesc(resourceHandle);
+
+		if (resourceUsage.NeedsAttachment() && resourceDesc.kind == ResourceKind.Texture)
+		{
+			textureDesc := resourceDesc.desc.texture;
+			attachment := Attachment();
+			attachment.format = textureDesc.format;
+			attachment.samples = textureDesc.samples;
+			attachment.load = this.GetLoadOpForResource(resourceUsage, passOrderIndex);
+			attachment.store = this.GetStoreOpForResource(resourceUsage);
+		}
+	}
+
+
+	return renderPass;
 }
 
 RenderGraph::Execute(context: RenderPassContext<Renderer>)
 {
-	for (passIndex in this.passOrder)
+	for (i .. this.passOrder.count)
 	{
+		passIndex := this.passOrder[i];
 		pass := this.passes[passIndex];
-		this.HandlePassTransitions(pass);
+
+		renderPass := this.CreateRenderPass(pass, i);
 		pass.exec(context@, pass.data);
 	}
 
@@ -212,9 +270,11 @@ RenderGraph::Clear()
 {
 	this.passes.Clear();
 	this.handles.Clear();
-	this.readersByResource.Clear();
-	this.readersByPass.Clear();
-	this.writersByResource.Clear();
+	this.readerResourceToPasses.Clear();
+	this.readerPassToResources.Clear();
+	this.writerResourceToPasses.Clear();
+	this.writerPassToResources.Clear();
 	this.passOrder.Clear();
+	this.passSet.ClearAll();
 }
 

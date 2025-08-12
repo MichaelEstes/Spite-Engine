@@ -4,7 +4,7 @@ import SDL
 
 enum GPUTextureFlags: uint32
 {
-	SizeSwapchainRelative = (1 << 0)
+	SizeSwapchainRelative = 1 << 0
 }
 
 enum GPUTextureTiling: uint32

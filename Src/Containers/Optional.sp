@@ -8,7 +8,7 @@ state Optional<Type>
 
 *Value Optional::Get()
 {
-	if(this.has) return this.value@;
+	if (this.has) return this.value@;
 
 	return null;
 }

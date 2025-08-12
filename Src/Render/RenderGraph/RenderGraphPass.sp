@@ -5,33 +5,80 @@ import Array
 
 MaxPassResourceCount := 32;
 
-enum RenderPassStage
+enum RenderPassStage: uint32
 {
 	Graphics,
 	Compute
 }
 
-enum ResourceAccess: uint32
+enum ResourceAccess: uint16
 {
-	Read,
-	Write
+	Read = 1 << 0,
+	Write = 1 << 1
 }
+
+ReadWriteMask := ResourceAccess.Read | ResourceAccess.Write;
+
+enum ResourceUsageFlags: uint16
+{
+	None = 0,
+
+	// Attachment flags
+	// Reads
+	Sampled = 1 << 0,
+	Input = 1 << 1,
+	StorageRead = 1 << 2,
+
+	// Writes
+	Color = 1 << 3,
+	Depth = 1 << 4,
+	Stencil = 1 << 5,
+	StorageWrite = 1 << 6,
+	DepthStencil = ResourceUsageFlags.Depth | ResourceUsageFlags.Stencil,
+	
+	Vertex = 1 << 7,
+	Index = 1 << 8,
+
+	TransferSrc = 1 << 9,
+	TransferDst = 1 << 10,
+
+	// Load/Store ops flags
+	Load = 1 << 11,
+	Clear = 1 << 12,
+	Store = 1 << 13,
+	LoadUndefined = 1 << 14,
+	StoreUndefined = 1 << 15,
+
+	DefaultRead = ResourceUsageFlags.Sampled,
+	DefaultWrite = ResourceUsageFlags.Color,
+}
+
+AttachmentMask := ResourceUsageFlags.Color | ResourceUsageFlags.DepthStencil | ResourceUsageFlags.Input;
 
 state RenderResourceUsage
 {
 	handle: RenderResourceHandle,
 	access: ResourceAccess,
-	layout: GPUTextureLayout
+	usage: ResourceUsageFlags,
 }
+
+bool RenderResourceUsage::IsRead() => this.access & ResourceAccess.Read;
+
+bool RenderResourceUsage::IsWrite() => this.access & ResourceAccess.Write;
+
+bool RenderResourceUsage::IsReadWrite() => (this.access & ReadWriteMask) == ReadWriteMask;
+
+bool RenderResourceUsage::NeedsAttachment() => (this.usage & AttachmentMask) != 0;
 
 state RenderGraphPass<Renderer>
 {
 	name: string,
 	resources: [MaxPassResourceCount]RenderResourceUsage,
-	count: uint32,
 	exec: ::(*RenderPassContext<Renderer>, *any),
-	stage: RenderPassStage,
-	data: *any
+	data: *any,
+
+	resourceCount: uint32,
+	stage: RenderPassStage
 }
 
 state RenderPassBuilder<Renderer>
@@ -46,23 +93,36 @@ state RenderPassBuilder<Renderer>
 	return this.renderGraph.renderer;
 }
 
-RenderPassBuilder::Add(usage: RenderResourceUsage)
+RenderPassBuilder::Add(handle: RenderResourceHandle, access: ResourceAccess, 
+					   usage: ResourceUsageFlags)
 {
+	for (i .. this.index)
+	{
+		if (this.resources[i].handle == handle)
+		{
+			this.resources[i].access |= access;
+			this.resources[i].usage |= usage;
+			return;
+		}
+	}
+
 	assert this.index < MaxPassResourceCount, "Resource limit for render pass reached";
-	this.resources[this.index] = usage;
+
+	resourceUsage := { handle, access, usage } as RenderResourceUsage;
+	this.resources[this.index] = resourceUsage;
 	this.index += 1;
 }
 
 RenderPassBuilder::Read(target: RenderResourceHandle,
-						layout: GPUTextureLayout = GPUTextureLayout.ShaderRead)
+						usage: ResourceUsageFlags = ResourceUsageFlags.DefaultRead)
 {
-	this.Add({ target, ResourceAccess.Read, layout });
+	this.Add(target, ResourceAccess.Read, usage);
 }
 
 RenderPassBuilder::Write(target: RenderResourceHandle,
-						 layout: GPUTextureLayout = GPUTextureLayout.ShaderWrite)
+						 usage: ResourceUsageFlags = ResourceUsageFlags.DefaultWrite)
 {
-	this.Add({ target, ResourceAccess.Write, layout });
+	this.Add(target, ResourceAccess.Write, usage);
 }
 
 RenderResourceHandle RenderPassBuilder::Create(name: string, desc: ResourceDesc)

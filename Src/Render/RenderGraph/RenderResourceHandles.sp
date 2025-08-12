@@ -8,6 +8,9 @@ state RenderResourceHandle
 	handle: uint32
 }
 
+bool RenderResourceHandle::operator::==(right: RenderResourceHandle)
+			=> this.handle == right.handle;
+
 state RenderResourceHandles<Renderer>
 {
 	handles := HandleSet<ResourceDesc>(),
