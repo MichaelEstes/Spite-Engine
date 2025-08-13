@@ -227,10 +227,12 @@ RunOnMainThread(func: ::(*any), data: *any)
 
 FlushMainThreadJobs()
 {
+	log "Running main thread jobs";
 	fibers.mainLock.Lock();
 	{
 		while (fibers.mainThreadJobs.count)
 		{
+			log "Running main thread job";
 			job := fibers.mainThreadJobs.Dequeue();
 			if (job.func)
 			{

@@ -66,9 +66,18 @@ bool RenderResourceUsage::IsRead() => this.access & ResourceAccess.Read;
 
 bool RenderResourceUsage::IsWrite() => this.access & ResourceAccess.Write;
 
+bool RenderResourceUsage::IsReadOnly() => this.IsRead() & !this.IsWrite();
+
 bool RenderResourceUsage::IsReadWrite() => (this.access & ReadWriteMask) == ReadWriteMask;
 
-bool RenderResourceUsage::NeedsAttachment() => (this.usage & AttachmentMask) != 0;
+bool RenderResourceUsage::NeedsAttachment()
+{
+	hasAttachmentMask := (this.usage & AttachmentMask) != 0;
+	isWrite := this.IsWrite();
+	isInput := (this.usage & ResourceUsageFlags.Input) != 0;
+
+	return hasAttachmentMask & (isWrite | isInput);
+}
 
 state RenderGraphPass<Renderer>
 {

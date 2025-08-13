@@ -3,16 +3,16 @@ package SDLRenderer
 import RenderGraph
 import ECS
 
-state RenderPass
+state SDLRenderPass
 {
 	onDraw: ::(RenderGraph<SDLRenderer>, *Scene)
 }
 
-nameToRenderPass := Map<string, RenderPass>();
+nameToRenderPass := Map<string, SDLRenderPass>();
 
-RenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph<SDLRenderer>, *Scene))
+SDLRenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph<SDLRenderer>, *Scene))
 {
-	pass := RenderPass();
+	pass := SDLRenderPass();
 	pass.onDraw = onDraw;
 
 	nameToRenderPass.Insert(name, pass);
@@ -20,4 +20,4 @@ RenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph<SDLRenderer>,
 	return pass;
 }
 
-*RenderPass GetRenderPass(name: string) => nameToRenderPass[name];
+*SDLRenderPass GetRenderPass(name: string) => nameToRenderPass[name];

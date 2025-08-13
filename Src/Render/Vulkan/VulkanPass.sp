@@ -3,16 +3,16 @@ package VulkanRenderer
 import RenderGraph
 import ECS
 
-state RenderPass
+state VulkanRenderPass
 {
 	onDraw: ::(RenderGraph<VulkanRenderer>, *Scene)
 }
 
-nameToRenderPass := Map<string, RenderPass>();
+nameToRenderPass := Map<string, VulkanRenderPass>();
 
-RenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph<VulkanRenderer>, *Scene))
+VulkanRenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph<VulkanRenderer>, *Scene))
 {
-	pass := RenderPass();
+	pass := VulkanRenderPass();
 	pass.onDraw = onDraw;
 
 	nameToRenderPass.Insert(name, pass);
@@ -20,4 +20,4 @@ RenderPass RegisterRenderPass(name: string, onDraw: ::(RenderGraph<VulkanRendere
 	return pass;
 }
 
-*RenderPass GetRenderPass(name: string) => nameToRenderPass[name];
+*VulkanRenderPass GetRenderPass(name: string) => nameToRenderPass[name];

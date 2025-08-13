@@ -76,7 +76,7 @@ state VulkanRenderer
 	frameFences: [FrameCount]*VkFence_T,
 	frameEndSemaphores: [FrameCount]*VkFence_T,
 
-	passes: Array<RenderPass>,
+	passes: Array<VulkanRenderPass>,
 
 	renderGraph: RenderGraph<VulkanRenderer>,
 	
@@ -137,23 +137,15 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>)
 	}
 
 	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables@);
-	vulkanRenderer.renderGraph.SetTransitionTextureFunc(
-		::(image: *VkImage_T, currentLayout: GPUTextureLayout, targetLayout: GPUTextureLayout, 
-		   format: GPUTextureFormat, renderer: *VulkanRenderer)
+	vulkanRenderer.renderGraph.SetRenderPassFuncs(
+		::*VkCommandBuffer_T(renderPass: RenderPass, renderer: *VulkanRenderer)
 		{
-			oldLayout := GPUTextureLayoutToVkLayout(currentLayout);
-			newLayout := GPUTextureLayoutToVkLayout(targetLayout);
-			vkFormat := GPUTextureFormatToVkFormat(format);
-			//log "Transitioning image: ", oldLayout, newLayout, vkFormat;
-
-			commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
-			TransitionImageLayout(
-				commandBuffer,
-				image,
-				oldLayout,
-				newLayout,
-				vkFormat
-			);
+			
+			return null;
+		},
+		::(commandBuffer: *VkCommandBuffer_T, renderer: *VulkanRenderer)
+		{
+			
 		}
 	);
 
@@ -218,6 +210,24 @@ VulkanRenderer::End(commandBuffer: *VkCommandBuffer_T)
 	vkEndCommandBuffer(commandBuffer);
 }
 
+VulkanRenderer::TransitionTexture(image: *VkImage_T, currentLayout: GPUTextureLayout, targetLayout: GPUTextureLayout, 
+								  format: GPUTextureFormat, renderer: *VulkanRenderer)
+{
+	oldLayout := GPUTextureLayoutToVkLayout(currentLayout);
+	newLayout := GPUTextureLayoutToVkLayout(targetLayout);
+	vkFormat := GPUTextureFormatToVkFormat(format);
+	//log "Transitioning image: ", oldLayout, newLayout, vkFormat;
+
+	commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
+	TransitionImageLayout(
+		commandBuffer,
+		image,
+		oldLayout,
+		newLayout,
+		vkFormat
+	);
+}
+
 VulkanRenderer::Draw(scene: *Scene)
 {
 	frame := this.Frame();
@@ -252,7 +262,7 @@ VulkanRenderer::Draw(scene: *Scene)
 		currentSwapchainLayout := resourceTables.GetCurrentTextureLayout(swapchainImage);
 		if (currentSwapchainLayout != GPUTextureLayout.Present)
 		{
-			renderGraph.transitionTexture(
+			this.TransitionTexture(
 				swapchainImage,
 				currentSwapchainLayout,
 				GPUTextureLayout.Present,

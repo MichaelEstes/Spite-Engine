@@ -11,15 +11,9 @@ state RenderPassPool
 RenderPassPool::ClearRenderPass(renderPass: RenderPass)
 {
 	renderPass.attachments.Clear();
-	for (subpass in renderPass.subpasses)
-	{
-		subpass.inputAttachments.Clear();
-		subpass.colorAttachments.Clear();
-		subpass.depthStencilAttachment = AttachmentRef();
-	}
-	renderPass.subpasses.Clear();
-	renderPass.dependecies.Clear();
-
+	renderPass.subpass.inputAttachments.Clear();
+	renderPass.subpass.colorAttachments.Clear();
+	renderPass.subpass.depthStencilAttachment = AttachmentRef();
 }
 
 uint32 RenderPassPool::GetNextIndex()
@@ -32,6 +26,7 @@ uint32 RenderPassPool::GetNextIndex()
 	index := this.pool.count;
 	renderPass := this.pool[index];
 	this.ClearRenderPass(renderPass);
+	this.pool.count += 1;
 	return index;
 }
 

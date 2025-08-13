@@ -102,7 +102,7 @@ state SDLRenderer
 {
 	device: *SDL.GPUDevice,
 	window: *SDL.Window,
-	passes: Array<RenderPass>,
+	passes: Array<SDLRenderPass>,
 	renderGraph: RenderGraph<SDLRenderer>
 }
 

@@ -43,7 +43,8 @@ state RenderGraph<Renderer>
 	passSet := BitSet(MaxPassCountForResource),
 	renderPassPool: RenderPassPool,
 
-	transitionTexture: ::(*any, GPUTextureLayout, GPUTextureLayout, GPUTextureFormat, *Renderer)
+	beginRenderPass: ::*any(RenderPass, *Renderer),
+	endRenderPass: ::(*any, *Renderer),
 }
 
 RenderGraph::SetResourceTables(resourceTables: *ResourceTables<Renderer>)
@@ -51,10 +52,10 @@ RenderGraph::SetResourceTables(resourceTables: *ResourceTables<Renderer>)
 	this.handles.resourceTables = resourceTables;
 }
 
-RenderGraph::SetTransitionTextureFunc(transitionTexture: ::(*any, GPUTextureLayout, GPUTextureLayout, 
-															GPUTextureFormat, *Renderer))
+RenderGraph::SetRenderPassFuncs(begin: ::*any(RenderPass, *Renderer), end: ::(*any, *Renderer))
 {
-	this.transitionTexture = transitionTexture;
+	this.beginRenderPass = begin;
+	this.endRenderPass = end;
 }
 
 RenderGraph::SetRenderer(renderer: *Renderer)
@@ -185,7 +186,7 @@ bool RenderGraph::HasPreviousWrite(resourceHandle: RenderResourceHandle, passOrd
 		prevPassIndex := this.passOrder[currIndex];
 		if (this.writerPassToResources.Has(prevPassIndex))
 		{
-			passResourceArr := this.writerPassToResources.Get(handle);
+			passResourceArr := this.writerPassToResources.Get(prevPassIndex);
 			for (i .. passResourceArr.count)
 			{
 				if (passResourceArr.values[i] == handle) return true;
@@ -193,6 +194,27 @@ bool RenderGraph::HasPreviousWrite(resourceHandle: RenderResourceHandle, passOrd
 		}
 
 		currIndex -= 1;
+	}
+
+	return false;
+}
+
+bool RenderGraph::HasFutureRead(resourceHandle: RenderResourceHandle, passOrderIndex: uint32)
+{
+	handle := resourceHandle.handle;
+	currIndex := passOrderIndex + 1;
+
+	for (currIndex := passOrderIndex + 1 .. this.passOrder.count)
+	{
+		prevPassIndex := this.passOrder[currIndex];
+		if (this.readerPassToResources.Has(prevPassIndex))
+		{
+			passResourceArr := this.readerPassToResources.Get(prevPassIndex);
+			for (i .. passResourceArr.count)
+			{
+				if (passResourceArr.values[i] == handle) return true;
+			}
+		}
 	}
 
 	return false;
@@ -213,12 +235,13 @@ LoadOp RenderGraph::GetLoadOpForResource(resourceUsage: RenderResourceUsage, pas
 	return LoadOp.Undefined;
 }
 
-StoreOp RenderGraph::GetStoreOpForResource(resourceUsage: RenderResourceUsage)
+StoreOp RenderGraph::GetStoreOpForResource(resourceUsage: RenderResourceUsage, passOrderIndex: uint32)
 {
 	if (resourceUsage.usage & ResourceUsageFlags.Store) return StoreOp.Store;
 	else if (resourceUsage.usage & ResourceUsageFlags.StoreUndefined) return StoreOp.Undefined;
 
-	if (resourceUsage.IsWrite())
+	if (resourceUsage.IsWrite() 
+		&& this.HasFutureRead(resourceUsage.handle, passOrderIndex))
 	{
 		return StoreOp.Store;
 	}
@@ -226,10 +249,55 @@ StoreOp RenderGraph::GetStoreOpForResource(resourceUsage: RenderResourceUsage)
 	return StoreOp.Undefined;
 }
 
-RenderPass RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOrderIndex: uint32)
+RenderGraph::SetStencilOps(attachment: Attachment, resourceUsage: RenderResourceUsage, 
+						   passOrderIndex: uint32)
+{
+	attachment.stencilLoad = LoadOp.Undefined;
+	attachment.stencilStore = StoreOp.Undefined;
+
+	if (resourceUsage.usage & ResourceUsageFlags.Stencil)
+	{
+		if (resourceUsage.IsRead() && 
+			this.HasPreviousWrite(resourceUsage.handle, passOrderIndex))
+		{
+			attachment.stencilLoad = LoadOp.Load;
+		}
+		
+		if (resourceUsage.IsWrite() && this.HasFutureRead(resourceUsage.handle, passOrderIndex))
+		{
+			attachment.stencilStore = StoreOp.Store;
+		}
+	}
+}
+
+GPUTextureLayout RenderGraph::GetTargetTextureLayout(resourceUsage: RenderResourceUsage)
+{
+	usage := resourceUsage.usage;
+
+	if (usage & ResourceUsageFlags.DepthStencil) return GPUTextureLayout.DepthStencilTarget;
+
+	if (usage & ResourceUsageFlags.Color) return GPUTextureLayout.RenderTarget;
+
+	if (usage & ResourceUsageFlags.StorageWrite) return GPUTextureLayout.ShaderWrite;
+
+	if (usage & ResourceUsageFlags.StorageRead) return GPUTextureLayout.ShaderRead;
+
+	if (usage & (ResourceUsageFlags.Sampled | ResourceUsageFlags.Input)) 
+		return GPUTextureLayout.ShaderRead;
+
+	if (usage & ResourceUsageFlags.TransferDst) return GPUTextureLayout.TransferDst;
+
+	if (usage & ResourceUsageFlags.TransferSrc) return GPUTextureLayout.TransferSrc;
+
+    return GPUTextureLayout.Undefined;
+}
+
+uint32 RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOrderIndex: uint32)
 {
 	renderPassIndex := this.renderPassPool.GetNextIndex();
 	renderPass := this.renderPassPool[renderPassIndex];
+
+	subpass := Subpass();
 
 	for (i .. pass.resourceCount)
 	{
@@ -240,16 +308,47 @@ RenderPass RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOr
 		if (resourceUsage.NeedsAttachment() && resourceDesc.kind == ResourceKind.Texture)
 		{
 			textureDesc := resourceDesc.desc.texture;
+			textureResource := this.handles.UseResource(resourceHandle, this.renderer);
+			assert textureResource.kind == ResourceKind.Texture, "Invalid resource handle for texture";
+			texture := textureResource.resource;
+
 			attachment := Attachment();
 			attachment.format = textureDesc.format;
 			attachment.samples = textureDesc.samples;
 			attachment.load = this.GetLoadOpForResource(resourceUsage, passOrderIndex);
-			attachment.store = this.GetStoreOpForResource(resourceUsage);
+			attachment.store = this.GetStoreOpForResource(resourceUsage, passOrderIndex);
+			this.SetStencilOps(attachment, resourceUsage, passOrderIndex);
+			attachment.fromLayout = this.handles.resourceTables.GetCurrentTextureLayout(texture);
+			attachment.toLayout = this.GetTargetTextureLayout(resourceUsage);
+
+			log "Created Attachment: ", attachment;
+
+			attachmentIndex := renderPass.attachments.Add(attachment);
+			attachmentRef := AttachmentRef();
+			attachmentRef.attachmentIndex = attachmentIndex;
+			attachmentRef.layout = attachment.toLayout;
+
+			usage := resourceUsage.usage;
+			if (usage & ResourceUsageFlags.Color)
+			{
+				subpass.colorAttachments.Add(attachmentRef);
+			}
+			else if (usage & ResourceUsageFlags.DepthStencil)
+			{
+				assert subpass.depthStencilAttachment.attachmentIndex == InvalidAttchmentIndex, "Depth stencil attachment already exists for subpass";
+
+				subpass.depthStencilAttachment = attachmentRef;
+			}
+			else if (usage & ResourceUsageFlags.Input)
+			{
+				subpass.inputAttachments.Add(attachmentRef);
+			}
+			renderPass.subpass = subpass;
+
 		}
 	}
 
-
-	return renderPass;
+	return renderPassIndex;
 }
 
 RenderGraph::Execute(context: RenderPassContext<Renderer>)
@@ -259,8 +358,12 @@ RenderGraph::Execute(context: RenderPassContext<Renderer>)
 		passIndex := this.passOrder[i];
 		pass := this.passes[passIndex];
 
-		renderPass := this.CreateRenderPass(pass, i);
+		renderPassIndex := this.CreateRenderPass(pass, i);
+		renderPass := this.renderPassPool[renderPassIndex];
+		HashRenderPass(renderPass);
+		value := this.beginRenderPass(renderPass, this.renderer);
 		pass.exec(context@, pass.data);
+		this.endRenderPass(value, this.renderer);
 	}
 
 	this.Clear();

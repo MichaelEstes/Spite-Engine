@@ -199,45 +199,45 @@ ref VulkanPipeline VulkanPipeline::CreatePipelineLayout(setLayouts: []*VkDescrip
 	return this;
 }
 
-ref VulkanPipeline VulkanPipeline::Create(renderPass: VulkanRenderPass, subpass: uint32,
-										  basePipelineHandle: *VkPipeline_T = null, basePipelineIndex: int32 = -1)
-{
-    dynamicState := VkPipelineDynamicStateCreateInfo();
-	dynamicState.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicState.dynamicStateCount = this.dynamicStates.count;
-	dynamicState.pDynamicStates = this.dynamicStates[0]@;
-	
-    shaderStages := Array<VkPipelineShaderStageCreateInfo>();
-	defer delete shaderStages;
-	//for (shader in this.shaders)
-	//{
-	//	shaderStages.Add(shader.shaderCreateInfo);
-	//}
-
-	pipelineInfo := VkGraphicsPipelineCreateInfo();
-	pipelineInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	
-    pipelineInfo.stageCount = shaderStages.count;
-	pipelineInfo.pStages = shaderStages[0]@;
-
-	pipelineInfo.pVertexInputState = this.vertexInput@;
-	pipelineInfo.pInputAssemblyState = this.inputAssembly@;
-	pipelineInfo.pViewportState = this.viewportState@;
-	pipelineInfo.pRasterizationState = this.rasterizer@;
-	pipelineInfo.pMultisampleState = this.multisampling@;
-	pipelineInfo.pDepthStencilState = this.depthStencil@;
-	pipelineInfo.pColorBlendState = this.colorBlend@;
-	pipelineInfo.pDynamicState = dynamicState@;
-	pipelineInfo.layout = this.layout;
-	pipelineInfo.renderPass = renderPass.renderPass;
-	pipelineInfo.subpass = subpass;
-	pipelineInfo.basePipelineHandle = basePipelineHandle; 
-	pipelineInfo.basePipelineIndex = basePipelineIndex;
-
-	CheckResult(
-		vkCreateGraphicsPipelines(this.device, null, uint32(1), pipelineInfo@, null, this.pipeline@),
-		"Error creating Vulkan pipeline"
-	);
-
-    return this;
-}
+//ref VulkanPipeline VulkanPipeline::Create(renderPass: VulkanRenderPass, subpass: uint32,
+//										  basePipelineHandle: *VkPipeline_T = null, basePipelineIndex: int32 = -1)
+//{
+//    dynamicState := VkPipelineDynamicStateCreateInfo();
+//	dynamicState.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+//	dynamicState.dynamicStateCount = this.dynamicStates.count;
+//	dynamicState.pDynamicStates = this.dynamicStates[0]@;
+//	
+//    shaderStages := Array<VkPipelineShaderStageCreateInfo>();
+//	defer delete shaderStages;
+//	//for (shader in this.shaders)
+//	//{
+//	//	shaderStages.Add(shader.shaderCreateInfo);
+//	//}
+//
+//	pipelineInfo := VkGraphicsPipelineCreateInfo();
+//	pipelineInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+//	
+//    pipelineInfo.stageCount = shaderStages.count;
+//	pipelineInfo.pStages = shaderStages[0]@;
+//
+//	pipelineInfo.pVertexInputState = this.vertexInput@;
+//	pipelineInfo.pInputAssemblyState = this.inputAssembly@;
+//	pipelineInfo.pViewportState = this.viewportState@;
+//	pipelineInfo.pRasterizationState = this.rasterizer@;
+//	pipelineInfo.pMultisampleState = this.multisampling@;
+//	pipelineInfo.pDepthStencilState = this.depthStencil@;
+//	pipelineInfo.pColorBlendState = this.colorBlend@;
+//	pipelineInfo.pDynamicState = dynamicState@;
+//	pipelineInfo.layout = this.layout;
+//	pipelineInfo.renderPass = renderPass.renderPass;
+//	pipelineInfo.subpass = subpass;
+//	pipelineInfo.basePipelineHandle = basePipelineHandle; 
+//	pipelineInfo.basePipelineIndex = basePipelineIndex;
+//
+//	CheckResult(
+//		vkCreateGraphicsPipelines(this.device, null, uint32(1), pipelineInfo@, null, this.pipeline@),
+//		"Error creating Vulkan pipeline"
+//	);
+//
+//    return this;
+//}
