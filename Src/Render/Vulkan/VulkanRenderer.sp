@@ -16,26 +16,6 @@ import ArrayView
 import ECS
 import Render
 
-UINT64_MAX := uint64(-1);
-VkFalse := uint32(0);
-VkTrue := uint32(1);
-
-appInfo := {
-	VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO,
-	null,
-	"Spite Engine"[0],
-	uint32(0),
-	"Spite Engine"[0],
-	uint32(0),
-	uint32(0),
-} as VkApplicationInfo;
-
-validationLayers := ["VK_LAYER_KHRONOS_validation"[0],];
-validationCount := #compile uint32 => (#typeof validationLayers).FixedArrayCount();
-
-requiredDeviceExtensions := ["VK_KHR_swapchain"[0],];
-requiredDeviceExtensionCount := #compile uint32 => (#typeof requiredDeviceExtensions).FixedArrayCount();
-
 CheckResult(result: VkResult, errorMsg: string)
 {
 	if (result != VkResult.VK_SUCCESS)
@@ -66,7 +46,8 @@ state VulkanRenderer
 	surface: *VkSurfaceKHR_T,
 
 	device: *VkDevice_T,
-	deviceProps: VulkanDeviceProps,
+	queues: *VulkanQueues,
+	physicalDevice: *VkPhysicalDevice_T
 	allocator: VulkanAllocator,
 
 	swapchain: VulkanSwapchain,
@@ -79,7 +60,10 @@ state VulkanRenderer
 	passes: Array<VulkanRenderPass>,
 
 	renderGraph: RenderGraph<VulkanRenderer>,
+
+	renderPassCache: VulkanRenderPassCache,
 	
+	deviceIndex: uint32,
 	swapchainHandle: RenderResourceHandle,
 	swapchainImageIndex: uint32,
 	currentFrame: uint32
@@ -90,7 +74,8 @@ VulkanRenderer::Destroy()
 
 }
 
-VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>)
+VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>, 
+								    deviceIndex: uint32 = vulkanInstance.defaultDevice)
 {
 	log "Creating Vulkan renderer";
 	vulkanRenderer := VulkanRenderer();
@@ -99,14 +84,16 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>)
 	vulkanRenderer.window = window;
 	vulkanRenderer.CreateSurface();
 
-	vulkanRenderer.device = vulkanRenderer.deviceProps.Create(vulkanRenderer.surface);
-	vulkanRenderer.allocator.Create(vulkanRenderer.device, vulkanRenderer.deviceProps.GetPhysicalDevice());
+	vulkanRenderer.device = vulkanInstance.devices[deviceIndex]~;
+	vulkanRenderer.queues = vulkanInstance.queues[deviceIndex];
+	vulkanRenderer.physicalDevice = vulkanInstance.physicalDevices[deviceIndex]~;
+	vulkanRenderer.allocator.Create(vulkanRenderer.device, vulkanRenderer.physicalDevice);
 
 	vulkanRenderer.swapchain.Create(vulkanRenderer@);
 
 	vulkanRenderer.graphicsCommands.Create(
 		vulkanRenderer.device, 
-		vulkanRenderer.deviceProps.queues.graphicsQueueIndex,
+		vulkanRenderer.queues.graphicsQueueIndex,
 		FrameCount
 	);
 
@@ -116,11 +103,11 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>)
 		vulkanRenderer.frameEndSemaphores[i] = CreateSemaphore(vulkanRenderer.device);
 	}
 
-	if (vulkanRenderer.deviceProps.queues.HasUniqueComputeQueue())
+	if (vulkanRenderer.queues.HasUniqueComputeQueue())
 	{
 		vulkanRenderer.computeCommands.Create(
 			vulkanRenderer.device, 
-			vulkanRenderer.deviceProps.queues.computeQueueIndex,
+			vulkanRenderer.queues.computeQueueIndex,
 			FrameCount
 		);
 	}
@@ -138,14 +125,29 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>)
 
 	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables@);
 	vulkanRenderer.renderGraph.SetRenderPassFuncs(
-		::*VkCommandBuffer_T(renderPass: RenderPass, renderer: *VulkanRenderer)
+		::*VkCommandBuffer_T(pass: RenderGraphPass<VulkanRenderer>, renderPass: RenderPass, 
+							 renderer: *VulkanRenderer)
 		{
-			
+			vkRenderPass := FindOrCreateRenderPass(renderPass, renderer.renderPassCache, renderer.device);
+			assert vkRenderPass, "Unable to create Vulkan render pass";
+
+			//commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
+			//
+			//renderPassInfo := VkRenderPassBeginInfo();
+			//renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			//renderPassInfo.renderPass = vkRenderPass;
+			//renderPassInfo.framebuffer = this.frameBuffers[imageIndex]~;
+			//renderPassInfo.renderArea = pass.renderArea;
+			//renderPassInfo.clearValueCount = 1;
+			//renderPassInfo.pClearValues = pass.clearColor@;
+			//
+			//vkCmdBeginRenderPass(commandBuffer, renderPassInfo@, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
+
 			return null;
 		},
 		::(commandBuffer: *VkCommandBuffer_T, renderer: *VulkanRenderer)
 		{
-			
+			//vkCmdEndRenderPass(commandBuffer);
 		}
 	);
 
@@ -289,11 +291,11 @@ VulkanRenderer::Draw(scene: *Scene)
 	submitInfo.pSignalSemaphores = fixed signalSemaphores;
 
 	CheckResult(
-		vkQueueSubmit(this.deviceProps.queues.graphicsQueue, 1, submitInfo@, fence),
+		vkQueueSubmit(this.queues.graphicsQueue, 1, submitInfo@, fence),
 		"Error submitting Vulkan draw command buffer"
 	);
 
-	this.swapchain.Present(this.deviceProps.queues.presentQueue, frame);
+	this.swapchain.Present(this.queues.presentQueue, frame);
 	this.currentFrame += 1;
 }
 

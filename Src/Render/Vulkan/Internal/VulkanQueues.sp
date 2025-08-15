@@ -136,7 +136,7 @@ Array<VkDeviceQueueCreateInfo> VulkanQueues::DeviceQueueCreateInfo()
 	return arr;
 }
 
-VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T, surface: *VkSurfaceKHR_T)
+VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T, instance: *VkInstance_T)
 {
 	dedicatedQueueIndicies := Array<uint32>();
 	defer delete dedicatedQueueIndicies;
@@ -180,6 +180,26 @@ VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T
 	{
 		this.transferQueueIndex = this.transferQueueIndicies[0]~;
 		vkGetDeviceQueue(device, this.transferQueueIndex, 0, this.computeQueue@);
+	}
+
+	tempWindow := CreateWindow(
+		null,
+		0,
+		0,
+		SDL.WindowFlags.Vulkan,
+	);
+	surface: *VkSurfaceKHR_T = null;
+	if (!SDL.VulkanCreateSurface(tempWindow, instance, null, surface@))
+	{
+		puts(SDL.GetError());
+		log "Error creating Vulkan surface";
+	}
+
+	defer 
+	{
+		log "Destroying temp window and surface";
+		DestroyWindow(tempWindow);
+		vkDestroySurfaceKHR(instance, surface, null);
 	}
 
 	for (i .. this.queueFamilyCount)

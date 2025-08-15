@@ -41,9 +41,8 @@ state RenderGraph<Renderer>
 	writerPassToResources := SparseSet<PassResourceArray>(),
 	passOrder: Array<uint32>,
 	passSet := BitSet(MaxPassCountForResource),
-	renderPassPool: RenderPassPool,
 
-	beginRenderPass: ::*any(RenderPass, *Renderer),
+	beginRenderPass: ::*any(RenderGraphPass<Renderer>, RenderPass, *Renderer),
 	endRenderPass: ::(*any, *Renderer),
 }
 
@@ -52,7 +51,8 @@ RenderGraph::SetResourceTables(resourceTables: *ResourceTables<Renderer>)
 	this.handles.resourceTables = resourceTables;
 }
 
-RenderGraph::SetRenderPassFuncs(begin: ::*any(RenderPass, *Renderer), end: ::(*any, *Renderer))
+RenderGraph::SetRenderPassFuncs(begin: ::*any(RenderGraphPass<Renderer>, RenderPass, *Renderer), 
+								end: ::(*any, *Renderer))
 {
 	this.beginRenderPass = begin;
 	this.endRenderPass = end;
@@ -77,6 +77,8 @@ RenderGraph::AddPass(name: string,
 		pass.name = name;
 		pass.resources = builder.resources;
 		pass.resourceCount = builder.index;
+		pass.clearColor = builder.clearColor;
+		pass.renderArea = builder.renderArea;
 		pass.exec = exec;
 		pass.stage = stage;
 		pass.data = data;
@@ -292,10 +294,9 @@ GPUTextureLayout RenderGraph::GetTargetTextureLayout(resourceUsage: RenderResour
     return GPUTextureLayout.Undefined;
 }
 
-uint32 RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOrderIndex: uint32)
+RenderPass RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOrderIndex: uint32)
 {
-	renderPassIndex := this.renderPassPool.GetNextIndex();
-	renderPass := this.renderPassPool[renderPassIndex];
+	renderPass := RenderPass();
 
 	subpass := Subpass();
 
@@ -348,7 +349,7 @@ uint32 RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOrderI
 		}
 	}
 
-	return renderPassIndex;
+	return renderPass;
 }
 
 RenderGraph::Execute(context: RenderPassContext<Renderer>)
@@ -358,12 +359,18 @@ RenderGraph::Execute(context: RenderPassContext<Renderer>)
 		passIndex := this.passOrder[i];
 		pass := this.passes[passIndex];
 
-		renderPassIndex := this.CreateRenderPass(pass, i);
-		renderPass := this.renderPassPool[renderPassIndex];
-		HashRenderPass(renderPass);
-		value := this.beginRenderPass(renderPass, this.renderer);
-		pass.exec(context@, pass.data);
-		this.endRenderPass(value, this.renderer);
+		if (pass.stage == RenderPassStage.Graphics)
+		{
+			renderPass := this.CreateRenderPass(pass, i);
+			value := this.beginRenderPass(pass, renderPass, this.renderer);
+			pass.exec(context@, pass.data);
+			this.endRenderPass(value, this.renderer);
+		}
+		else
+		{
+			pass.exec(context@, pass.data);
+		}
+
 	}
 
 	this.Clear();

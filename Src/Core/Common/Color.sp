@@ -1,11 +1,11 @@
-package Color
+package Common
 
 state Color
 {
 	r: float32,
 	g: float32,
 	b: float32,
-	a: float32 = 1.0
+	a: float32,
 }
 
 Color::(r: float32, g: float32, b: float32, a: float32) 

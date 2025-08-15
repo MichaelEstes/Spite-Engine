@@ -234,7 +234,6 @@ Scene::RemoveComponent<Type>(entity: Entity)
 
 Scene::SetSingleton<Type>(value: Type)
 {
-	log "Setting Singleton: ", value;
 	this.singletonComponents.Insert<Type>(value);
 	component := instance.GetComponent<Type>();
 	instance.OnComponentEnter(component.id, this.GetSingleton<Type>(), this);

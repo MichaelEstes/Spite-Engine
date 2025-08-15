@@ -1,6 +1,6 @@
 package Scene
 
-import Color
+import Common
 import Vec
 
 state DirectionalLight

@@ -144,7 +144,6 @@ AddJob(func: ::(*any), data: *any = null, handle: **JobHandle = null, priority: 
 	jobHandle := GetJobHandle(1, handle, index);
 	job := {func, data, jobHandle} as Job;
 
-	
 	AddJobForIndex(job, priority, index);
 }
 
@@ -159,7 +158,6 @@ AddJobs(funcs: []::(*any), data: []*any, handle: **JobHandle = null, priority: J
 		func := funcs[i];
 		dataItem := data[i];
 		job := {func, dataItem, jobHandle} as Job;
-
 
 		AddJobForIndex(job, priority, (index + i) % fibers.processCount);
 	}
@@ -241,6 +239,7 @@ FlushMainThreadJobs()
 		}
 	}
 	fibers.mainLock.Unlock();
+	log "Finished running main thread jobs";
 }
 
 Job GetNextJob(index: uint)

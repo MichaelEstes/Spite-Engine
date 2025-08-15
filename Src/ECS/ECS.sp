@@ -199,8 +199,9 @@ ECS::RunSystems(systems: Array<System>)
 		}
 	}
 
-	Fiber.WaitForHandle(handle);
 	Fiber.FlushMainThreadJobs();
+	Fiber.WaitForHandle(handle);
+	log "Ran Systems";
 }
 
 ECS::RunFrameSystems(systems: Array<FrameSystem>)
@@ -221,8 +222,9 @@ ECS::RunFrameSystems(systems: Array<FrameSystem>)
 		}, sceneSystem, handle@, Fiber.JobPriority.High);
 	}
 
-	Fiber.WaitForHandle(handle);
 	Fiber.FlushMainThreadJobs();
+	Fiber.WaitForHandle(handle);
+	log "Ran Frame Systems";
 }
 
 ECS::Start()

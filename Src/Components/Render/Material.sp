@@ -1,7 +1,7 @@
 package Render
 
 import Vec
-import Color
+import Common
 
 enum AlphaMode: uint16
 {

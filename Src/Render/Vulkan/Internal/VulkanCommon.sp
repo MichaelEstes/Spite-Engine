@@ -267,6 +267,15 @@ VkImageCreateInfo TextureDescToCreateInfo(createDesc: TextureDesc, renderer: *Vu
 	return createInfo;
 }
 
+samplesTable := [
+   VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT,
+   VkSampleCountFlagBits.VK_SAMPLE_COUNT_2_BIT,
+   VkSampleCountFlagBits.VK_SAMPLE_COUNT_4_BIT,
+   VkSampleCountFlagBits.VK_SAMPLE_COUNT_8_BIT
+];
+
+VkFormat GPUTextureSamplesToVkSamples(samples: GPUSampleCount) => samplesTable[samples];
+
 VkBufferCreateInfo BufferDescToCreateInfo(createDesc: BufferDesc)
 {
 	createInfo := VkBufferCreateInfo();

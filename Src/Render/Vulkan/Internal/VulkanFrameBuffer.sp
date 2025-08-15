@@ -1,8 +1,8 @@
 package VulkanRenderer
 
-state VulkanFrameBuffer
+state VulkanFrameBufferCache
 {
-	frameBuffer: *VkFramebuffer_T
+	frameBufferMap: *VkFramebuffer_T
 }
 
 //VulkanFrameBuffer::Create(device: *VkDevice_T, extent: VkExtent2D, renderPass: VulkanRenderPass, 

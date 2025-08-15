@@ -2,14 +2,41 @@ package VulkanRenderer
 
 import ArrayView
 
+UINT64_MAX := uint64(-1);
+VkFalse := uint32(0);
+VkTrue := uint32(1);
+
+appInfo := {
+	VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO,
+	null,
+	"Spite Engine"[0],
+	uint32(0),
+	"Spite Engine"[0],
+	uint32(0),
+	uint32(0),
+} as VkApplicationInfo;
+
+validationLayers := ["VK_LAYER_KHRONOS_validation"[0],];
+validationCount := #compile uint32 => (#typeof validationLayers).FixedArrayCount();
+
+requiredDeviceExtensions := ["VK_KHR_swapchain"[0],];
+requiredDeviceExtensionCount := #compile uint32 => (#typeof requiredDeviceExtensions).FixedArrayCount();
+
 state VulkanInstance
 {
 	instance: *VkInstance_T,
 	extensionNames: **byte,
 	physicalDevices: Allocator<*VkPhysicalDevice_T>,
+	devices: Allocator<*VkDevice_T>,
+	deviceFeatures: Allocator<VkPhysicalDeviceFeatures>,
+	deviceProperties: Allocator<VkPhysicalDeviceProperties>,
+	queues: Allocator<VulkanQueues>,
+	
 	resourceTables: ResourceTables<VulkanRenderer>,
 
+
 	physicalDeviceCount: uint32,
+	defaultDevice: uint32,
 	extensionCount: uint32,
 	initialized := false
 }
@@ -17,6 +44,76 @@ state VulkanInstance
 ArrayView<*VkPhysicalDevice_T> VulkanInstance::PhysicalDevices()
 {
 	return ArrayView<*VkPhysicalDevice_T>(this.physicalDevices[0], this.physicalDeviceCount);
+}
+
+VulkanInstance::SelectDefaultDevice()
+{
+	if (this.physicalDeviceCount == 1)
+	{
+		log "Only one physical device found, using it";
+		this.defaultDevice = 0;
+		return;
+	}
+
+	log "Selecting default device";
+
+	backupDevice := -1;
+
+	for (i .. this.physicalDeviceCount)
+	{
+		deviceProperties := this.deviceProperties[i];
+
+		log "Evaluating Device: ", string(256, fixed deviceProperties.deviceName);
+		if (deviceProperties.deviceType == VkPhysicalDeviceType.VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+		{
+			log "Found discrete GPU, using it";
+			this.defaultDevice = i;
+			return;
+		}
+		else if (deviceProperties.deviceType == VkPhysicalDeviceType.VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+		{
+			log "Found integrated GPU, set as backup";
+			backupDevice = i;
+		}
+	}
+
+	if (backupDevice != -1)
+	{
+		log "No discrete GPU found, using integrated GPU";
+		this.defaultDevice = backupDevice;
+		return;
+	}
+
+	log "No backup device found, using first device";
+	this.defaultDevice = 0;
+}
+
+VulkanInstance::DebugLogExtensions()
+{
+	physicalDevice := this.physicalDevices[this.defaultDevice]~;
+	extCount := uint32(0);
+	vkEnumerateDeviceExtensionProperties(physicalDevice, null, extCount@, null);
+	log "Device ext count: ", extCount;
+	extProps := Allocator<VkExtensionProperties>();
+	extProps.Alloc(extCount);
+	vkEnumerateDeviceExtensionProperties(physicalDevice, null, extCount@, extProps[0]);
+	for (i .. extCount)
+	{
+		puts(fixed extProps[i].extensionName);
+	}
+	log "End device ext";
+
+	instExtCount := uint32(0);
+	vkEnumerateInstanceExtensionProperties(null, instExtCount@, null);
+	log "Instance ext count: ", extCount;
+	instExtProps := Allocator<VkExtensionProperties>();
+	instExtProps.Alloc(extCount);
+	vkEnumerateInstanceExtensionProperties(null, instExtCount@, instExtProps[0]);
+	for (i .. instExtCount)
+	{
+		puts(fixed instExtProps[i].extensionName);
+	}
+	log "End instance ext";
 }
 
 vulkanInstance := VulkanInstance();
@@ -54,9 +151,51 @@ InitializeVulkanInstance()
 		"Error finding device for Vulkan"
 	);
 
+	vulkanInstance.devices.Alloc(vulkanInstance.physicalDeviceCount);
+	vulkanInstance.deviceFeatures.Alloc(vulkanInstance.physicalDeviceCount);
+	vulkanInstance.deviceProperties.Alloc(vulkanInstance.physicalDeviceCount);
+	vulkanInstance.queues.Alloc(vulkanInstance.physicalDeviceCount);
+
+	for (i .. vulkanInstance.physicalDeviceCount)
+	{
+		physicalDevice := vulkanInstance.physicalDevices[i]~;
+
+		deviceFeatures := vulkanInstance.deviceFeatures[i];
+		deviceProperties := vulkanInstance.deviceProperties[i];
+		vkGetPhysicalDeviceFeatures(physicalDevice, deviceFeatures);
+		vkGetPhysicalDeviceProperties(physicalDevice, deviceProperties);
+
+		queues := vulkanInstance.queues[i];
+		queues~ = VulkanQueues();
+		queues.Create(physicalDevice);
+
+		queueCreateInfos := queues.DeviceQueueCreateInfo();
+		defer delete queueCreateInfos;
+
+		createInfo := VkDeviceCreateInfo();
+		createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		createInfo.queueCreateInfoCount = queueCreateInfos.count;
+		createInfo.pQueueCreateInfos = queueCreateInfos[0]@;
+		createInfo.enabledExtensionCount = requiredDeviceExtensionCount;
+		createInfo.ppEnabledExtensionNames = requiredDeviceExtensions[0]@;
+		createInfo.pEnabledFeatures = vulkanInstance.deviceFeatures[i];
+
+		device := vulkanInstance.devices[i];
+		CheckResult(
+			vkCreateDevice(physicalDevice, createInfo@, null, device),
+			"Error creating Vulkan device"
+		);
+
+		queues.GetQueues(device~, physicalDevice, vulkanInstance.instance);
+	}
+
+	vulkanInstance.SelectDefaultDevice();
+
 	vulkanInstance.resourceTables = ResourceTables<VulkanRenderer>(
 		::*VkImage_T(createDesc: TextureDesc, renderer: *VulkanRenderer) {
-			return CreateVkImage(renderer.device, TextureDescToCreateInfo(createDesc, renderer));
+			image := CreateVkImage(renderer.device, TextureDescToCreateInfo(createDesc, renderer));
+
+			return image;
 		},
 		::*VkBuffer_T(createDesc: BufferDesc, renderer: *VulkanRenderer) {
 			return CreateVkBuffer(renderer.device, BufferDescToCreateInfo(createDesc));
@@ -73,6 +212,7 @@ InitializeVulkanInstance()
 				renderer := scene.GetSingleton<VulkanRenderer>();
 				if (renderer.window.id == windowID)
 				{
+					log "Window resized";
 					//renderer.RecreateSwapchain();
 				}
 			}

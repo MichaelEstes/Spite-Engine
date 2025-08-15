@@ -5,7 +5,7 @@ import Array
 import Matrix
 import Vec
 import Quaternion
-import Color
+import Common
 import Arena
 import StrArena
 import JSON

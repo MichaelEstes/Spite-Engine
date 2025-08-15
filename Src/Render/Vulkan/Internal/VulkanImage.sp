@@ -12,6 +12,17 @@ package VulkanRenderer
 	return image;
 }
 
+*VkImageView_T CreateVkImageView(device: *VkDevice_T, createInfo: VkImageViewCreateInfo)
+{
+	imageView: *VkImageView_T = null;
+	CheckResult(
+		vkCreateImageView(device, createInfo@, null, imageView@),
+		"Error creating Vulkan image view"
+	);
+
+	return imageView;
+}
+
 *VkDeviceMemory_T CreateDedicatedVkImage(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T, 
 										 createInfo: VkImageCreateInfo, memoryFlags: uint32)
 {

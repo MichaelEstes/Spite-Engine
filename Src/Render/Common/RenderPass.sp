@@ -7,15 +7,15 @@ InvalidAttchmentIndex := uint32(-1);
 
 enum LoadOp: uint16
 {
-	Undefined,
 	Load,
-	Clear
+	Clear,
+	Undefined
 }
 
 enum StoreOp: uint16
 {
-	Undefined,
-	Store
+	Store,
+	Undefined
 }
 
 enum StageFlags: uint32

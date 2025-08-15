@@ -26,7 +26,7 @@ VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)
 	surfaceFormats := Allocator<VkSurfaceFormatKHR>();
 	surfaceFormatCount := uint32(0);
 	vkGetPhysicalDeviceSurfaceFormatsKHR(
-		renderer.deviceProps.GetPhysicalDevice(), 
+		renderer.physicalDevice, 
 		renderer.surface,
 		surfaceFormatCount@, 
 		null
@@ -35,7 +35,7 @@ VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)
 	{
 		surfaceFormats.Alloc(surfaceFormatCount);
 		vkGetPhysicalDeviceSurfaceFormatsKHR(
-			renderer.deviceProps.GetPhysicalDevice(), 
+			renderer.physicalDevice, 
 			renderer.surface,
 			surfaceFormatCount@, 
 			surfaceFormats[0]
@@ -90,7 +90,7 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 	surfaceCapabilities := VkSurfaceCapabilitiesKHR();
 	CheckResult(
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-			renderer.deviceProps.GetPhysicalDevice(),
+			renderer.physicalDevice,
 			renderer.surface,
 			surfaceCapabilities@
 		),
@@ -107,9 +107,7 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 		this.imageSemaphores[i] = CreateSemaphore(renderer.device);
 	}
 
-	queueFamilyIndices := [renderer.deviceProps.queues.presentQueueIndex, renderer.deviceProps.queues.graphicsQueueIndex];
-
-	log "Swapchain Image format: ", this.imageFormat;
+	queueFamilyIndices := [renderer.queues.presentQueueIndex, renderer.queues.graphicsQueueIndex];
 
 	createInfo := VkSwapchainCreateInfoKHR();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -122,7 +120,7 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 	createInfo.imageUsage = VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | 
 							VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-	if (renderer.deviceProps.queues.presentQueueIndex == renderer.deviceProps.queues.graphicsQueueIndex)
+	if (renderer.queues.presentQueueIndex == renderer.queues.graphicsQueueIndex)
 	{
 		createInfo.imageSharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
 	}

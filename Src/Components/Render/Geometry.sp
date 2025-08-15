@@ -1,7 +1,7 @@
 package Render
 
 import Vec
-import Color
+import Common
 import ArrayView
 import Array
 

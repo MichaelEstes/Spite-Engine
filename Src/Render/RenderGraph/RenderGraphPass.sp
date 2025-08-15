@@ -2,8 +2,9 @@ package RenderGraph
 
 import RenderCommon
 import Array
+import Common
 
-MaxPassResourceCount := 32;
+MaxPassResourceCount := 16;
 
 enum RenderPassStage: uint32
 {
@@ -84,6 +85,8 @@ state RenderGraphPass<Renderer>
 	name: string,
 	resources: [MaxPassResourceCount]RenderResourceUsage,
 	exec: ::(*RenderPassContext<Renderer>, *any),
+	clearColor: Color,
+	renderArea: Rect2D,
 	data: *any,
 
 	resourceCount: uint32,
@@ -94,6 +97,8 @@ state RenderPassBuilder<Renderer>
 {
 	renderGraph: *RenderGraph<Renderer>,
 	resources: [MaxPassResourceCount]RenderResourceUsage,
+	clearColor: Color,
+	renderArea: Rect2D,
 	index: uint32
 }
 
@@ -155,4 +160,14 @@ RenderResourceHandle RenderPassBuilder::CreateBuffer(name: string, buffer: Buffe
 	desc.desc.buffer = buffer;
 
 	return this.renderGraph.RegisterResourceToCreate(name, desc);
+}
+
+RenderPassBuilder::SetClearColor(color: Color)
+{
+	this.clearColor = color;
+}
+
+RenderPassBuilder::SetRenderArea(rect: Rect2D)
+{
+	this.renderArea = rect;
 }
