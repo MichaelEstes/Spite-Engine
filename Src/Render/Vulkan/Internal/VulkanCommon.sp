@@ -54,9 +54,25 @@ uint32 FindMemoryType(physicalDevice: *VkPhysicalDevice_T, typeFilter: uint32, p
 	return -1;
 }
 
+bool IsDepthFormat(format: VkFormat) {
+    switch (format) 
+    {
+        case (VkFormat.VK_FORMAT_D16_UNORM) continue;
+        case (VkFormat.VK_FORMAT_X8_D24_UNORM_PACK32) continue;
+        case (VkFormat.VK_FORMAT_D32_SFLOAT) continue;
+        case (VkFormat.VK_FORMAT_D16_UNORM_S8_UINT) continue;
+        case (VkFormat.VK_FORMAT_D24_UNORM_S8_UINT) continue;
+        case (VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT) return true;
+    }
+    
+    return false;
+}
+
 bool HasStencilComponent(format: VkFormat) {
     return format == VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT || 
-	       format == VkFormat.VK_FORMAT_D24_UNORM_S8_UINT;
+	       format == VkFormat.VK_FORMAT_D24_UNORM_S8_UINT ||
+           format == VkFormat.VK_FORMAT_D16_UNORM_S8_UINT ||
+           format == VkFormat.VK_FORMAT_S8_UINT;
 }
 
 VkImageType GPUTextureTypeToVkImageType(type: GPUTextureType)

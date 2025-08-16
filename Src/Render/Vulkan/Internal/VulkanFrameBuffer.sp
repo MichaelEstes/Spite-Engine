@@ -5,6 +5,12 @@ state VulkanFrameBufferCache
 	frameBufferMap: *VkFramebuffer_T
 }
 
+*VkFramebuffer_T FindOrCreateFramebuffer(renderPass: *VkRenderPass_T, cache: VulkanFrameBufferCache, 
+									     device: *VkDevice_T, extent: VkExtent2D, attachments: []*VkImageView_T)
+{
+	return null;
+}
+
 //VulkanFrameBuffer::Create(device: *VkDevice_T, extent: VkExtent2D, renderPass: VulkanRenderPass, 
 //						  attachments: []*VkImageView_T)
 //{

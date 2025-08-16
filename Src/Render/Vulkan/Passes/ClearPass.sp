@@ -22,7 +22,7 @@ clearPass := RegisterRenderPass(
 			},
 			::(context: *RenderPassContext<VulkanRenderer>, param: *void) 
 			{
-				//log "Vulkan Clear pass exec";
+				log "Vulkan Clear pass exec";
 				renderer := context.renderer;
 				commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 				image := renderer.GetSwapchainImage();

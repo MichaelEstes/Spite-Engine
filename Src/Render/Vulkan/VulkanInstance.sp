@@ -31,9 +31,9 @@ state VulkanInstance
 	deviceFeatures: Allocator<VkPhysicalDeviceFeatures>,
 	deviceProperties: Allocator<VkPhysicalDeviceProperties>,
 	queues: Allocator<VulkanQueues>,
-	
-	resourceTables: ResourceTables<VulkanRenderer>,
 
+	resourceTables: Allocator<ResourceTables<VulkanRenderer>>,
+	resourceManagers: Allocator<VulkanResourceManager>,
 
 	physicalDeviceCount: uint32,
 	defaultDevice: uint32,
@@ -155,9 +155,34 @@ InitializeVulkanInstance()
 	vulkanInstance.deviceFeatures.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.deviceProperties.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.queues.Alloc(vulkanInstance.physicalDeviceCount);
+	vulkanInstance.resourceTables.Alloc(vulkanInstance.physicalDeviceCount);
+	vulkanInstance.resourceManagers.Alloc(vulkanInstance.physicalDeviceCount);
 
 	for (i .. vulkanInstance.physicalDeviceCount)
 	{
+		vulkanInstance.resourceTables[i]~ = ResourceTables<VulkanRenderer>(
+			::*VkImage_T(createDesc: TextureDesc, renderer: *VulkanRenderer) {
+				imageCreateInfo := TextureDescToCreateInfo(createDesc, renderer);
+				image := CreateVkImage(renderer.device, imageCreateInfo);
+				imageViewInfo := DefaultImageView(image, imageCreateInfo);
+				imageView := CreateVkImageView(renderer.device, imageViewInfo);
+
+				renderTarget := VulkanRenderTarget();
+				renderTarget.image = image;
+				renderTarget.imageView = imageView;
+
+				resourceManager := vulkanInstance.resourceManagers[renderer.deviceIndex];
+				resourceManager.renderTargetMap.Insert(image, renderTarget);
+
+				return image;
+			},
+			::*VkBuffer_T(createDesc: BufferDesc, renderer: *VulkanRenderer) {
+				return CreateVkBuffer(renderer.device, BufferDescToCreateInfo(createDesc));
+			}
+		)
+
+		vulkanInstance.resourceManagers[i]~ = VulkanResourceManager();
+
 		physicalDevice := vulkanInstance.physicalDevices[i]~;
 
 		deviceFeatures := vulkanInstance.deviceFeatures[i];
@@ -188,19 +213,8 @@ InitializeVulkanInstance()
 
 		queues.GetQueues(device~, physicalDevice, vulkanInstance.instance);
 	}
-
+ 
 	vulkanInstance.SelectDefaultDevice();
-
-	vulkanInstance.resourceTables = ResourceTables<VulkanRenderer>(
-		::*VkImage_T(createDesc: TextureDesc, renderer: *VulkanRenderer) {
-			image := CreateVkImage(renderer.device, TextureDescToCreateInfo(createDesc, renderer));
-
-			return image;
-		},
-		::*VkBuffer_T(createDesc: BufferDesc, renderer: *VulkanRenderer) {
-			return CreateVkBuffer(renderer.device, BufferDescToCreateInfo(createDesc));
-		}
-	)
 
 	SDLEventEmitter.On(SDL.EventType.WINDOW_RESIZED, ::(event: SDL.Event) {
 		windowID := event.data.window.windowID;

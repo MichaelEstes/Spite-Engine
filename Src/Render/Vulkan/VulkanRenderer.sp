@@ -84,6 +84,7 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	vulkanRenderer.window = window;
 	vulkanRenderer.CreateSurface();
 
+	vulkanRenderer.deviceIndex = deviceIndex;
 	vulkanRenderer.device = vulkanInstance.devices[deviceIndex]~;
 	vulkanRenderer.queues = vulkanInstance.queues[deviceIndex];
 	vulkanRenderer.physicalDevice = vulkanInstance.physicalDevices[deviceIndex]~;
@@ -123,7 +124,7 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 		vulkanRenderer.passes.Add(renderPass~);
 	}
 
-	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables@);
+	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables[deviceIndex]);
 	vulkanRenderer.renderGraph.SetRenderPassFuncs(
 		::*VkCommandBuffer_T(pass: RenderGraphPass<VulkanRenderer>, renderPass: RenderPass, 
 							 renderer: *VulkanRenderer)
@@ -131,16 +132,31 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 			vkRenderPass := FindOrCreateRenderPass(renderPass, renderer.renderPassCache, renderer.device);
 			assert vkRenderPass, "Unable to create Vulkan render pass";
 
-			//commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
-			//
-			//renderPassInfo := VkRenderPassBeginInfo();
-			//renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			//renderPassInfo.renderPass = vkRenderPass;
+			commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
+			
+			clearValues := [VkClearValue(), VkClearValue()];
+			clearCount := 0;
+
+			if (pass.ValidClearColor())
+			{
+				clearValues[clearCount].value.color = pass.clearColor as [4]float32;
+				clearCount += 1;
+			}
+
+			if (pass.ValidDepthStencilClear())
+			{
+				clearValues[clearCount].value.depthStencil = pass.depthStencilClear as VkClearDepthStencilValue;
+				clearCount += 1;
+			}
+
+			renderPassInfo := VkRenderPassBeginInfo();
+			renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassInfo.renderPass = vkRenderPass;
 			//renderPassInfo.framebuffer = this.frameBuffers[imageIndex]~;
-			//renderPassInfo.renderArea = pass.renderArea;
-			//renderPassInfo.clearValueCount = 1;
-			//renderPassInfo.pClearValues = pass.clearColor@;
-			//
+			renderPassInfo.renderArea = pass.renderArea as VkRect2D;
+			renderPassInfo.clearValueCount = clearCount;
+			renderPassInfo.pClearValues = fixed clearValues;
+			
 			//vkCmdBeginRenderPass(commandBuffer, renderPassInfo@, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
 
 			return null;
@@ -315,10 +331,13 @@ vulkanDrawSystem := ECS.RegisterSystem(
 	SystemStep.Draw
 );
 
-sdlDrawCleanupSystem := ECS.RegisterFrameSystem(
+drawCleanupSystem := ECS.RegisterFrameSystem(
 	::(dt: float) 
 	{
-		vulkanInstance.resourceTables.ReleaseTrackedResources();
+		for (i .. vulkanInstance.physicalDeviceCount)
+		{
+			vulkanInstance.resourceTables[i].ReleaseTrackedResources();
+		}
 	},
 	FrameSystemStep.End
 );

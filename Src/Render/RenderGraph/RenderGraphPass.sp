@@ -12,6 +12,12 @@ enum RenderPassStage: uint32
 	Compute
 }
 
+enum RenderPassFlags: uint32
+{
+	None = 0,
+	SelfManagedRenderPass = 1 << 0,
+}
+
 enum ResourceAccess: uint16
 {
 	Read = 1 << 0,
@@ -56,6 +62,14 @@ enum ResourceUsageFlags: uint16
 
 AttachmentMask := ResourceUsageFlags.Color | ResourceUsageFlags.DepthStencil | ResourceUsageFlags.Input;
 
+state DepthStencilClear
+{
+	depth: float32,
+    stencil: uint32 = uint32(-1);
+}
+
+InvalidColor := { float32(-1.0), float32(-1.0), float32(-1.0), float32(-1.0) } as Color;
+
 state RenderResourceUsage
 {
 	handle: RenderResourceHandle,
@@ -86,18 +100,24 @@ state RenderGraphPass<Renderer>
 	resources: [MaxPassResourceCount]RenderResourceUsage,
 	exec: ::(*RenderPassContext<Renderer>, *any),
 	clearColor: Color,
+	depthStencilClear: DepthStencilClear,
 	renderArea: Rect2D,
 	data: *any,
 
 	resourceCount: uint32,
-	stage: RenderPassStage
+	stage: RenderPassStage,
+	flags: RenderPassFlags
 }
+
+bool RenderGraphPass::ValidClearColor() => this.clearColor.r != float32(-1.0);
+bool RenderGraphPass::ValidDepthStencilClear() => this.depthStencilClear.stencil != uint32(-1);
 
 state RenderPassBuilder<Renderer>
 {
 	renderGraph: *RenderGraph<Renderer>,
 	resources: [MaxPassResourceCount]RenderResourceUsage,
-	clearColor: Color,
+	clearColor: Color = InvalidColor,
+	depthStencilClear: DepthStencilClear,
 	renderArea: Rect2D,
 	index: uint32
 }
@@ -165,6 +185,11 @@ RenderResourceHandle RenderPassBuilder::CreateBuffer(name: string, buffer: Buffe
 RenderPassBuilder::SetClearColor(color: Color)
 {
 	this.clearColor = color;
+}
+
+RenderPassBuilder::SetDepthStencilColor(clear: DepthStencilClear)
+{
+	this.depthStencilClear = clear;
 }
 
 RenderPassBuilder::SetRenderArea(rect: Rect2D)

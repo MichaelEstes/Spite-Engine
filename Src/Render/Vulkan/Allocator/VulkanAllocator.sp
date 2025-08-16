@@ -74,10 +74,13 @@ ResourceHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags: ui
 		"Error binding buffer memory"
 	);
 
-	resourceParam := VulkanResource();
-	resourceParam.allocator = this@;
-	resourceParam.allocation = alloc;
-	return VulkanResourceManager.LoadResource(resourceParam, ::(handle: ResourceHandle){});
+
+	return uint32(0) as ResourceHandle;
+
+	//resourceParam := VulkanResource();
+	//resourceParam.allocator = this@;
+	//resourceParam.allocation = alloc;
+	//return VulkanResourceManager.LoadResource(resourceParam, ::(handle: ResourceHandle){});
 }
 
 *VulkanBlock VulkanAllocator::FindBlock(size: uint32, memoryFlags: uint32)

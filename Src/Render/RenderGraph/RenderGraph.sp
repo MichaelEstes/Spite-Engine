@@ -66,7 +66,8 @@ RenderGraph::SetRenderer(renderer: *Renderer)
 RenderGraph::AddPass(name: string, 
 					 init: ::bool(*RenderPassBuilder<Renderer>, *any), 
 					 exec: ::(*RenderPassContext<Renderer>, *any),
-					 stage: RenderPassStage, data: *any = null)
+					 stage: RenderPassStage, data: *any = null,
+					 flags: RenderPassFlags = RenderPassFlags.None)
 {
 	builder := RenderPassBuilder<Renderer>();
 	builder.renderGraph = this@;
@@ -78,10 +79,12 @@ RenderGraph::AddPass(name: string,
 		pass.resources = builder.resources;
 		pass.resourceCount = builder.index;
 		pass.clearColor = builder.clearColor;
+		pass.depthStencilClear= builder.depthStencilClear;
 		pass.renderArea = builder.renderArea;
 		pass.exec = exec;
 		pass.stage = stage;
 		pass.data = data;
+		pass.flags = flags;
 		this.passes.Add(pass);
 	}
 }
@@ -359,7 +362,8 @@ RenderGraph::Execute(context: RenderPassContext<Renderer>)
 		passIndex := this.passOrder[i];
 		pass := this.passes[passIndex];
 
-		if (pass.stage == RenderPassStage.Graphics)
+		if (pass.stage == RenderPassStage.Graphics &&
+			!(pass.flags & RenderPassFlags.SelfManagedRenderPass))
 		{
 			renderPass := this.CreateRenderPass(pass, i);
 			value := this.beginRenderPass(pass, renderPass, this.renderer);

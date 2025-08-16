@@ -55,6 +55,51 @@ package VulkanRenderer
 	return memory;
 }
 
+imageViewTypesTable := [
+	VkImageViewType.VK_IMAGE_VIEW_TYPE_1D,
+	VkImageViewType.VK_IMAGE_VIEW_TYPE_2D,
+	VkImageViewType.VK_IMAGE_VIEW_TYPE_3D
+];
+
+imageViewArrTypesTable := [
+	VkImageViewType.VK_IMAGE_VIEW_TYPE_1D_ARRAY,
+	VkImageViewType.VK_IMAGE_VIEW_TYPE_2D_ARRAY,
+	VkImageViewType.VK_IMAGE_VIEW_TYPE_2D_ARRAY
+];
+
+VkImageViewCreateInfo DefaultImageView(image: *VkImage_T, imageInfo: VkImageCreateInfo)
+{
+	viewCreateInfo := VkImageViewCreateInfo();
+	viewCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewCreateInfo.image = image;
+	viewCreateInfo.format = imageInfo.format;
+
+	if (imageInfo.arrayLayers > 1)
+	{
+		viewCreateInfo.viewType = imageViewArrTypesTable[imageInfo.imageType];
+	}
+	else
+	{
+		viewCreateInfo.viewType = imageViewTypesTable[imageInfo.imageType];
+	}
+
+	aspectMask := VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+	if (IsDepthFormat(imageInfo.format)) 
+	{
+	    aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT;
+	    if (HasStencilComponent(imageInfo.format)) 
+			aspectMask |= VkImageAspectFlagBits.VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	viewCreateInfo.subresourceRange.aspectMask = aspectMask;
+	viewCreateInfo.subresourceRange.baseMipLevel = 0;
+	viewCreateInfo.subresourceRange.levelCount = imageInfo.mipLevels;
+	viewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	viewCreateInfo.subresourceRange.layerCount = imageInfo.arrayLayers;
+
+	return viewCreateInfo;
+}
+
 TransitionImageLayout(commandBuffer: *VkCommandBuffer_T, image: *VkImage_T,  
 					  oldLayout: VkImageLayout, newLayout: VkImageLayout,
 					  format: VkFormat)
