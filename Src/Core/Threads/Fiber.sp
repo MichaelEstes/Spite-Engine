@@ -219,27 +219,19 @@ RunOnMainThread(func: ::(*any), data: *any)
 		fibers.mainThreadJobs.Enqueue(job);
 	}
 	fibers.mainLock.Unlock();
-
-	log "Added main thread job";
 }
 
 FlushMainThreadJobs()
 {
-	log "Running main thread jobs";
 	fibers.mainLock.Lock();
 	{
 		while (fibers.mainThreadJobs.count)
 		{
-			log "Running main thread job";
 			job := fibers.mainThreadJobs.Dequeue();
-			if (job.func)
-			{
-				job.func(job.data);
-			}
+			job.func(job.data);
 		}
 	}
 	fibers.mainLock.Unlock();
-	log "Finished running main thread jobs";
 }
 
 Job GetNextJob(index: uint)

@@ -1,8 +1,24 @@
 package VulkanRenderer
 
+import MurmurHash
+
 state VulkanFrameBufferCache
 {
 	frameBufferMap: *VkFramebuffer_T
+}
+
+state FrameBufferKey
+{
+	renderPass: *VkRenderPass_T,
+	attachments: [8]*VkImageView_T,
+	width: uint16,
+	height: uint16,
+	layers: uint16,
+}
+
+uint HashFrameBufferKey(key: FrameBufferKey)
+{
+	return MHash<FrameBufferKey>(key);
 }
 
 *VkFramebuffer_T FindOrCreateFramebuffer(renderPass: *VkRenderPass_T, cache: VulkanFrameBufferCache, 

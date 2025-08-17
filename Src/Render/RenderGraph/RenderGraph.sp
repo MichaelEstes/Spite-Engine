@@ -325,8 +325,6 @@ RenderPass RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOr
 			attachment.fromLayout = this.handles.resourceTables.GetCurrentTextureLayout(texture);
 			attachment.toLayout = this.GetTargetTextureLayout(resourceUsage);
 
-			log "Created Attachment: ", attachment;
-
 			attachmentIndex := renderPass.attachments.Add(attachment);
 			attachmentRef := AttachmentRef();
 			attachmentRef.attachmentIndex = attachmentIndex;
@@ -374,7 +372,6 @@ RenderGraph::Execute(context: RenderPassContext<Renderer>)
 		{
 			pass.exec(context@, pass.data);
 		}
-
 	}
 
 	this.Clear();

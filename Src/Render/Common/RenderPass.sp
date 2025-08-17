@@ -1,6 +1,7 @@
 package RenderCommon
 
 import SizedArray
+import MurmurHash
 
 MaxAttachmentCount := 8;
 InvalidAttchmentIndex := uint32(-1);
@@ -113,39 +114,7 @@ state RenderPass
 
 uint HashRenderPass(renderPass: RenderPass)
 {
-	c1 := 0xCC9E2D51;
-    c2 := 0x1B873593;
-    r1 := 15;
-    r2 := 13;
-    m  := 5;
-    n  := 0xE6546B64;
-
-	hash := 0x9747B28C;
-	u32Count := (#sizeof RenderPass) / 4;
-
-	start := renderPass@ as *uint32;
-
-	for (i .. u32Count)
-	{
-		val := start[i]~;
-
-		val *= c1;
-		val = (val << r1);
-		val *= c2;
-
-		hash = hash ^ val;
-		hash = hash << r2;
-		hash = (hash * m) + n;
-	}
-
-	hash = hash ^ u32Count;
-	hash = hash ^ (hash >> 16);
-	hash *= 0x85EbCA6B;
-	hash = hash ^ (hash >> 13);
-	hash *= 0xC2B2AE35;
-	hash = hash ^ (hash >> 16);
-
-	return hash;
+	return MHash<RenderPass>(renderPass);
 }
 
 bool RenderPassEquals(left: RenderPass, right: RenderPass)
