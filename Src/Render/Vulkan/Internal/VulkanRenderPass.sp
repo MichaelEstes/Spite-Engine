@@ -5,7 +5,7 @@ import RenderCommon
 state VulkanRenderPassCache
 {
 	renderPassMap := Map<RenderPass, *VkRenderPass_T, 
-						 RenderCommon.HashRenderPass, RenderCommon.RenderPassEquals>()
+						 HashRenderPass, RenderPassEquals>()
 }
 
 *VkRenderPass_T CreateVulkanRenderPass(device: *VkDevice_T, createInfo: VkRenderPassCreateInfo)

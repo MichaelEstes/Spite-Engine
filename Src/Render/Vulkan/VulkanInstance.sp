@@ -35,6 +35,9 @@ state VulkanInstance
 	resourceTables: Allocator<ResourceTables<VulkanRenderer>>,
 	resourceManagers: Allocator<VulkanResourceManager>,
 
+	renderPassCaches: Allocator<VulkanRenderPassCache>,
+	frameBufferCaches: Allocator<VulkanFrameBufferCache>,
+
 	physicalDeviceCount: uint32,
 	defaultDevice: uint32,
 	extensionCount: uint32,
@@ -157,6 +160,8 @@ InitializeVulkanInstance()
 	vulkanInstance.queues.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.resourceTables.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.resourceManagers.Alloc(vulkanInstance.physicalDeviceCount);
+	vulkanInstance.renderPassCaches.Alloc(vulkanInstance.physicalDeviceCount);
+	vulkanInstance.frameBufferCaches.Alloc(vulkanInstance.physicalDeviceCount);
 
 	for (i .. vulkanInstance.physicalDeviceCount)
 	{
@@ -180,8 +185,9 @@ InitializeVulkanInstance()
 				return CreateVkBuffer(renderer.device, BufferDescToCreateInfo(createDesc));
 			}
 		)
-
 		vulkanInstance.resourceManagers[i]~ = VulkanResourceManager();
+		vulkanInstance.renderPassCaches[i]~ = VulkanRenderPassCache();
+		vulkanInstance.frameBufferCaches[i]~ = VulkanFrameBufferCache();
 
 		physicalDevice := vulkanInstance.physicalDevices[i]~;
 

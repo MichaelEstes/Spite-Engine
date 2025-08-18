@@ -60,8 +60,6 @@ state VulkanRenderer
 	passes: Array<VulkanRenderPass>,
 
 	renderGraph: RenderGraph<VulkanRenderer>,
-
-	renderPassCache: VulkanRenderPassCache,
 	
 	deviceIndex: uint32,
 	swapchainHandle: RenderResourceHandle,
@@ -91,6 +89,16 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	vulkanRenderer.allocator.Create(vulkanRenderer.device, vulkanRenderer.physicalDevice);
 
 	vulkanRenderer.swapchain.Create(vulkanRenderer@);
+	resourceManager := vulkanInstance.resourceManagers[deviceIndex];
+	for (i .. vulkanRenderer.swapchain.imageCount)
+	{
+		image := vulkanRenderer.swapchain.images[i]~;
+		imageView := vulkanRenderer.swapchain.imageViews[i]~;
+		renderTarget := VulkanRenderTarget();
+		renderTarget.image = image;
+		renderTarget.imageView = imageView;
+		resourceManager.renderTargetMap.Insert(image, renderTarget);
+	}
 
 	vulkanRenderer.graphicsCommands.Create(
 		vulkanRenderer.device, 
@@ -98,7 +106,7 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 		FrameCount
 	);
 
-	for (i .. FrameCount)
+	for (i := 0 .. FrameCount)
 	{
 		vulkanRenderer.frameFences[i] = CreateFence(vulkanRenderer.device);
 		vulkanRenderer.frameEndSemaphores[i] = CreateSemaphore(vulkanRenderer.device);
@@ -129,30 +137,67 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 		::*VkCommandBuffer_T(pass: RenderGraphPass<VulkanRenderer>, renderPass: RenderPass, 
 							 renderer: *VulkanRenderer)
 		{
-			vkRenderPass := FindOrCreateRenderPass(renderPass, renderer.renderPassCache, renderer.device);
+			deviceIndex := renderer.deviceIndex;
+			device := renderer.device;
+			renderPassCache := vulkanInstance.renderPassCaches[deviceIndex]~;
+			frameBufferCache := vulkanInstance.frameBufferCaches[deviceIndex]~;
+			resourceManager := vulkanInstance.resourceManagers[deviceIndex]~;
+			renderGraph := renderer.renderGraph;
+
+			vkRenderPass := FindOrCreateRenderPass(renderPass, renderPassCache, device);
 			assert vkRenderPass, "Unable to create Vulkan render pass";
 
 			commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 			
 			clearValues := [VkClearValue(), VkClearValue()];
 			clearCount := 0;
-
 			if (pass.ValidClearColor())
 			{
 				clearValues[clearCount].value.color = pass.clearColor as [4]float32;
 				clearCount += 1;
 			}
-
 			if (pass.ValidDepthStencilClear())
 			{
 				clearValues[clearCount].value.depthStencil = pass.depthStencilClear as VkClearDepthStencilValue;
 				clearCount += 1;
 			}
 
+
+			width := uint16(0);
+			height := uint16(0);
+			layers := uint16(1);
+			attachmentImageViews := [MaxAttachmentCount]*VkImageView_T;
+			for (i .. MaxAttachmentCount) attachmentImageViews[i] = null;
+	
+			attachmentIndex := 0;
+			for (i := 0 .. pass.resourceCount)
+			{
+				resourceUsage := pass.resources[i];
+				handle := resourceUsage.handle;
+				imageResource := renderGraph.handles.UseResource(handle, renderer);
+				if (imageResource.kind == ResourceKind.Texture)
+				{
+					image := imageResource.resource as *VkImage_T;
+					renderTarget := resourceManager.renderTargetMap.Find(image);
+					attachmentImageViews[attachmentIndex] = renderTarget.imageView;
+
+					textureDesc := renderGraph.handles.GetResourceDesc(handle).desc.texture;
+					if (textureDesc.width > width) width = textureDesc.width;
+					if (textureDesc.height > height) height = textureDesc.height;
+				}
+			}
+
+			frameBuffer := FindOrCreateFramebuffer(
+				vkRenderPass, frameBufferCache, device,
+				width, height, layers,
+				attachmentImageViews
+			);
+			assert frameBuffer, "Unable to create Vulkan frame buffer";
+
 			renderPassInfo := VkRenderPassBeginInfo();
 			renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 			renderPassInfo.renderPass = vkRenderPass;
-			//renderPassInfo.framebuffer = this.frameBuffers[imageIndex]~;
+			renderPassInfo.framebuffer = frameBuffer;
 			renderPassInfo.renderArea = pass.renderArea as VkRect2D;
 			renderPassInfo.clearValueCount = clearCount;
 			renderPassInfo.pClearValues = fixed clearValues;
