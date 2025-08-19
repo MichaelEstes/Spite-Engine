@@ -2,8 +2,6 @@ package VulkanRenderer
 
 import MurmurHash
 
-MaxFrameBufferAttachmentCount := 8;
-
 state VulkanFrameBufferCache
 {
 	frameBufferMap := Map<VulkanFrameBufferKey, *VkFramebuffer_T, HashFrameBufferKey>()
@@ -12,7 +10,7 @@ state VulkanFrameBufferCache
 state VulkanFrameBufferKey
 {
 	renderPass: *VkRenderPass_T,
-	attachments: [MaxFrameBufferAttachmentCount]*VkImageView_T,
+	attachments: [8]*VkImageView_T,
 	width: uint16,
 	height: uint16,
 	layers: uint16,
@@ -31,7 +29,7 @@ uint HashFrameBufferKey(key: VulkanFrameBufferKey)
 
 *VkFramebuffer_T FindOrCreateFramebuffer(renderPass: *VkRenderPass_T, cache: VulkanFrameBufferCache, 
 									     device: *VkDevice_T, width: uint16, height: uint16, layers: uint16,
-										 attachments: [MaxFrameBufferAttachmentCount]*VkImageView_T)
+										 attachments: [8]*VkImageView_T)
 {
 	key := VulkanFrameBufferKey();
 	key.renderPass = renderPass;
@@ -42,11 +40,11 @@ uint HashFrameBufferKey(key: VulkanFrameBufferKey)
 
 	if (cache.frameBufferMap.Has(key))
 	{
-		log "Using cached frame buffer";
+		//log "Using cached frame buffer";
 		return cache.frameBufferMap.Find(key)~;
 	}
 
-	log "Creating framebuffer";
+	//log "Creating framebuffer";
 	createInfo := VkFramebufferCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	
@@ -56,7 +54,7 @@ uint HashFrameBufferKey(key: VulkanFrameBufferKey)
 	createInfo.layers = layers;
 
 	attachmentCount := 0;
-	while (attachmentCount < MaxFrameBufferAttachmentCount && 
+	while (attachmentCount < MaxAttachmentCount && 
 		   attachments[attachmentCount] != null) 
 	{
 		attachmentCount += 1;

@@ -8,6 +8,10 @@ import SceneDescription
 import SDLRenderPass
 import VulkanRenderPass
 
+import GLTFManager
+
+gltfEntities := Array<Entity>();
+
 _ := SceneRegistry.RegisterScene(
 	0,
 	::(scene: *Scene) {
@@ -26,6 +30,15 @@ _ := SceneRegistry.RegisterScene(
 				//RendererFlags.SDL
 			}
 		});
+
+		LoadGLTFResource("./Resource/Models/Box/Box.gltf", scene, ::(handle: ResourceHandle) {
+			log "Loaded gltf: ", handle;
+
+			gltfResource := Resource.TakeResourceRef<GLTFResource>(handle);
+			log "GLTF RESOURCE: ", gltfResource;
+			Resource.ReleaseResourceRef(handle);
+		}, gltfEntities@);
+
 	},
 	"Main Scene"
 )

@@ -172,6 +172,15 @@ TransitionImageLayout(commandBuffer: *VkCommandBuffer_T, image: *VkImage_T,
 		sourceStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		destinationStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 	}
+	else if (oldLayout == VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+			 newLayout == VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+	{
+	    barrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	    barrier.dstAccessMask = 0;
+	
+	    sourceStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	    destinationStage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	}
 	else 
 	{
 	    log "Unsupported layout transition, old: ", oldLayout, " new: ", newLayout;

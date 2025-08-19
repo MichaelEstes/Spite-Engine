@@ -78,8 +78,6 @@ RenderGraph::AddPass(name: string,
 		pass.name = name;
 		pass.resources = builder.resources;
 		pass.resourceCount = builder.index;
-		pass.clearColor = builder.clearColor;
-		pass.depthStencilClear= builder.depthStencilClear;
 		pass.renderArea = builder.renderArea;
 		pass.exec = exec;
 		pass.stage = stage;
@@ -227,8 +225,8 @@ bool RenderGraph::HasFutureRead(resourceHandle: RenderResourceHandle, passOrderI
 
 LoadOp RenderGraph::GetLoadOpForResource(resourceUsage: RenderResourceUsage, passOrderIndex: uint32)
 {
-	if (resourceUsage.usage & ResourceUsageFlags.Load) return LoadOp.Load;
-	else if (resourceUsage.usage & ResourceUsageFlags.Clear) return LoadOp.Clear;
+	if (resourceUsage.usage & ResourceUsageFlags.Clear) return LoadOp.Clear;
+	else if (resourceUsage.usage & ResourceUsageFlags.Load) return LoadOp.Load;
 	else if (resourceUsage.usage & ResourceUsageFlags.LoadUndefined) return LoadOp.Undefined;
 
 	if (resourceUsage.IsRead() && 
@@ -279,15 +277,16 @@ GPUTextureLayout RenderGraph::GetTargetTextureLayout(resourceUsage: RenderResour
 {
 	usage := resourceUsage.usage;
 
+	if (usage & ResourceUsageFlags.Present) return GPUTextureLayout.Present;
+
 	if (usage & ResourceUsageFlags.DepthStencil) return GPUTextureLayout.DepthStencilTarget;
 
 	if (usage & ResourceUsageFlags.Color) return GPUTextureLayout.RenderTarget;
 
 	if (usage & ResourceUsageFlags.StorageWrite) return GPUTextureLayout.ShaderWrite;
 
-	if (usage & ResourceUsageFlags.StorageRead) return GPUTextureLayout.ShaderRead;
-
-	if (usage & (ResourceUsageFlags.Sampled | ResourceUsageFlags.Input)) 
+	if (usage & 
+		(ResourceUsageFlags.Sampled | ResourceUsageFlags.Input | ResourceUsageFlags.StorageRead)) 
 		return GPUTextureLayout.ShaderRead;
 
 	if (usage & ResourceUsageFlags.TransferDst) return GPUTextureLayout.TransferDst;
@@ -371,6 +370,21 @@ RenderGraph::Execute(context: RenderPassContext<Renderer>)
 		else
 		{
 			pass.exec(context@, pass.data);
+		}
+
+		for (i .. pass.resourceCount)
+		{
+			resourceUsage := pass.resources[i];
+			resourceHandle := resourceUsage.handle;
+			resourceDesc := this.handles.GetResourceDesc(resourceHandle);
+
+			if (resourceDesc.kind == ResourceKind.Texture)
+			{
+				toLayout := this.GetTargetTextureLayout(resourceUsage);
+				texture := this.handles.UseResource(resourceHandle, this.renderer).resource;
+				this.handles.resourceTables.SetCurrentTextureLayout(texture, toLayout);
+			}
+	
 		}
 	}
 

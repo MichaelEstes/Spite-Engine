@@ -10,7 +10,8 @@ state VulkanSwapchain
 	images: Allocator<*VkImage_T>,
 	imageViews: Allocator<*VkImageView_T>,
 
-	imageSemaphores: [FrameCount]*VkSemaphore_T,
+	waitSemaphores: [FrameCount]*VkSemaphore_T,
+	signalSemaphores: [FrameCount]*VkSemaphore_T,
 
 	extent: VkExtent2D,
 
@@ -104,7 +105,8 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 
 	for (i .. FrameCount)
 	{
-		this.imageSemaphores[i] = CreateSemaphore(renderer.device);
+		this.waitSemaphores[i] = CreateSemaphore(renderer.device);
+		this.signalSemaphores[i] = CreateSemaphore(renderer.device);
 	}
 
 	queueFamilyIndices := [renderer.queues.presentQueueIndex, renderer.queues.graphicsQueueIndex];
@@ -183,7 +185,7 @@ VkResult VulkanSwapchain::AcquireNext(device: *VkDevice_T, frame: uint32)
 		device, 
 		this.swapchain, 
 		UINT64_MAX, 
-		this.imageSemaphores[frame], 
+		this.waitSemaphores[frame],
 		null, 
 		this.currentImage@
 	);
@@ -199,7 +201,7 @@ VkResult VulkanSwapchain::Present(presentQueue: *VkQueue_T, frame: uint32)
 	presentInfo := VkPresentInfoKHR();
 	presentInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = this.imageSemaphores[frame]@;
+	presentInfo.pWaitSemaphores = this.signalSemaphores[frame]@;
 	presentInfo.swapchainCount = 1;
 	presentInfo.pSwapchains = this.swapchain@;
 	presentInfo.pImageIndices = this.currentImage@;

@@ -24,10 +24,11 @@ state VulkanRenderPassCache
 {
 	if (cache.renderPassMap.Has(renderPass))
 	{
-		log "Using cached render pass";
+		//log "Using cached render pass";
 		return cache.renderPassMap.Find(renderPass)~;
 	}
 
+	//log "Creating render pass";
 	createInfo := VkRenderPassCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	createInfo.attachmentCount = renderPass.attachments.count;

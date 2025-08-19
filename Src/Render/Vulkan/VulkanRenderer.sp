@@ -55,7 +55,6 @@ state VulkanRenderer
 	computeCommands: VulkanCommands,
 	
 	frameFences: [FrameCount]*VkFence_T,
-	frameEndSemaphores: [FrameCount]*VkFence_T,
 
 	passes: Array<VulkanRenderPass>,
 
@@ -109,7 +108,6 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	for (i := 0 .. FrameCount)
 	{
 		vulkanRenderer.frameFences[i] = CreateFence(vulkanRenderer.device);
-		vulkanRenderer.frameEndSemaphores[i] = CreateSemaphore(vulkanRenderer.device);
 	}
 
 	if (vulkanRenderer.queues.HasUniqueComputeQueue())
@@ -149,28 +147,17 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 
 			commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 			
-			clearValues := [VkClearValue(), VkClearValue()];
 			clearCount := 0;
-			if (pass.ValidClearColor())
-			{
-				clearValues[clearCount].value.color = pass.clearColor as [4]float32;
-				clearCount += 1;
-			}
-			if (pass.ValidDepthStencilClear())
-			{
-				clearValues[clearCount].value.depthStencil = pass.depthStencilClear as VkClearDepthStencilValue;
-				clearCount += 1;
-			}
-
-
 			width := uint16(0);
 			height := uint16(0);
 			layers := uint16(1);
-			attachmentImageViews := [MaxAttachmentCount]*VkImageView_T;
-			for (i .. MaxAttachmentCount) attachmentImageViews[i] = null;
+
+			clearValues := [8]VkClearValue;
+			attachmentImageViews := [8]*VkImageView_T;
+			for (imageView in attachmentImageViews) imageView = null;
 	
 			attachmentIndex := 0;
-			for (i := 0 .. pass.resourceCount)
+			for (i .. pass.resourceCount)
 			{
 				resourceUsage := pass.resources[i];
 				handle := resourceUsage.handle;
@@ -180,6 +167,8 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 					image := imageResource.resource as *VkImage_T;
 					renderTarget := resourceManager.renderTargetMap.Find(image);
 					attachmentImageViews[attachmentIndex] = renderTarget.imageView;
+					clearValues[attachmentIndex] = resourceUsage.clearValue as VkClearValue;
+					attachmentIndex += 1;
 
 					textureDesc := renderGraph.handles.GetResourceDesc(handle).desc.texture;
 					if (textureDesc.width > width) width = textureDesc.width;
@@ -194,21 +183,25 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 			);
 			assert frameBuffer, "Unable to create Vulkan frame buffer";
 
+			renderArea := pass.renderArea~ as VkRect2D;
+			if (!renderArea.extent.width) renderArea.extent.width = width;
+			if (!renderArea.extent.height) renderArea.extent.height = height;
+
 			renderPassInfo := VkRenderPassBeginInfo();
 			renderPassInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 			renderPassInfo.renderPass = vkRenderPass;
 			renderPassInfo.framebuffer = frameBuffer;
-			renderPassInfo.renderArea = pass.renderArea as VkRect2D;
-			renderPassInfo.clearValueCount = clearCount;
+			renderPassInfo.renderArea = renderArea;
+			renderPassInfo.clearValueCount = attachmentIndex;
 			renderPassInfo.pClearValues = fixed clearValues;
 			
-			//vkCmdBeginRenderPass(commandBuffer, renderPassInfo@, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
+			vkCmdBeginRenderPass(commandBuffer, renderPassInfo@, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
 
-			return null;
+			return commandBuffer;
 		},
 		::(commandBuffer: *VkCommandBuffer_T, renderer: *VulkanRenderer)
 		{
-			//vkCmdEndRenderPass(commandBuffer);
+			vkCmdEndRenderPass(commandBuffer);
 		}
 	);
 
@@ -336,9 +329,9 @@ VulkanRenderer::Draw(scene: *Scene)
 	}
 	this.End(graphicsCommandBuffer);
 
-	waitSemaphores := [this.swapchain.imageSemaphores[frame],];
+	waitSemaphores := [this.swapchain.waitSemaphores[frame],];
 	waitStages := [VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,];
-	signalSemaphores := [this.frameEndSemaphores[frame],];
+	signalSemaphores := [this.swapchain.signalSemaphores[frame],];
 	fence := this.frameFences[frame];
 
 	submitInfo := VkSubmitInfo();
@@ -376,7 +369,7 @@ vulkanDrawSystem := ECS.RegisterSystem(
 	SystemStep.Draw
 );
 
-drawCleanupSystem := ECS.RegisterFrameSystem(
+vulkanDrawCleanupSystem := ECS.RegisterFrameSystem(
 	::(dt: float) 
 	{
 		for (i .. vulkanInstance.physicalDeviceCount)

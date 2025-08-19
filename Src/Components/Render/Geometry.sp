@@ -5,7 +5,7 @@ import Common
 import ArrayView
 import Array
 
-enum GeometryKind: uint32
+enum GeometryKind: uint16
 {
     Triangle,
     TraiangleStrip,
@@ -14,6 +14,13 @@ enum GeometryKind: uint32
     LineStrip,
     LineLoop,
     Point
+}
+
+enum IndexKind: uint16
+{
+    None,
+    I16,
+    I32
 }
 
 state Geometry
@@ -28,6 +35,7 @@ state Geometry
 
     colors: Array<ArrayView<Color>>,
 
+    indexKind: IndexKind,
     kind: GeometryKind
 }
 

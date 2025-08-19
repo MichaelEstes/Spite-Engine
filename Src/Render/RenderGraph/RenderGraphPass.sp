@@ -6,13 +6,13 @@ import Common
 
 MaxPassResourceCount := 16;
 
-enum RenderPassStage: uint32
+enum RenderPassStage: uint16
 {
 	Graphics,
 	Compute
 }
 
-enum RenderPassFlags: uint32
+enum RenderPassFlags: uint16
 {
 	None = 0,
 	SelfManagedRenderPass = 1 << 0,
@@ -26,7 +26,7 @@ enum ResourceAccess: uint16
 
 ReadWriteMask := ResourceAccess.Read | ResourceAccess.Write;
 
-enum ResourceUsageFlags: uint16
+enum ResourceUsageFlags: uint32
 {
 	None = 0,
 
@@ -56,25 +56,37 @@ enum ResourceUsageFlags: uint16
 	LoadUndefined = 1 << 14,
 	StoreUndefined = 1 << 15,
 
-	DefaultRead = ResourceUsageFlags.Sampled,
-	DefaultWrite = ResourceUsageFlags.Color,
+	Present = 1 << 16,
+
+	DefaultRead = ResourceUsageFlags.Sampled | ResourceUsageFlags.Load,
+	DefaultWrite = ResourceUsageFlags.Color | ResourceUsageFlags.Store,
 }
 
-AttachmentMask := ResourceUsageFlags.Color | ResourceUsageFlags.DepthStencil | ResourceUsageFlags.Input;
+AttachmentMask := ResourceUsageFlags.Color | 
+				  ResourceUsageFlags.DepthStencil | 
+				  ResourceUsageFlags.Input |
+				  ResourceUsageFlags.Present;
 
 state DepthStencilClear
 {
 	depth: float32,
-    stencil: uint32 = uint32(-1);
+    stencil: uint32
 }
 
-InvalidColor := { float32(-1.0), float32(-1.0), float32(-1.0), float32(-1.0) } as Color;
+state ClearValue
+{
+	value: ?{
+		color: Color,
+		depthStencilClear: DepthStencilClear
+	}
+}
 
 state RenderResourceUsage
 {
+	clearValue: ClearValue,
 	handle: RenderResourceHandle,
-	access: ResourceAccess,
 	usage: ResourceUsageFlags,
+	access: ResourceAccess
 }
 
 bool RenderResourceUsage::IsRead() => this.access & ResourceAccess.Read;
@@ -99,8 +111,6 @@ state RenderGraphPass<Renderer>
 	name: string,
 	resources: [MaxPassResourceCount]RenderResourceUsage,
 	exec: ::(*RenderPassContext<Renderer>, *any),
-	clearColor: Color,
-	depthStencilClear: DepthStencilClear,
 	renderArea: Rect2D,
 	data: *any,
 
@@ -109,15 +119,10 @@ state RenderGraphPass<Renderer>
 	flags: RenderPassFlags
 }
 
-bool RenderGraphPass::ValidClearColor() => this.clearColor.r != float32(-1.0);
-bool RenderGraphPass::ValidDepthStencilClear() => this.depthStencilClear.stencil != uint32(-1);
-
 state RenderPassBuilder<Renderer>
 {
 	renderGraph: *RenderGraph<Renderer>,
 	resources: [MaxPassResourceCount]RenderResourceUsage,
-	clearColor: Color = InvalidColor,
-	depthStencilClear: DepthStencilClear,
 	renderArea: Rect2D,
 	index: uint32
 }
@@ -127,36 +132,50 @@ state RenderPassBuilder<Renderer>
 	return this.renderGraph.renderer;
 }
 
-RenderPassBuilder::Add(handle: RenderResourceHandle, access: ResourceAccess, 
-					   usage: ResourceUsageFlags)
+*RenderResourceUsage RenderPassBuilder::FindResourceUsage(handle: RenderResourceHandle)
 {
 	for (i .. this.index)
 	{
 		if (this.resources[i].handle == handle)
 		{
-			this.resources[i].access |= access;
-			this.resources[i].usage |= usage;
-			return;
+			return this.resources[i]@
 		}
+	}
+
+	return null;
+}
+
+RenderPassBuilder::Add(handle: RenderResourceHandle, access: ResourceAccess, 
+					   usage: ResourceUsageFlags)
+{
+	prevUsage := this.FindResourceUsage(handle);
+	if (prevUsage)
+	{
+		prevUsage.access |= access;
+		prevUsage.usage |= usage;
+		return;
 	}
 
 	assert this.index < MaxPassResourceCount, "Resource limit for render pass reached";
 
-	resourceUsage := { handle, access, usage } as RenderResourceUsage;
+	resourceUsage := RenderResourceUsage();
+	resourceUsage.handle = handle;
+	resourceUsage.access = access;
+	resourceUsage.usage = usage;
 	this.resources[this.index] = resourceUsage;
 	this.index += 1;
 }
 
-RenderPassBuilder::Read(target: RenderResourceHandle,
+RenderPassBuilder::Read(handle: RenderResourceHandle,
 						usage: ResourceUsageFlags = ResourceUsageFlags.DefaultRead)
 {
-	this.Add(target, ResourceAccess.Read, usage);
+	this.Add(handle, ResourceAccess.Read, usage);
 }
 
-RenderPassBuilder::Write(target: RenderResourceHandle,
+RenderPassBuilder::Write(handle: RenderResourceHandle,
 						 usage: ResourceUsageFlags = ResourceUsageFlags.DefaultWrite)
 {
-	this.Add(target, ResourceAccess.Write, usage);
+	this.Add(handle, ResourceAccess.Write, usage);
 }
 
 RenderResourceHandle RenderPassBuilder::Create(name: string, desc: ResourceDesc)
@@ -182,14 +201,20 @@ RenderResourceHandle RenderPassBuilder::CreateBuffer(name: string, buffer: Buffe
 	return this.renderGraph.RegisterResourceToCreate(name, desc);
 }
 
-RenderPassBuilder::SetClearColor(color: Color)
+RenderPassBuilder::SetClearColor(handle: RenderResourceHandle, color: Color)
 {
-	this.clearColor = color;
+	usage := this.FindResourceUsage(handle);
+	assert usage, "RenderPassBuilder::SetClearColor No usage found for resource handle";
+	usage.clearValue.value.color = color;
+	usage.usage |= ResourceUsageFlags.Clear;
 }
 
-RenderPassBuilder::SetDepthStencilColor(clear: DepthStencilClear)
+RenderPassBuilder::SetDepthStencilColor(handle: RenderResourceHandle, clear: DepthStencilClear)
 {
-	this.depthStencilClear = clear;
+	usage := this.FindResourceUsage(handle);
+	assert usage, "RenderPassBuilder::SetDepthStencilColor No usage found for resource handle";
+	usage.clearValue.value.depthStencilClear = clear;
+	usage.usage |= ResourceUsageFlags.Clear;
 }
 
 RenderPassBuilder::SetRenderArea(rect: Rect2D)
