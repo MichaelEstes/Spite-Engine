@@ -357,6 +357,17 @@ vulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(
 	ComponentKind.Singleton
 );
 
+vulkanPreDrawSystem := ECS.RegisterSystem(
+	::(scene: Scene, dt: float) 
+	{
+		for (mesh in scene.Iterate<Mesh>())
+		{
+			log "Mesh: ", mesh;
+		}
+	},
+	SystemStep.PreDraw
+);
+
 vulkanDrawSystem := ECS.RegisterSystem(
 	::(scene: Scene, dt: float) 
 	{

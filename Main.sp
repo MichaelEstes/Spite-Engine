@@ -24,13 +24,6 @@ state SingletonTest
 	myValue: float
 }
 
-transformComponent := ECS.RegisterComponent<Transform>(
-	ComponentKind.Common, 
-	::(transform: *Transform, scene: Scene) {
-		log "Removing transform: ", transform;
-	}
-);
-
 testComponent := ECS.RegisterComponent<Test>(
 	ComponentKind.Sparse, 
 	::(test: *Test, scene: Scene) {
@@ -101,7 +94,7 @@ Main()
 			scene.SetComponent<Test>(entity, i as Test);
 		}
 	}
-
+	
 	//scene.RemoveEntity(Entity(5));
 	//scene.RemoveComponent<Transform>(Entity(6));
 	//scene.RemoveComponent<Test>(Entity(7));

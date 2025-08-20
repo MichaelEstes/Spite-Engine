@@ -2,12 +2,12 @@ package ECS
 
 import BitSet
 
-state EntityComponentArray<Component, InitialCapacity = 1024>
+state EntityComponentArray<Type, InitialCapacity = 1024>
 {
 	capacity: uint32,
 
 	entitySet: BitSet,
-	componentArr: Allocator<Component>
+	componentArr: Allocator<Type>
 }
 
 EntityComponentArray::()
@@ -17,9 +17,9 @@ EntityComponentArray::()
 	this.capacity = InitialCapacity;
 }
 
-[]EntityComponent<Component> EntityComponentArray::log()
+[]EntityComponent<Type> EntityComponentArray::log()
 {
-	arr := []EntityComponent<Component>;
+	arr := []EntityComponent<Type>;
 
 	for (i .. this.capacity)
 	{
@@ -46,12 +46,12 @@ bool EntityComponentArray::next(it: Iterator)
 	return it.index < this.capacity;
 }
 
-EntityComponent<Component> EntityComponentArray::current(it: Iterator)
+EntityComponent<Type> EntityComponentArray::current(it: Iterator)
 {
 	index := it.index;
 	entity := Entity(index);
 	component := this.componentArr[index];
-	return {entity, component} as EntityComponent<Component>;
+	return {entity, component} as EntityComponent<Type>;
 }
 
 EntityComponentArray::Resize(amount: uint32)
@@ -63,7 +63,7 @@ EntityComponentArray::Resize(amount: uint32)
 	this.capacity = resizedCapacity;
 }
 
-EntityComponentArray::Insert(entity: Entity, component: Component)
+EntityComponentArray::Insert(entity: Entity, component: Type)
 {
 	assert !!entity, "Cannot insert null entity";
 

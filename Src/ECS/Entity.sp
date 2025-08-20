@@ -21,5 +21,6 @@ Entity::(id: uint32) => this.id = id;
 
 bool Entity::operator::!()
 {
+	log "Entity Not operator";
 	return this.id == nullEntityID;
 }

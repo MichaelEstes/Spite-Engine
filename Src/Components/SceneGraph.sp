@@ -1,6 +1,0 @@
-package SceneGraph
-
-state SceneGraph
-{
-
-}

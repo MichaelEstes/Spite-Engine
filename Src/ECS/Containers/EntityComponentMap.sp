@@ -13,7 +13,7 @@ uint16 ResizeFactor(capacity: uint16)
 	return resized;
 }
 
-state EntityComponentMap<Component, InitialCapacity = 16, InitialSparseCapacity = 1024>
+state EntityComponentMap<Type, InitialCapacity = 16, InitialSparseCapacity = 1024>
 {
 	count: uint16,
 	capacity: uint16,
@@ -21,7 +21,7 @@ state EntityComponentMap<Component, InitialCapacity = 16, InitialSparseCapacity 
 
 	sparseArr: ZeroedAllocator<uint16>,
 	entityArr: Allocator<Entity>,
-	componentArr: Allocator<Component>
+	componentArr: Allocator<Type>
 }
 
 EntityComponentMap::()
@@ -42,9 +42,9 @@ EntityComponentMap::delete
 	this.componentArr.Dealloc(this.capacity);
 }
 
-[]EntityComponent<Component> EntityComponentMap::log()
+[]EntityComponent<Type> EntityComponentMap::log()
 {
-	arr := []EntityComponent<Component>;
+	arr := []EntityComponent<Type>;
 
 	for (i .. this.count)
 	{
@@ -67,12 +67,12 @@ bool EntityComponentMap::next(it: Iterator)
 	return it.index < this.count;
 }
 
-EntityComponent<Component> EntityComponentMap::current(it: Iterator)
+EntityComponent<Type> EntityComponentMap::current(it: Iterator)
 {
 	index := it.index;
 	entity := this.entityArr[index]~;
 	component := this.componentArr[index];
-	return {entity, component} as EntityComponent<Component>;
+	return {entity, component} as EntityComponent<Type>;
 }
 
 EntityComponentMap::ResizeSparse(amount: uint32)
@@ -93,7 +93,7 @@ EntityComponentMap::ResizeDense()
 	this.capacity = resizedCapacity;
 }
 
-EntityComponentMap::Insert(entity: Entity, component: Component)
+EntityComponentMap::Insert(entity: Entity, component: Type)
 {
 	assert !!entity, "Cannot insert null entity";
 

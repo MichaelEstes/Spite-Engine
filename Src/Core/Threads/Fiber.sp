@@ -70,7 +70,7 @@ InitalizeFibers()
 	fibers.currentProcess.Init(0);
 
 	sysInfo := GetSystemInfo();
-	// - 2, executable start thread, main (IO) fiber thread
+	// - 2 - executable start thread, main (IO) fiber thread
 	fibers.processCount = Math.Max(sysInfo.processorCount - 2, 1);
 	totalProcessCount := fibers.processCount + 1;
 	fibers.handleAllocator = BucketAllocator(#sizeof JobHandle, 32, totalProcessCount);
@@ -203,7 +203,7 @@ uint CreateFiberThread(index: uint)
 
 RunOnMainFiber(func: ::(*any), data: *any, handle: **JobHandle = null, priority: JobPriority = JobPriority.Medium)
 {
-	mainIndex := fibers.threads.count - 1;
+	mainIndex := fibers.processCount;
 	jobHandle := GetJobHandle(1, handle, mainIndex);
 	job := {func, data, jobHandle} as Job;
 

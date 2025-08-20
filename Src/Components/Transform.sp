@@ -1,6 +1,7 @@
 package Transform
 
 import Vec
+import ECS
 
 state Transform
 {
@@ -13,3 +14,11 @@ Transform::(x: float, y: float, z: float)
 	this.pos.y = y;
 	this.pos.z = z;
 }
+
+TransformComponent := ECS.RegisterComponent<Transform>(
+	ComponentKind.Common, 
+	::(transform: *Transform, scene: Scene) 
+	{
+		log "Removing transform: ", transform;
+	}
+);

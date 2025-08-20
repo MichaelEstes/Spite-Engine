@@ -9,6 +9,7 @@ import Render
 import Array
 import URIManager
 import ImageManager
+import Hierarchy
 
 state GLTFResource
 {
@@ -78,9 +79,14 @@ GLTFManagerLoad(param: *ResourceParam<GLTFResource, GLTFLoadParam>)
 
 		for (gltfScene in gltf.scenes)
 		{
+			sceneEntity := scene.CreateEntity();
+			scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
+
+			outEntities.Add(sceneEntity);
+
 			for (nodeIndex in gltfScene.nodes)
 			{
-				NodeToECS(gltfData, gltf, scene, nodeIndex, nullEntity, outEntities);
+				NodeToECS(gltfData, gltf, scene, nodeIndex, sceneEntity, outEntities);
 			}
 		}
 
@@ -300,6 +306,9 @@ NodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uint32, 
 	gltfNode := gltf.nodes[nodeIndex];
 
 	entity := scene.CreateEntity();
+	scene.SetComponent<Hierarchy>(entity, Hierarchy());
+	ParentEntity(parentEntity, entity, scene);
+
 	if (outEntities) outEntities.Add(entity);
 
 	if (gltfNode.mesh != InvalidGLTFIndex)

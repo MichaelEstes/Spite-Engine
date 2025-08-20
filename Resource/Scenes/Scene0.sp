@@ -10,7 +10,7 @@ import VulkanRenderPass
 
 import GLTFManager
 
-gltfEntities := Array<Entity>();
+boxEntities := Array<Entity>();
 
 _ := SceneRegistry.RegisterScene(
 	0,
@@ -31,13 +31,15 @@ _ := SceneRegistry.RegisterScene(
 			}
 		});
 
-		LoadGLTFResource("./Resource/Models/Box/Box.gltf", scene, ::(handle: ResourceHandle) {
-			log "Loaded gltf: ", handle;
-
-			gltfResource := Resource.TakeResourceRef<GLTFResource>(handle);
-			log "GLTF RESOURCE: ", gltfResource;
-			Resource.ReleaseResourceRef(handle);
-		}, gltfEntities@);
+		boxGLTFHandle := LoadGLTFResource(
+			"./Resource/Models/Box/Box.gltf", 
+			scene, 
+			::(handle: ResourceHandle) 
+			{
+				log "Loaded gltf: ", boxEntities;
+			}, 
+			boxEntities@
+		);
 
 	},
 	"Main Scene"

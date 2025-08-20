@@ -11,7 +11,7 @@ colorPass := RegisterRenderPass(
 	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene) 
 	{
 		graph.AddPass(
-			colorPass,
+			colorPassName,
 			::bool(builder: *RenderPassBuilder<VulkanRenderer>, param: *void) 
 			{
 				//log "Vulkan Color pass init";

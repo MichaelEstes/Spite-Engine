@@ -64,7 +64,7 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 	type := #typeof Type;
 	assert !this.componentTypeMap.Has(type), "Cannot register a component twice";
 
-	component := { this.componentCount, componentKind, uint32(#sizeof Type)} as Component;
+	component := { this.componentCount, componentKind, uint32(#sizeof Type) } as Component;
 	this.componentTypeMap.Insert(type, component);
 	this.componentIDMap.Insert(component.id, component);
 	if (onRemove) this.componentRemoveCallbacks.Insert(component.id, onRemove);

@@ -153,6 +153,11 @@ Scene::RemoveEntities(entities: []Entity)
 Scene::SetComponent<Type>(entity: Entity, value: Type)
 {
 	component := instance.GetComponent<Type>();
+	this.SetComponentDirect<Type>(entity, value, component);
+}
+
+Scene::SetComponentDirect<Type>(entity: Entity, value: Type, component: Component)
+{
 	id := component.id
 
 	switch (component.kind)
@@ -175,6 +180,11 @@ Scene::SetComponent<Type>(entity: Entity, value: Type)
 *Type Scene::GetComponent<Type>(entity: Entity)
 {
 	component := instance.GetComponent<Type>();
+	return this.GetComponentDirect<Type>(entity, component);
+}
+
+*Type Scene::GetComponentDirect<Type>(entity: Entity, component: Component)
+{
 	id := component.id
 
 	switch (component.kind)
@@ -201,6 +211,11 @@ Scene::SetComponent<Type>(entity: Entity, value: Type)
 Scene::RemoveComponent<Type>(entity: Entity)
 {
 	component := instance.GetComponent<Type>();
+	this.RemoveComponentDirect<Type>(entity, component);
+}
+
+Scene::RemoveComponentDirect<Type>(entity: Entity, component: Component)
+{
 	id := component.id
 
 	switch (component.kind)
