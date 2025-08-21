@@ -99,7 +99,7 @@ Scene::RemoveEntity(entity: Entity)
 		if (keyValue.value.Has(entity))
 		{
 			componentData := keyValue.value.GetUntyped(entity, component.size);
-			instance.OnComponentRemove(componentID, componentData, this);
+			instance.OnComponentRemove(componentID, entity, componentData, this);
 			keyValue.value.Remove(entity);
 		}
 	}
@@ -111,7 +111,7 @@ Scene::RemoveEntity(entity: Entity)
 		if (keyValue.value.Has(entity))
 		{
 			componentData := keyValue.value.GetUntyped(entity, component.size);
-			instance.OnComponentRemove(componentID, componentData, this);
+			instance.OnComponentRemove(componentID, entity, componentData, this);
 			keyValue.value.RemoveUntyped(entity, component.size);
 		}
 	}
@@ -128,7 +128,7 @@ Scene::RemoveEntities(entities: []Entity)
 			if (keyValue.value.Has(entity))
 			{
 				componentData := keyValue.value.GetUntyped(entity, component.size);
-				instance.OnComponentRemove(componentID, componentData, this);
+				instance.OnComponentRemove(componentID, entity, componentData, this);
 				keyValue.value.Remove(entity);
 			}
 		}
@@ -143,7 +143,7 @@ Scene::RemoveEntities(entities: []Entity)
 			if (keyValue.value.Has(entity))
 			{
 				componentData := keyValue.value.GetUntyped(entity, component.size);
-				instance.OnComponentRemove(componentID, componentData, this);
+				instance.OnComponentRemove(componentID, entity, componentData, this);
 				keyValue.value.RemoveUntyped(entity, component.size);
 			}
 		}
@@ -174,7 +174,7 @@ Scene::SetComponentDirect<Type>(entity: Entity, value: Type, component: Componen
 		}
 	}
 
-	instance.OnComponentEnter(id, value@, this);
+	instance.OnComponentEnter(id, entity, value@, this);
 }
 
 *Type Scene::GetComponent<Type>(entity: Entity)
@@ -228,7 +228,7 @@ Scene::RemoveComponentDirect<Type>(entity: Entity, component: Component)
 			if (componentArrPtr.Has(entity))
 			{
 				componentData := componentArrPtr.Get(entity);
-				instance.OnComponentRemove(id, componentData, this);
+				instance.OnComponentRemove(id, entity, componentData, this);
 				componentArrPtr.Remove(entity);
 			}
 		}
@@ -240,7 +240,7 @@ Scene::RemoveComponentDirect<Type>(entity: Entity, component: Component)
 			if (componentMapPtr.Has(entity))
 			{
 				componentData := componentMapPtr.Get(entity);
-				instance.OnComponentRemove(id, componentData, this);
+				instance.OnComponentRemove(id, entity, componentData, this);
 				componentMapPtr.Remove(entity);
 			}
 		}
@@ -251,7 +251,9 @@ Scene::SetSingleton<Type>(value: Type)
 {
 	this.singletonComponents.Insert<Type>(value);
 	component := instance.GetComponent<Type>();
-	instance.OnComponentEnter(component.id, this.GetSingleton<Type>(), this);
+
+	valuePtr := this.GetSingleton<Type>();
+	instance.OnComponentEnter(component.id, NullEntity, valuePtr, this);
 }
 
 bool Scene::HasSingleton<Type>()

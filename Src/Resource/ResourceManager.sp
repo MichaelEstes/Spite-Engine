@@ -22,9 +22,63 @@ state ResourceHandle
 
 InvalidResourceHandle := ResourceHandle();
 
+state ResourceKey
+{
+	value: ?{
+		name: string,
+		id: uint
+	}
+}
+
+ResourceKey::(name: string)
+{
+	this.value.name = name;
+}
+
+ResourceKey::(id: uint)
+{
+	zero_out_bytes(this@, #sizeof ResourceKey);
+	this.value.id = id;
+}
+
+ResourceKey::delete
+{
+	if (this.IsString()) delete this.value.name;
+}
+
+bool ResourceKey::IsString()
+{
+	return (this.value as [2]uint)[1];
+}
+
+uint HashResourceKey(resourceKey: ResourceKey)
+{
+	if (resourceKey.IsString())
+	{
+		return DefaultHash<string>(resourceKey.value.name)
+	}
+
+	return resourceKey.value.id;
+}
+
+bool ResourceKeyEquals(left: ResourceKey, right: ResourceKey)
+{
+	if (left.IsString())
+	{
+		if (right.IsString())
+		{
+			return left.value.name == right.value.name;
+		}
+
+		return false;
+	}
+
+	return left.value.id == right.value.id;
+}
+
 state ResourceParam<Type, ParamType>
 {
-	key: string,
+	key: ResourceKey,
 	manager: *ResourceManager<Type, ParamType>,
 	onResourceLoad: ::(*ResourceParam<Type, ParamType>, ResourceResult),
 	onLoad: ::(ResourceHandle),
@@ -41,16 +95,16 @@ state Resource<Type>
 
 	refCount: Atomic<int>,
 	
-	//Data needs to be last in so the other fields can be accessed in a type erased context
+	//Data needs to be last so the other fields can be accessed in a type erased context
 	data: Type
 }
 
 state ResourceManager<Type, ParamType>
 {
-	resourceKeyToHandle := Map<string, ResourceHandle>(),
+	resourceKeyToHandle := Map<ResourceKey, ResourceHandle, HashResourceKey, ResourceKeyEquals>(),
 	resources := HandleSet<Resource<Type>>(),
 
-	getResourceKey: ::string(ParamType)
+	getResourceKey: ::ResourceKey(ParamType)
 	loader: ::(*ResourceParam<Type, ParamType>),
 	onRelease: ::(ResourceHandle),
 	onChildRelease: ::(ResourceHandle, ResourceHandle),
@@ -167,7 +221,7 @@ resourceManagers := Map<uint32, *ResourceManager<any, any>>();
 
 ResourceManager<ResourceType, ParamType> CreateResourceManager<ResourceType, ParamType>(
 		name: [4]byte
-		getResourceKey: ::string(ParamType), 
+		getResourceKey: ::ResourceKey(ParamType), 
 		loader: ::(*ResourceParam<ResourceType, ParamType>),
 		onRelease: ::(ResourceHandle) = null,
 		onChildRelease: ::(ResourceHandle, ResourceHandle) = null,

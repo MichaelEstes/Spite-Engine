@@ -29,8 +29,9 @@ vkStageFlagTable := [
 
 ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderParam>(
 	['v', 'k', 's', 'h'],
-	::string(param: ShaderParam) => param.path.Copy(), 
-	::(shaderResourceParam: *ResourceParam<ShaderResource, ShaderParam>) {
+	::ResourceKey(param: ShaderParam) => ResourceKey(param.path.Copy()), 
+	::(shaderResourceParam: *ResourceParam<ShaderResource, ShaderParam>) 
+	{
 		handle := shaderResourceParam.handle;
 		param := shaderResourceParam.param;
 		resourceManager := shaderResourceParam.manager;
@@ -67,7 +68,8 @@ ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderPa
 
 		shaderResourceParam.onResourceLoad(shaderResourceParam, ResourceResult.Loaded)
 	},
-	::(handle: ResourceHandle) {
+	::(handle: ResourceHandle) 
+	{
 		resource := Resource.GetResource<ShaderResource>(handle).data;
 		delete resource.metadata;
 		delete resource.shaderStageInfo.pName;

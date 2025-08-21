@@ -222,20 +222,34 @@ InitializeVulkanInstance()
  
 	vulkanInstance.SelectDefaultDevice();
 
-	SDLEventEmitter.On(SDL.EventType.WINDOW_RESIZED, ::(event: SDL.Event) {
-		windowID := event.data.window.windowID;
-
-		for (scene in ECS.Scenes())
+	ECS.instance.events.On(
+		MeshAddedEvent, 
+		::(sceneEntity: SceneEntity)
 		{
-			if (scene.HasSingleton<VulkanRenderer>())
+			scene := sceneEntity.scene;
+			entity := sceneEntity.entity;
+			log "Mesh Added: ", entity;
+		}
+	);
+
+	SDLEventEmitter.On(
+		SDL.EventType.WINDOW_RESIZED, 
+		::(event: SDL.Event) 
+		{
+			windowID := event.data.window.windowID;
+
+			for (scene in ECS.Scenes())
 			{
-				renderer := scene.GetSingleton<VulkanRenderer>();
-				if (renderer.window.id == windowID)
+				if (scene.HasSingleton<VulkanRenderer>())
 				{
-					log "Window resized";
-					//renderer.RecreateSwapchain();
+					renderer := scene.GetSingleton<VulkanRenderer>();
+					if (renderer.window.id == windowID)
+					{
+						log "Window resized";
+						//renderer.RecreateSwapchain();
+					}
 				}
 			}
 		}
-	});
+	);
 }

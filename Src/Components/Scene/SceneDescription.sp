@@ -43,16 +43,17 @@ state SceneDescParam { sceneDesc: *SceneDesc, scene: *Scene }
 
 SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 	ComponentKind.Singleton,
-	::(sceneDesc: *SceneDesc, scene: Scene) {
+	::(entity: Entity, sceneDesc: *SceneDesc, scene: Scene) 
+	{
 		log "Scene description removed";
 	},
-	::(sceneDesc: *SceneDesc, scene: Scene) {
-		log "Adding scene description";
+	::(entity: Entity, sceneDesc: *SceneDesc, scene: Scene) 
+	{
 		param := AllocThreadParam<SceneDescParam>();
 		param.sceneDesc = sceneDesc;
 		param.scene = scene@;
 
-		Fiber.RunOnMainThread(::(param: *SceneDescParam) 
+		Fiber.RunOnMainThread(::(param: *SceneDescParam)
 		{
 		    defer DeallocThreadParam<SceneDescParam>(param);
 			sceneDesc := param.sceneDesc;

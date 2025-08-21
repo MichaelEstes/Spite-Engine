@@ -17,7 +17,7 @@ Transform::(x: float, y: float, z: float)
 
 TransformComponent := ECS.RegisterComponent<Transform>(
 	ComponentKind.Common, 
-	::(transform: *Transform, scene: Scene) 
+	::(entity: Entity, transform: *Transform, scene: Scene) 
 	{
 		log "Removing transform: ", transform;
 	}

@@ -5,6 +5,16 @@ import SparseSet
 
 SDLEventEmitter := Event.Emitter();
 
+currEventID := uint32(0);
+
+// Generic 'Type' here is just for reference of what type to use in the callbacks
+uint32 RegisterEvent<Type>()
+{
+	eventID := currEventID;
+	currEventID += 1;
+	return eventID;
+}
+
 state Emitter
 {
 	callbacks := SparseSet<[]::(any)>(),

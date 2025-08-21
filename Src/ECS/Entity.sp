@@ -1,19 +1,11 @@
 package ECS
 
-nullEntityID := uint32(0);
-invalidEntityID := uint32(-1);
-
-nullEntity := Entity(nullEntityID);
-
-state EntityComponent<Type>
-{
-	entity: Entity,
-	component: *Type
-}
+NullEntityID := uint32(0);
+NullEntity := Entity(NullEntityID);
 
 state Entity
 {
-	[value]
+	//[value]
 	id: uint32,
 }
 
@@ -22,5 +14,29 @@ Entity::(id: uint32) => this.id = id;
 bool Entity::operator::!()
 {
 	log "Entity Not operator";
-	return this.id == nullEntityID;
+	return this.id == NullEntityID;
+}
+
+state EntityComponent<Type>
+{
+	entity: Entity,
+	component: *Type
+}
+
+EntityComponent::(entity: Entity, component: *Type)
+{
+	this.entity = entity;
+	this.component = component;
+}
+
+state SceneEntity
+{
+	scene: *Scene,
+	entity: Entity
+}
+
+SceneEntity::(scene: *Scene, entity: Entity)
+{
+	this.scene = scene;
+	this.entity = entity;
 }

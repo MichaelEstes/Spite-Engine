@@ -11,7 +11,7 @@ state Hierarchy
 
 HierarchyComponent := ECS.RegisterComponent<Hierarchy>(
 	ComponentKind.Common, 
-	::(hierarchy: *Hierarchy, scene: Scene) 
+	::(entity: Entity, hierarchy: *Hierarchy, scene: Scene) 
 	{
 		delete hierarchy.children;
 	}

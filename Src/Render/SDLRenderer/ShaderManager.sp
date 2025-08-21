@@ -18,8 +18,9 @@ state ShaderParam
 
 ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderParam>(
 	['s', 'h', 'd', 'r'],
-	::string(param: ShaderParam) => param.uri.Copy(), 
-	::(shaderResourceParam: *ResourceParam<ShaderResource, ShaderParam>) {
+	::ResourceKey(param: ShaderParam) => ResourceKey(param.uri.Copy()),
+	::(shaderResourceParam: *ResourceParam<ShaderResource, ShaderParam>) 
+	{
 		handle := shaderResourceParam.handle;
 		param := shaderResourceParam.param;
 		resourceManager := shaderResourceParam.manager;
@@ -51,7 +52,8 @@ ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderPa
 
 		shaderResourceParam.onResourceLoad(shaderResourceParam, ResourceResult.Loaded)
 	},
-	::(handle: ResourceHandle) {
+	::(handle: ResourceHandle) 
+	{
 		resource := Resource.GetResource<ShaderResource>(handle);
 		ReleaseGPUShader(instance.device, resource.data.shader);
 		delete resource.data.metadata;

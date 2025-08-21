@@ -2,6 +2,9 @@ package Render
 
 import Array
 import ECS
+import Event
+
+MeshAddedEvent := RegisterEvent<SceneEntity>();
 
 state Mesh
 {
@@ -15,8 +18,12 @@ Mesh::delete
 
 MeshComponent := ECS.RegisterComponent<Mesh>(
 	ComponentKind.Sparse, 
-	::(mesh: *Mesh, scene: Scene) 
+	::(entity: Entity, mesh: *Mesh, scene: Scene) 
 	{
 		delete mesh~;
+	}
+	::(entity: Entity, mesh: *Mesh, scene: Scene) 
+	{
+		ECS.instance.events.Emit<SceneEntity>(MeshAddedEvent, SceneEntity(scene@, entity));
 	}
 );

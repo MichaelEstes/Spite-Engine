@@ -1,6 +1,11 @@
 package VulkanRenderer
 
 
+state VulkanResourceHandle
+{
+	handle: uint32
+}
+
 state VulkanRenderTarget
 {
 	image: *VkImage_T,

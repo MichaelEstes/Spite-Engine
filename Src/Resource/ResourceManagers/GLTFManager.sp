@@ -55,7 +55,7 @@ GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadPara
 
 GLTFResourceManagerID := Resource.RegisterResourceManager(GLTFResourceManager@);
 
-string GetGLTFKey(param: GLTFLoadParam) => param.file.Copy();
+ResourceKey GetGLTFKey(param: GLTFLoadParam) => ResourceKey(param.file.Copy());
 
 GLTFManagerLoad(param: *ResourceParam<GLTFResource, GLTFLoadParam>)
 {

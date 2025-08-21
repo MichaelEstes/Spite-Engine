@@ -29,7 +29,7 @@ ImageResourceManager := Resource.CreateResourceManager<ImageResource, ImageParam
 
 ImageResourceManagerID := Resource.RegisterResourceManager(ImageResourceManager@);
 
-string GetImageKey(param: ImageParam) => OS.JoinPaths([param.basePath, param.uri]);
+ResourceKey GetImageKey(param: ImageParam) => ResourceKey(OS.JoinPaths([param.basePath, param.uri]));
 
 ImageManagerLoad(imageResourceParam: *ResourceParam<ImageResource, ImageParam>)
 {
@@ -51,7 +51,7 @@ ImageManagerLoad(imageResourceParam: *ResourceParam<ImageResource, ImageParam>)
     }
     else
     {
-		path := imageResourceParam.key;
+		path := imageResourceParam.key.value.name;
 		resourceData.image = Image.LoadTextureImage(path);
 	}
 

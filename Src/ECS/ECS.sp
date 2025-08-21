@@ -7,6 +7,7 @@ import RingBuffer
 import Fiber
 import Atomic
 import FrameAllocator
+import Event
 
 instance: ECS = ECS();
 
@@ -27,7 +28,8 @@ state Component
 state SceneSystem { scene: *Scene, system: *System, time: float64 }
 
 Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
-								  onRemove: ::(*Type, Scene) = null, onEnter: ::(*Type, Scene) = null)
+								  onRemove: ::(Entity, *Type, Scene) = null, 
+								  onEnter: ::(Entity, *Type, Scene) = null)
 			=> instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
 
 {id: uint32, step: SystemStep} RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
@@ -48,10 +50,11 @@ state ECS
 	systems: Systems,
 	componentTypeMap := Map<*_Type, Component>(),
 	componentIDMap := SparseSet<Component>(),
-	componentRemoveCallbacks := SparseSet<::(*any, Scene)>(),
-	componentEnterCallbacks := SparseSet<::(*any, Scene)>(),
+	componentRemoveCallbacks := SparseSet<::(Entity, *any, Scene)>(),
+	componentEnterCallbacks := SparseSet<::(Entity, *any, Scene)>(),
 	recycledScenes := Stack<uint16>(),
 	systemBuffer := RingBuffer<SceneSystem>(),
+	events := Event.Emitter(),
 	frameCount: uint,
 	lastFrameTime: float,
 	componentCount: uint32,
@@ -59,7 +62,8 @@ state ECS
 }
 
 Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
-									   onRemove: ::(*Type, Scene) = null, onEnter: ::(*Type, Scene) = null)
+									   onRemove: ::(Entity, *Type, Scene) = null, 
+									   onEnter: ::(Entity, *Type, Scene) = null)
 {
 	type := #typeof Type;
 	assert !this.componentTypeMap.Has(type), "Cannot register a component twice";
@@ -155,25 +159,25 @@ Component ECS::GetComponent<Type>()
 	return componentPtr~;
 }
 
-Component ECS::GetComponentByID(id: uint16)
+Component ECS::GetComponentByID(id: uint32)
 {
 	return this.componentIDMap.Get(id)~;
 }
 
-ECS::OnComponentRemove(id: uint16, componentData: *any, scene: Scene)
+ECS::OnComponentRemove(id: uint32, entity: Entity, componentData: *any, scene: Scene)
 {
 	if (!this.componentRemoveCallbacks.Has(id)) return;
 
 	callback := this.componentRemoveCallbacks.Get(id)~;
-	callback(componentData, scene);
+	callback(entity, componentData, scene);
 }
 
-ECS::OnComponentEnter(id: uint16, componentData: *any, scene: Scene)
+ECS::OnComponentEnter(id: uint32, entity: Entity, componentData: *any, scene: Scene)
 {
 	if (!this.componentEnterCallbacks.Has(id)) return;
 
 	callback := this.componentEnterCallbacks.Get(id)~;
-	callback(componentData, scene);
+	callback(entity, componentData, scene);
 }
 
 ECS::RunSystems(systems: Array<System>)

@@ -28,7 +28,7 @@ URIResourceManager := Resource.CreateResourceManager<URIResource, URIParam>(
 
 URIResourceManagerID := Resource.RegisterResourceManager(URIResourceManager@);
 
-string GetURIKey(param: URIParam) => OS.JoinPaths([param.basePath, param.uri]);
+ResourceKey GetURIKey(param: URIParam) => ResourceKey(OS.JoinPaths([param.basePath, param.uri]));
 
 URIManagerLoad(uriResourceParam: *ResourceParam<URIResource, URIParam>)
 {
@@ -50,7 +50,7 @@ URIManagerLoad(uriResourceParam: *ResourceParam<URIResource, URIParam>)
     }
     else
     {
-		path := uriResourceParam.key;
+		path := uriResourceParam.key.value.name;
 
         fileContent := OS.ReadFile(path);
 		resourceData.buffer = fileContent[0];
