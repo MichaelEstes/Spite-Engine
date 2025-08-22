@@ -38,6 +38,9 @@ state VulkanInstance
 	renderPassCaches: Allocator<VulkanRenderPassCache>,
 	frameBufferCaches: Allocator<VulkanFrameBufferCache>,
 
+	allocators: Allocator<VulkanAllocator>,
+	stagingBuffers: Allocator<VulkanStagingBuffer>,
+
 	physicalDeviceCount: uint32,
 	defaultDevice: uint32,
 	extensionCount: uint32,
@@ -47,6 +50,19 @@ state VulkanInstance
 ArrayView<*VkPhysicalDevice_T> VulkanInstance::PhysicalDevices()
 {
 	return ArrayView<*VkPhysicalDevice_T>(this.physicalDevices[0], this.physicalDeviceCount);
+}
+
+*VulkanStagingBuffer VulkanInstance::GetStagingBuffer(deviceIndex: uint32)
+{
+	stagingBuffer := this.stagingBuffers[deviceIndex];
+	if (!stagingBuffer.buffer)
+	{
+		device := this.devices[deviceIndex]~;
+		physicalDevice := this.physicalDevices[deviceIndex]~;
+		stagingBuffer.Create(device, physicalDevice);
+	}
+
+	return stagingBuffer;
 }
 
 VulkanInstance::SelectDefaultDevice()
@@ -162,6 +178,10 @@ InitializeVulkanInstance()
 	vulkanInstance.resourceManagers.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.renderPassCaches.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.frameBufferCaches.Alloc(vulkanInstance.physicalDeviceCount);
+	vulkanInstance.allocators.Alloc(vulkanInstance.physicalDeviceCount);
+
+	// Allocated but not created until a renderer calls GetStagingBuffer
+	vulkanInstance.stagingBuffers.Alloc(vulkanInstance.physicalDeviceCount);
 
 	for (i .. vulkanInstance.physicalDeviceCount)
 	{
@@ -188,6 +208,7 @@ InitializeVulkanInstance()
 		vulkanInstance.resourceManagers[i]~ = VulkanResourceManager();
 		vulkanInstance.renderPassCaches[i]~ = VulkanRenderPassCache();
 		vulkanInstance.frameBufferCaches[i]~ = VulkanFrameBufferCache();
+		vulkanInstance.stagingBuffers[i]~ = VulkanStagingBuffer();
 
 		physicalDevice := vulkanInstance.physicalDevices[i]~;
 
@@ -218,6 +239,9 @@ InitializeVulkanInstance()
 		);
 
 		queues.GetQueues(device~, physicalDevice, vulkanInstance.instance);
+		
+		vulkanInstance.allocators[i]~ = VulkanAllocator();
+		vulkanInstance.allocators[i].Create(device~, physicalDevice);
 	}
  
 	vulkanInstance.SelectDefaultDevice();
@@ -228,7 +252,14 @@ InitializeVulkanInstance()
 		{
 			scene := sceneEntity.scene;
 			entity := sceneEntity.entity;
-			log "Mesh Added: ", entity;
+
+			if (scene.HasSingleton<VulkanRenderer>())
+			{
+				renderer := scene.GetSingleton<VulkanRenderer>();
+				mesh := scene.GetComponent<Mesh>(entity);
+				
+				UploadMesh(sceneEntity, mesh, renderer);
+			}
 		}
 	);
 

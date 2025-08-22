@@ -53,6 +53,7 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 		param.sceneDesc = sceneDesc;
 		param.scene = scene@;
 
+		handle: *JobHandle = null
 		Fiber.RunOnMainThread(::(param: *SceneDescParam)
 		{
 		    defer DeallocThreadParam<SceneDescParam>(param);
@@ -88,6 +89,7 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 			}
 			
 			log "Scene description added";
-		}, param);
+		}, param, handle@);
+		WaitForHandle(handle);
 	}
 );

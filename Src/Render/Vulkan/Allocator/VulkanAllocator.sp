@@ -1,7 +1,7 @@
 package VulkanRenderer
 
 import Array
-import Resource
+import HandleSet
 
 enum VulkanMemoryFlags: uint32
 {
@@ -10,6 +10,11 @@ enum VulkanMemoryFlags: uint32
 	Coherent = VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 	Cached = VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
 	GPULazy = VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT
+}
+
+state VulkanAllocHandle
+{
+	handle: uint32
 }
 
 state VulkanAllocation
@@ -26,7 +31,7 @@ state VulkanBlock
 	memory: *VkDeviceMemory_T,
 	size: uint64,
 	currentOffset: uint64,
-	allocations: Array<VulkanAllocation>,
+	allocations: Array<VulkanAllocHandle>,
 	memoryFlags: uint32
 	index: uint16
 }
@@ -39,7 +44,8 @@ state VulkanAllocator
 {
 	device: *VkDevice_T,
 	memoryProps: VkPhysicalDeviceMemoryProperties,
-	blocks: Array<VulkanBlock>
+	blocks: Array<VulkanBlock>,
+	allocationHandles := HandleSet<VulkanAllocation>()
 }
 
 VulkanAllocator::Create(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T)
@@ -49,7 +55,7 @@ VulkanAllocator::Create(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T
 	log "Found device memory properties";
 }
 
-ResourceHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags: uint32)
+VulkanAllocHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags: uint32)
 {
 	memoryRequirements := VkMemoryRequirements();
 	vkGetBufferMemoryRequirements(this.device, buffer, memoryRequirements@);
@@ -57,7 +63,7 @@ ResourceHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags: ui
 	block := this.FindBlock(memoryRequirements.size, memoryFlags);
 	if (!block)
 	{
-		block := this.CreateBlock(memoryFlags, memoryRequirements);
+		block = this.CreateBlock(memoryFlags, memoryRequirements);
 	}
 
 	alloc := VulkanAllocation();
@@ -66,21 +72,19 @@ ResourceHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags: ui
 	alloc.index = block.allocations.count;
 	alloc.blockIndex = block.index;
 
-	block.currentOffset += memoryRequirements.size;
-	block.allocations.Add(alloc);
-
 	CheckResult(
 		vkBindBufferMemory(this.device, buffer, block.memory, alloc.offset),
 		"Error binding buffer memory"
 	);
 
+	allocHandleValue := this.allocationHandles.GetNext();
+	handle := allocHandleValue.handle as VulkanAllocHandle;
+	allocHandleValue.value~ = alloc;
 
-	return uint32(0) as ResourceHandle;
+	block.currentOffset += memoryRequirements.size;
+	block.allocations.Add(handle);
 
-	//resourceParam := VulkanResource();
-	//resourceParam.allocator = this@;
-	//resourceParam.allocation = alloc;
-	//return VulkanResourceManager.LoadResource(resourceParam, ::(handle: ResourceHandle){});
+	return handle;
 }
 
 *VulkanBlock VulkanAllocator::FindBlock(size: uint32, memoryFlags: uint32)

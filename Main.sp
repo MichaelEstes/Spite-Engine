@@ -26,7 +26,7 @@ state SingletonTest
 
 testComponent := ECS.RegisterComponent<Test>(
 	ComponentKind.Sparse, 
-	::(test: *Test, scene: Scene) {
+	::(entity: Entity, test: *Test, scene: Scene) {
 		log "Removing test component: ", test;
 	}
 );
@@ -57,7 +57,7 @@ transformSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 });
 
 testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
-	//log "Test System called", dt;
+	log "Test System called", dt;
 	
 	for (item in scene.Iterate<Test>())
 	{

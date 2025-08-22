@@ -10,7 +10,6 @@ import Event
 import Vertex
 import UniformBufferObject
 import Time
-import FixedArray
 import ArrayView
 
 import ECS
@@ -48,11 +47,13 @@ state VulkanRenderer
 	device: *VkDevice_T,
 	queues: *VulkanQueues,
 	physicalDevice: *VkPhysicalDevice_T
-	allocator: VulkanAllocator,
+	allocator: *VulkanAllocator,
+	stagingBuffer: *VulkanStagingBuffer,
 
 	swapchain: VulkanSwapchain,
 	graphicsCommands: VulkanCommands,
 	computeCommands: VulkanCommands,
+	transferCommands: VulkanCommands,
 	
 	frameFences: [FrameCount]*VkFence_T,
 
@@ -85,7 +86,8 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	vulkanRenderer.device = vulkanInstance.devices[deviceIndex]~;
 	vulkanRenderer.queues = vulkanInstance.queues[deviceIndex];
 	vulkanRenderer.physicalDevice = vulkanInstance.physicalDevices[deviceIndex]~;
-	vulkanRenderer.allocator.Create(vulkanRenderer.device, vulkanRenderer.physicalDevice);
+	vulkanRenderer.allocator = vulkanInstance.allocators[deviceIndex];
+	vulkanRenderer.stagingBuffer = vulkanInstance.GetStagingBuffer(deviceIndex);
 
 	vulkanRenderer.swapchain.Create(vulkanRenderer@);
 	resourceManager := vulkanInstance.resourceManagers[deviceIndex];
@@ -99,25 +101,26 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 		resourceManager.renderTargetMap.Insert(image, renderTarget);
 	}
 
-	vulkanRenderer.graphicsCommands.Create(
-		vulkanRenderer.device, 
-		vulkanRenderer.queues.graphicsQueueIndex,
-		FrameCount
-	);
-
 	for (i := 0 .. FrameCount)
 	{
 		vulkanRenderer.frameFences[i] = CreateFence(vulkanRenderer.device);
 	}
 
-	if (vulkanRenderer.queues.HasUniqueComputeQueue())
-	{
-		vulkanRenderer.computeCommands.Create(
-			vulkanRenderer.device, 
-			vulkanRenderer.queues.computeQueueIndex,
-			FrameCount
-		);
-	}
+	vulkanRenderer.graphicsCommands.Create(
+		vulkanRenderer.device, 
+		vulkanRenderer.queues.graphicsQueueIndex,
+		FrameCount
+	);
+	vulkanRenderer.computeCommands.Create(
+		vulkanRenderer.device, 
+		vulkanRenderer.queues.computeQueueIndex,
+		FrameCount
+	);
+	vulkanRenderer.transferCommands.Create(
+		vulkanRenderer.device, 
+		vulkanRenderer.queues.transferQueueIndex,
+		FrameCount
+	);
 
 	for (passName in passes)
 	{

@@ -296,8 +296,8 @@ VkBufferCreateInfo BufferDescToCreateInfo(createDesc: BufferDesc)
 {
 	createInfo := VkBufferCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	createInfo.usage = createDesc.size;
-	createInfo.size = createDesc.usage;
+	createInfo.usage = createDesc.usage;
+	createInfo.size = createDesc.size;
 
     if (createDesc.shared)
     {

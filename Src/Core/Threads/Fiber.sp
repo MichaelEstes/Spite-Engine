@@ -32,7 +32,7 @@ bool JobHandle::Finished()
 
 uint32 JobHandle::Add(count: uint32) => this.counter.Add(count);
 
-uint32 JobHandle::Remove() => this.counter.Sub(1);
+uint32 JobHandle::Decrement() => this.counter.Sub(1);
 
 state Job
 {
@@ -53,6 +53,7 @@ state Fibers
 	// Jobs to run on the main thread
 	mainThreadJobs := Queue<Job>(),
 	mainLock := Mutex(),
+	mainThreadID: uint32,
 
 	handleAllocator: BucketAllocator,
 
@@ -68,6 +69,7 @@ InitalizeFibers()
 {
 	fibers = new Fibers();
 	fibers.currentProcess.Init(0);
+	fibers.mainThreadID = GetCurrentThreadID();
 
 	sysInfo := GetSystemInfo();
 	// - 2 - executable start thread, main (IO) fiber thread
@@ -169,14 +171,14 @@ WaitForHandle(handle: *JobHandle)
 
 	defer DeallocJobHandle(handle);
 
-	currThread := GetCurrentThreadID();
+	currThreadID := GetCurrentThreadID();
 	
 	for (i .. fibers.processCount + 1)
 	{
-		thread := fibers.threadIDs[i];
+		threadID := fibers.threadIDs[i]~;
 		
 		// Waiting for a job on a fiber thread, continue running jobs
-		if (currThread == thread)
+		if (currThreadID == threadID)
 		{
 			while (!handle.Finished())
 			{
@@ -184,6 +186,12 @@ WaitForHandle(handle: *JobHandle)
 			}
 			return;
 		}
+	}
+
+	// Don't stall main thread
+	if (currThreadID == fibers.mainThreadID)
+	{
+		FlushMainThreadJobs();
 	}
 
 	// Waiting on a non fiber thread, spin
@@ -210,9 +218,10 @@ RunOnMainFiber(func: ::(*any), data: *any, handle: **JobHandle = null, priority:
 	AddJobForIndex(job, priority, mainIndex);
 }
 
-RunOnMainThread(func: ::(*any), data: *any)
+RunOnMainThread(func: ::(*any), data: *any, handle: **JobHandle = null)
 {
-	job := {func, data, null} as Job;
+	jobHandle := GetJobHandle(1, handle, 0);
+	job := {func, data, jobHandle} as Job;
 
 	fibers.mainLock.Lock();
 	{
@@ -229,6 +238,10 @@ FlushMainThreadJobs()
 		{
 			job := fibers.mainThreadJobs.Dequeue();
 			job.func(job.data);
+			if (job.handle)
+			{
+				job.handle.Decrement();
+			}
 		}
 	}
 	fibers.mainLock.Unlock();
@@ -263,7 +276,7 @@ RunNext(index: uint)
 		job.func(job.data);
 		if (job.handle)
 		{
-			job.handle.Remove();
+			job.handle.Decrement();
 		}
 	}
 }
