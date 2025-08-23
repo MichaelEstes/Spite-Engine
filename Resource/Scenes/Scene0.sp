@@ -25,7 +25,7 @@ _ := SceneRegistry.RegisterScene(
 				uint32(1000)
 			},
 			{
-				Array<string>(["ClearPass",]),
+				Array<string>(["ClearPass", "ColorPass"]),
 				RendererFlags.Vulkan
 				//RendererFlags.SDL
 			}

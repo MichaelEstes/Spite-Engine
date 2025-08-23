@@ -56,13 +56,15 @@ VulkanPipeline::(device: *VkDevice_T)
 	this.colorBlend.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 }
 
-ref VulkanPipeline VulkanPipeline::AddShader(path: string, stage: VkShaderStageFlagBits, 
-											 entry: string = "main")
+ref VulkanPipeline VulkanPipeline::SetVertexShader(vertexShaderHandle: ResourceHandle)
 {
-	//shader := VulkanShader();
-	//shader.Create(renderer, file, stage, entry);
-	//this.shaders.Add(shader);
+	this.vertexShaderHandle = vertexShaderHandle;
+	return this;
+}
 
+ref VulkanPipeline VulkanPipeline::SetFragmentShader(fragmentShaderHandle: ResourceHandle)
+{
+	this.fragmentShaderHandle = fragmentShaderHandle;
 	return this;
 }
 

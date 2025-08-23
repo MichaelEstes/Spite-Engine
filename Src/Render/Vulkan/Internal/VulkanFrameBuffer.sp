@@ -2,11 +2,6 @@ package VulkanRenderer
 
 import MurmurHash
 
-state VulkanFrameBufferCache
-{
-	frameBufferMap := Map<VulkanFrameBufferKey, *VkFramebuffer_T, HashFrameBufferKey>()
-}
-
 state VulkanFrameBufferKey
 {
 	renderPass: *VkRenderPass_T,
@@ -20,6 +15,11 @@ state VulkanFrameBufferValue
 {
 	frameBuffer: *VkFramebuffer_T,
 	timestamp: uint,
+}
+
+state VulkanFrameBufferCache
+{
+	frameBufferMap := Map<VulkanFrameBufferKey, *VkFramebuffer_T, HashFrameBufferKey>()
 }
 
 uint HashFrameBufferKey(key: VulkanFrameBufferKey)

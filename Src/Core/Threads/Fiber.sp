@@ -195,7 +195,10 @@ WaitForHandle(handle: *JobHandle)
 	}
 
 	// Waiting on a non fiber thread, spin
-	while (!handle.Finished()) {}
+	while (!handle.Finished()) 
+	{
+		Thread.Sleep(0);
+	}
 }
 
 uint CreateFiberThread(index: uint)

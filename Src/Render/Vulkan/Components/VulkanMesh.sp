@@ -1,11 +1,26 @@
 package VulkanRenderer
 
 import Render
+import Array
 
-state VulkanMesh
+state VulkanGeometry
 {
 	vertexHandle: VulkanAllocHandle,
 	indexHandle: VulkanAllocHandle,
+
+	indexKind: VkIndexType,
+}
+
+state VulkanMaterial
+{
+	test: uint
+}
+
+state VulkanMesh
+{
+	geos: Allocator<VulkanGeometry>,
+	mats: Allocator<VulkanMaterial>,
+	count: uint32
 }
 
 VulkanMeshComponent := ECS.RegisterComponent<VulkanMesh>(
@@ -27,14 +42,24 @@ UploadMesh(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer)
 
 	log "Uploading mesh: ", entity;
 
-	for (primitive in mesh.primitives)
+	primCount := mesh.primitives.count;
+	vulkanMesh := VulkanMesh();
+	vulkanMesh.geos.Alloc(primCount);
+	vulkanMesh.mats.Alloc(primCount);
+	vulkanMesh.count = primCount;
+
+	for (i .. primCount)
 	{
+		primitive := mesh.primitives[i];
 		geo := primitive.geometry;
 		mat := primitive.material;
 
-		UploadGeometry(sceneEntity, geo, renderer);
+		vulkanGeo := UploadGeometry(geo, renderer);
+		vulkanMesh.geos[i]~ = vulkanGeo;
 
-	}				
+	}
+	
+	scene.SetComponentDirect<VulkanMesh>(entity, vulkanMesh, VulkanMeshComponent);
 }
 
 VkBufferCreateInfo VertexBufferCreateInfo(size: uint32)
@@ -49,16 +74,13 @@ VkBufferCreateInfo VertexBufferCreateInfo(size: uint32)
 	return createInfo;
 }
 
-UploadGeometry(sceneEntity: SceneEntity, geo: Geometry, renderer: *VulkanRenderer)
+VulkanGeometry UploadGeometry(geo: Geometry, renderer: *VulkanRenderer)
 {
-	scene := sceneEntity.scene;
-	entity := sceneEntity.entity;
-
 	device := renderer.device;
 	commands := renderer.transferCommands;
 	queue := renderer.queues.transferQueue;
 
-	vulkanMesh := VulkanMesh();
+	vulkanGeo := VulkanGeometry();
 
 	vertexSize := uint(geo.vertices.count * (#sizeof Vec3));
 	indexSize := uint(geo.indices.count * (#sizeof uint16));
@@ -76,7 +98,7 @@ UploadGeometry(sceneEntity: SceneEntity, geo: Geometry, renderer: *VulkanRendere
 		commands,
 		queue
 	);
-	vulkanMesh.vertexHandle = vertexBufferHandle;
+	vulkanGeo.vertexHandle = vertexBufferHandle;
 
 	if (indexSize)
 	{
@@ -90,10 +112,15 @@ UploadGeometry(sceneEntity: SceneEntity, geo: Geometry, renderer: *VulkanRendere
 			commands,
 			queue
 		);
-		vulkanMesh.indexHandle = indexBufferHandle;
+		vulkanGeo.indexHandle = indexBufferHandle;
+
+		if (geo.indexKind == IndexKind.I32)
+		{
+			vulkanGeo.indexKind = VkIndexType.VK_INDEX_TYPE_UINT32;
+		}
 	}
 
-	scene.SetComponentDirect<VulkanMesh>(entity, vulkanMesh, VulkanMeshComponent);
+	return vulkanGeo;
 }
 
 

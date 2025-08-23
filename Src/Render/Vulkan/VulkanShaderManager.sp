@@ -72,20 +72,20 @@ ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderPa
 	{
 		resource := Resource.GetResource<ShaderResource>(handle).data;
 		delete resource.metadata;
-		delete resource.shaderStageInfo.pName;
 		vkDestroyShaderModule(resource.device, resource.shaderModule, null);
 	}
 );
 
 ShaderResourceManagerID := Resource.RegisterResourceManager(ShaderResourceManager@);
 
-ResourceHandle UseShader(device: *VkDevice_T, path: string, stage: GPUShaderStage, entry: string)
+ResourceHandle UseShader(device: *VkDevice_T, path: string, stage: GPUShaderStage, 
+						 entry: string = "main")
 {
 	shaderParam := ShaderParam();
 	shaderParam.device = device;
 	shaderParam.path = path;
 	shaderParam.stage = stage;
-	shaderParam.entry = entry.Copy();
+	shaderParam.entry = entry;
 
 	return ShaderResourceManager.LoadResource(shaderParam, ::(handle: ResourceHandle){});
 }

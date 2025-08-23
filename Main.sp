@@ -57,7 +57,7 @@ transformSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 });
 
 testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
-	log "Test System called", dt;
+	//log "Test System called", dt;
 	
 	for (item in scene.Iterate<Test>())
 	{

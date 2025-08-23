@@ -130,12 +130,13 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 			log "Unable to find render pass for Vulkan backend with name: ", passName;
 			continue;
 		}
+		if (renderPass.onInit) renderPass.onInit(vulkanRenderer);
 		vulkanRenderer.passes.Add(renderPass~);
 	}
 
 	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables[deviceIndex]);
 	vulkanRenderer.renderGraph.SetRenderPassFuncs(
-		::*VkCommandBuffer_T(pass: RenderGraphPass<VulkanRenderer>, renderPass: RenderPass, 
+		::*VkRenderPass_T(pass: RenderGraphPass<VulkanRenderer>, renderPass: RenderPass, 
 							 renderer: *VulkanRenderer)
 		{
 			deviceIndex := renderer.deviceIndex;
@@ -200,10 +201,11 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 			
 			vkCmdBeginRenderPass(commandBuffer, renderPassInfo@, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
 
-			return commandBuffer;
+			return vkRenderPass;
 		},
-		::(commandBuffer: *VkCommandBuffer_T, renderer: *VulkanRenderer)
+		::(vkRenderPass: *VkRenderPass_T, renderer: *VulkanRenderer)
 		{
+			commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 			vkCmdEndRenderPass(commandBuffer);
 		}
 	);
@@ -315,8 +317,7 @@ VulkanRenderer::Draw(scene: *Scene)
 	graphicsCommandBuffer := this.GetCommandBuffer(CommandBufferKind.Graphics);
 	this.Begin(graphicsCommandBuffer);
 	{
-		context := renderGraph.CreateContext();
-		renderGraph.Execute(context);
+		renderGraph.Execute();
 
 		currentSwapchainLayout := resourceTables.GetCurrentTextureLayout(swapchainImage);
 		if (currentSwapchainLayout != GPUTextureLayout.Present)

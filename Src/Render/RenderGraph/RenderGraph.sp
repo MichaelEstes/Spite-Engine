@@ -159,7 +159,7 @@ RenderGraph::WalkResources(resourceHandle: uint32, passes: PassResourceArray)
 	for (i .. passes.count)
 	{
 		passIndex := passes.values[i];
-		if (this.passOrder.Has(passIndex)) continue;
+		if (this.passSet[passIndex]) continue;
 		if (this.readerPassToResources.Has(passIndex))
 		{
 			resourcesRead := this.readerPassToResources.Get(passIndex);
@@ -174,8 +174,11 @@ RenderGraph::WalkResources(resourceHandle: uint32, passes: PassResourceArray)
 			}
 		}
 
-		this.passSet.Set(i);
-		this.passOrder.Add(i);
+		if (this.passSet[passIndex])
+		{
+			this.passSet.Set(passIndex);
+			this.passOrder.Add(passIndex);
+		}
 	}
 }
 
@@ -352,8 +355,10 @@ RenderPass RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOr
 	return renderPass;
 }
 
-RenderGraph::Execute(context: RenderPassContext<Renderer>)
+RenderGraph::Execute()
 {
+	context := this.CreateContext();
+	
 	for (i .. this.passOrder.count)
 	{
 		passIndex := this.passOrder[i];

@@ -118,9 +118,7 @@ SDLRenderer::Draw(scene: *Scene)
 	}
 
 	renderGraph.Compile();
-	
-	context := renderGraph.CreateContext();
-	renderGraph.Execute(context);
+	renderGraph.Execute();
 }
 
 SDLRenderer CreateSDLRenderer(window: *SDL.Window, device: *SDL.GPUDevice, passes: Array<string>)
