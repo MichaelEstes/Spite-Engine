@@ -272,11 +272,11 @@ VulkanRenderer::End(commandBuffer: *VkCommandBuffer_T)
 }
 
 VulkanRenderer::TransitionTexture(image: *VkImage_T, currentLayout: GPUTextureLayout, targetLayout: GPUTextureLayout, 
-								  format: GPUTextureFormat, renderer: *VulkanRenderer)
+								  format: GPUFormat, renderer: *VulkanRenderer)
 {
 	oldLayout := GPUTextureLayoutToVkLayout(currentLayout);
 	newLayout := GPUTextureLayoutToVkLayout(targetLayout);
-	vkFormat := GPUTextureFormatToVkFormat(format);
+	vkFormat := format;
 	//log "Transitioning image: ", oldLayout, newLayout, vkFormat;
 
 	commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);

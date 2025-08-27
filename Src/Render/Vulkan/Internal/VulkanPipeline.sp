@@ -3,6 +3,13 @@ package VulkanRenderer
 import Resource
 import SDL
 
+MaxDynamicStates := 8;
+
+state PipelineKey
+{
+	geometryFlags: GeometryAttributeFlags,
+}
+
 state VulkanPipeline
 {
 	device: *VkDevice_T,
@@ -19,21 +26,18 @@ state VulkanPipeline
     multisampling: VkPipelineMultisampleStateCreateInfo,
     depthStencil: VkPipelineDepthStencilStateCreateInfo,
     colorBlend: VkPipelineColorBlendStateCreateInfo,
-    dynamicStates: Array<VkDynamicState>
+    dynamicStates: [MaxDynamicStates]VkDynamicState,
+	dynamicStateCount: uint32
 }
 
 VulkanPipeline::delete
 {
-	delete this.dynamicStates;
-
 	vkDestroyPipeline(this.device, this.pipeline, null);
 	vkDestroyPipelineLayout(this.device, this.layout, null);
 }
 
-VulkanPipeline::(device: *VkDevice_T)
+VulkanPipeline::()
 {
-    this.device = device;
-
 	this.vertexInput = VkPipelineVertexInputStateCreateInfo();
 	this.vertexInput.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
@@ -68,13 +72,13 @@ ref VulkanPipeline VulkanPipeline::SetFragmentShader(fragmentShaderHandle: Resou
 	return this;
 }
 
-ref VulkanPipeline VulkanPipeline::SetVertexInput(vertexBindingDescriptions: []*VkVertexInputBindingDescription, 
-	                                              vertexAttributeDescriptions: []*VkVertexInputAttributeDescription)
+ref VulkanPipeline VulkanPipeline::SetVertexInput(vertexBindingDescriptions: []VkVertexInputBindingDescription, 
+	                                              vertexAttributeDescriptions: []VkVertexInputAttributeDescription)
 {
 	this.vertexInput.vertexBindingDescriptionCount = vertexBindingDescriptions.count;
-	this.vertexInput.pVertexBindingDescriptions = vertexBindingDescriptions[0];
+	this.vertexInput.pVertexBindingDescriptions = vertexBindingDescriptions[0]@;
 	this.vertexInput.vertexAttributeDescriptionCount = vertexAttributeDescriptions.count;
-	this.vertexInput.pVertexAttributeDescriptions = vertexAttributeDescriptions[0];
+	this.vertexInput.pVertexAttributeDescriptions = vertexAttributeDescriptions[0]@;
 
 	return this;
 }
@@ -88,12 +92,13 @@ ref VulkanPipeline VulkanPipeline::SetInputAssembly(topology: VkPrimitiveTopolog
 	return this;
 }
 
-ref VulkanPipeline VulkanPipeline::SetViewportState(viewports: []*VkViewport, scissors: []*VkRect2D)
+ref VulkanPipeline VulkanPipeline::SetViewportState(viewportCount: uint32, scissorCount: uint32,
+													viewports: *VkViewport = null, scissors: *VkRect2D = null)
 {
-	this.viewportState.viewportCount = viewports.count;
-	this.viewportState.pViewports = viewports[0];
-	this.viewportState.scissorCount = scissors.count;
-	this.viewportState.pScissors = scissors[0];
+	this.viewportState.viewportCount = viewportCount;
+	this.viewportState.pViewports = viewports;
+	this.viewportState.scissorCount = scissorCount;
+	this.viewportState.pScissors = scissors;
 
 	return this;
 }
@@ -179,7 +184,9 @@ ref VulkanPipeline VulkanPipeline::SetColorBlend(attachments: []VkPipelineColorB
 
 ref VulkanPipeline VulkanPipeline::AddDynamicState(dynamicState: VkDynamicState)
 {
-	this.dynamicStates.Add(dynamicState);
+	assert this.dynamicStateCount < MaxDynamicStates, "VulkanPipeline::AddDynamicState Exceed allow dynamicState count";
+	this.dynamicStates[this.dynamicStateCount] = dynamicState;
+	this.dynamicStateCount += 1;
 
 	return this;
 }
@@ -243,3 +250,26 @@ ref VulkanPipeline VulkanPipeline::CreatePipelineLayout(setLayouts: []*VkDescrip
 //
 //    return this;
 //}
+
+VkPipelineColorBlendAttachmentState ColorBlendAttachment(colorWriteMask: VkColorComponentFlagBits = VkColorComponentFlagBits.VK_COLOR_COMPONENT_R_BIT | VkColorComponentFlagBits.VK_COLOR_COMPONENT_G_BIT | VkColorComponentFlagBits.VK_COLOR_COMPONENT_B_BIT | VkColorComponentFlagBits.VK_COLOR_COMPONENT_A_BIT,
+														 blendEnable: uint32 = VkFalse,
+														 srcColorBlendFactor: VkBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ONE,
+														 dstColorBlendFactor: VkBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ZERO,
+														 colorBlendOp: VkBlendOp = VkBlendOp.VK_BLEND_OP_ADD,
+														 srcAlphaBlendFactor: VkBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ONE,
+														 dstAlphaBlendFactor: VkBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ZERO,
+														 alphaBlendOp: VkBlendOp = VkBlendOp.VK_BLEND_OP_ADD
+														)
+{
+	colorBlendAttachment := VkPipelineColorBlendAttachmentState();
+	colorBlendAttachment.colorWriteMask = colorWriteMask;
+	colorBlendAttachment.blendEnable = blendEnable;
+	colorBlendAttachment.srcColorBlendFactor = srcColorBlendFactor;
+	colorBlendAttachment.dstColorBlendFactor = dstColorBlendFactor;
+	colorBlendAttachment.colorBlendOp = colorBlendOp;
+	colorBlendAttachment.srcAlphaBlendFactor = srcAlphaBlendFactor;
+	colorBlendAttachment.dstAlphaBlendFactor = dstAlphaBlendFactor;
+	colorBlendAttachment.alphaBlendOp = alphaBlendOp;
+
+	return colorBlendAttachment;
+}

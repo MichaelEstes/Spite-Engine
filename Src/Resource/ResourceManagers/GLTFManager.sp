@@ -265,7 +265,10 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 
 	material.emissiveFactor = gltfMaterial.emissiveFactor;
 	material.alphaCutoff = gltfMaterial.alphaCutoff;
-	material.doubleSided = gltfMaterial.doubleSided;
+	if (gltfMaterial.doubleSided)
+	{
+		material.cullMode = CullModeFlags.None;
+	}
 	material.alphaMode = GetAlphaMode(gltfMaterial);
 
 	primitive.material = material;

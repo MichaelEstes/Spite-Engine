@@ -249,7 +249,7 @@ VkImageCreateInfo TextureDescToCreateInfo(createDesc: TextureDesc, renderer: *Vu
 	createInfo := VkImageCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	createInfo.imageType = GPUTextureTypeToVkImageType(createDesc.type);
-	createInfo.format = GPUTextureFormatToVkFormat(createDesc.format);
+	createInfo.format = createDesc.format;
 
     if (createDesc.flags & GPUTextureFlags.SizeSwapchainRelative)
     {

@@ -3,11 +3,26 @@ package Render
 import Vec
 import Common
 
-enum AlphaMode: uint16
+enum AlphaMode: ubyte
 {
 	Opaque,
 	Mask,
 	Blend
+}
+
+enum CullModeFlags: ubyte
+{
+	None = 0,
+	Front = 1 << 0,
+	Back = 1 << 1,
+	Both = CullModeFlags.Front | CullModeFlags.Back
+}
+
+enum PolygonMode: ubyte
+{
+	Fill,
+	Line,
+	Point
 }
 
 state TextureMap
@@ -30,15 +45,15 @@ state Material
 	occlusionStrength := float32(1.0),
 	alphaCutoff := float32(0.5),
 
-	color := int16(-1),
-	normal := int16(-1),
-	metallicRoughness := int16(-1),
-	occlusion := int16(-1),
-	emissive := int16(-1),
+	color := ubyte(-1),
+	normal := ubyte(-1),
+	metallicRoughness := ubyte(-1),
+	occlusion := ubyte(-1),
+	emissive := ubyte(-1),
 
 	alphaMode: AlphaMode = AlphaMode.Opaque,
-
-	doubleSided: bool
+	cullMode: CullModeFlags = CullModeFlags.Back,
+	polygonMode: PolygonMode = PolygonMode.Fill
 }
 
 Material::delete

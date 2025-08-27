@@ -39,7 +39,7 @@ state VulkanRenderPassCache
 		attachment := renderPass.attachments[i];
 
 		vkAttachment := VkAttachmentDescription();
-		vkAttachment.format = GPUTextureFormatToVkFormat(attachment.format);
+		vkAttachment.format = attachment.format;
 		vkAttachment.samples = GPUTextureSamplesToVkSamples(attachment.samples);
 		vkAttachment.loadOp = attachment.load;
 		vkAttachment.storeOp = attachment.store;

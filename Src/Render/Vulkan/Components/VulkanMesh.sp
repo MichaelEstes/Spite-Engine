@@ -3,12 +3,53 @@ package VulkanRenderer
 import Render
 import Array
 
+enum GeometryAttributeFlags: uint16
+{
+	None = 0,
+	Tangent = 1 << 0,
+    Color = 1 << 1,
+    UV0 = 1 << 2,
+    UV1 = 1 << 3,
+    UV2 = 1 << 4,
+    UV3= 1 << 5,
+}
+
 state VulkanGeometry
 {
 	vertexHandle: VulkanAllocHandle,
 	indexHandle: VulkanAllocHandle,
+	normals: VulkanAllocHandle,
 
+	tangents: VulkanAllocHandle,
+
+	color: VulkanAllocHandle,
+
+	uvs: [4]VulkanAllocHandle = [
+		VulkanAllocHandle(),
+		VulkanAllocHandle(),
+		VulkanAllocHandle(),
+		VulkanAllocHandle()
+	],
+
+	geoKind: GeometryKind,
 	indexKind: VkIndexType,
+}
+
+GeometryAttributeFlags VulkanGeometry::GetAttributesFlags()
+{
+	mask := GeometryAttributeFlags.None;
+	if (this.tangents.handle) mask |= GeometryAttributeFlags.Tangent;
+	if (this.color.handle) mask |= GeometryAttributeFlags.Color;
+
+	for (i .. 4)
+	{
+		if (this.uvs[i].handle)
+		{
+			mask |= (GeometryAttributeFlags.UV0 << i);
+		}
+	}
+
+	return mask;
 }
 
 state VulkanMaterial
@@ -56,7 +97,6 @@ UploadMesh(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer)
 
 		vulkanGeo := UploadGeometry(geo, renderer);
 		vulkanMesh.geos[i]~ = vulkanGeo;
-
 	}
 	
 	scene.SetComponentDirect<VulkanMesh>(entity, vulkanMesh, VulkanMeshComponent);

@@ -213,7 +213,7 @@ VkResult VulkanSwapchain::Present(presentQueue: *VkQueue_T, frame: uint32)
 TextureDesc VulkanSwapchain::GetSwapchainDesc()
 {
 	desc := TextureDesc();
-	desc.format = VkFormatToGPUTextureFormat(this.imageFormat);
+	desc.format = this.imageFormat;
 	desc.usage = GPUTextureUsageFlags.COLOR_TARGET;
 	desc.width = this.extent.width;
 	desc.height = this.extent.height;

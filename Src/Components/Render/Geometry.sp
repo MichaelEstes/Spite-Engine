@@ -31,9 +31,14 @@ state Geometry
     normals: ArrayView<Vec3>,
     tangents: ArrayView<Vec4>,
 
-    uvs: Array<ArrayView<Vec2>>,
+    colors: ArrayView<Color>,
 
-    colors: Array<ArrayView<Color>>,
+    uvs: [4]ArrayView<Vec2> = [
+        ArrayView<Vec2>(),
+        ArrayView<Vec2>(),
+        ArrayView<Vec2>(),
+        ArrayView<Vec2>()
+    ],
 
     indexKind: IndexKind,
     kind: GeometryKind
