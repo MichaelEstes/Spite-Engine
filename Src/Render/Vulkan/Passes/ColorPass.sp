@@ -4,6 +4,7 @@ import VulkanRenderer
 import RenderGraph
 import ECS
 import Vec
+import SparseSet
 
 vertShaderHandle := ResourceHandle();
 fragShaderHandle := ResourceHandle();
@@ -28,40 +29,43 @@ colorPass := RegisterRenderPass(
 			{
 				//log "Vulkan Color pass exec";
 
-				pipeline := VulkanPipeline()
-					.SetVertexShader(vertShaderHandle)
-					.SetFragmentShader(fragShaderHandle)
-					.SetVertexInput(
-						VkVertexInputBindingDescription:
-							[
-								{uint32(0), uint32(#sizeof Vec3), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX},
-								{uint32(1), uint32(#sizeof Vec3), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX},
-								{uint32(2), uint32(#sizeof Vec2), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX}
-							],
-						VkVertexInputAttributeDescription:
-							[
-								{uint32(0), uint32(0), VkFormat.VK_FORMAT_R32G32B32_SFLOAT, uint32(0)},
-								{uint32(1), uint32(1), VkFormat.VK_FORMAT_R32G32B32_SFLOAT, uint32(0)},
-								{uint32(2), uint32(2), VkFormat.VK_FORMAT_R32G32_SFLOAT, uint32(0)}
-							]
-					)
-					.SetInputAssembly(VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-					.SetViewportState(1, 1)
-					.SetRasterizer()
-					.SetMultisampling()
-					.SetDepthStencil(VkTrue, VkTrue)
-					.SetColorBlend(
-						VkPipelineColorBlendAttachmentState:[ColorBlendAttachment(),]
-					);
+				renderer := context.renderer;
 
+				//pipelineBuilder := VulkanPipelineBuilder()
+				//	.SetVertexShader(vertShaderHandle)
+				//	.SetFragmentShader(fragShaderHandle)
+				//	.SetVertexInput(
+				//		VkVertexInputBindingDescription:
+				//			[
+				//				{uint32(0), uint32(#sizeof Vec3), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX},
+				//				{uint32(1), uint32(#sizeof Vec3), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX},
+				//				{uint32(2), uint32(#sizeof Vec2), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX}
+				//			],
+				//		VkVertexInputAttributeDescription:
+				//			[
+				//				{uint32(0), uint32(0), VkFormat.VK_FORMAT_R32G32B32_SFLOAT, uint32(0)},
+				//				{uint32(1), uint32(1), VkFormat.VK_FORMAT_R32G32B32_SFLOAT, uint32(0)},
+				//				{uint32(2), uint32(2), VkFormat.VK_FORMAT_R32G32_SFLOAT, uint32(0)}
+				//			]
+				//	)
+				//	.SetInputAssembly(VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+				//	.SetViewportState(1, 1)
+				//	.SetRasterizer()
+				//	.SetMultisampling()
+				//	.SetDepthStencil(VkTrue, VkTrue)
+				//	.SetColorBlend(
+				//		VkPipelineColorBlendAttachmentState:[ColorBlendAttachment(),]
+				//	);
 
-				for (vulkanMeshEC in scene.Iterate<VulkanMesh>())
+				pipelineMeshMap := meshGroupsByScene.Get(scene.id);
+				for (kv in pipelineMeshMap)
 				{
-					entity := vulkanMeshEC.entity;
-					vulkanMesh := vulkanMeshEC.component;
-					for (i .. vulkanMesh.count)
+					pipelineKey := kv.key~;
+					meshArr := kv.value~;
+
+					for (mesh in meshArr)
 					{
-						geo := vulkanMesh.geos[i];
+
 					}
 				}
 

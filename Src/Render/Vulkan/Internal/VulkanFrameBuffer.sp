@@ -38,11 +38,8 @@ uint HashFrameBufferKey(key: VulkanFrameBufferKey)
 	key.height = height;
 	key.layers = layers;
 
-	if (cache.frameBufferMap.Has(key))
-	{
-		//log "Using cached frame buffer";
-		return cache.frameBufferMap.Find(key)~;
-	}
+	cachedFrameBuffer := cache.frameBufferMap.Find(key);
+	if (cachedFrameBuffer) return cachedFrameBuffer~;
 
 	//log "Creating framebuffer";
 	createInfo := VkFramebufferCreateInfo();

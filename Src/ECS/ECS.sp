@@ -11,6 +11,9 @@ import Event
 
 instance: ECS = ECS();
 
+SceneCreatedEvent := RegisterEvent<*Scene>();
+SceneRemovedEvent := RegisterEvent<*Scene>();
+
 enum ComponentKind: uint32
 {
 	Common,
@@ -42,6 +45,22 @@ Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.S
 *Type FrameAllocType<Type>() => instance.frameAllocator.AllocType<Type>();
 
 ArrayView<Scene> Scenes() => instance.scenes.Values();
+
+OnSceneCreated(callback: ::(*Scene))
+{
+	ECS.instance.events.On(
+		SceneCreatedEvent, 
+		callback
+	);
+}
+
+OnSceneRemoved(callback: ::(*Scene))
+{
+	ECS.instance.events.On(
+		SceneRemovedEvent, 
+		callback
+	);
+}
 
 state ECS
 {
@@ -137,14 +156,18 @@ ECS::ExpandSystemBuffer(count: uint32)
 	else this.sceneCount += 1;
 
 	this.scenes.Insert(sceneID, Scene(sceneID));
-	return this.GetScene(sceneID);
+	scene := this.GetScene(sceneID);
+	this.events.Emit<*Scene>(SceneCreatedEvent, scene);
+	return scene;
 }
 
 *Scene ECS::GetScene(id: uint16) => this.scenes.Get(id);
 
 ECS::RemoveScene(id: uint16)
 {
-	delete this.GetScene(id)~;
+	scene := this.GetScene(id);
+	this.events.Emit<*Scene>(SceneRemovedEvent, scene);
+	delete scene~;
 	this.scenes.Remove(id);
 	this.recycledScenes.Push(id);
 }

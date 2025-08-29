@@ -59,22 +59,47 @@ state VulkanMaterial
 
 state VulkanMesh
 {
-	geos: Allocator<VulkanGeometry>,
-	mats: Allocator<VulkanMaterial>,
-	count: uint32
+	geometry: VulkanGeometry,
+	material: VulkanMaterial,
+	entity: Entity
 }
 
-VulkanMeshComponent := ECS.RegisterComponent<VulkanMesh>(
-	ComponentKind.Sparse, 
-	::(entity: Entity, mesh: *VulkanMesh, scene: Scene) 
-	{
-		log "Removing Vulkan mesh", entity;
-	}
-	::(entity: Entity, mesh: *VulkanMesh, scene: Scene) 
-	{
-		log "Vulkan mesh added: ", entity;
-	}
-);
+VulkanPipelineKey VulkanMesh::GetPipelineKey()
+{
+	pipelineKey := VulkanPipelineKey();
+	pipelineKey.geometryFlags = this.geometry.GetAttributesFlags();
+
+	return pipelineKey;
+}
+
+meshGroupsByScene := SparseSet<Map<VulkanPipelineKey, Array<VulkanMesh>>>();
+
+bool AddSceneCallbacks()
+{
+	ECS.OnSceneCreated(
+		::(scene: *Scene) 
+		{
+			log "Scene Created";
+			sceneID := scene.id;
+			meshGroupsByScene.Insert(sceneID, Map<VulkanPipelineKey, Array<VulkanMesh>>());
+		}
+	);
+
+	ECS.OnSceneRemoved(
+		::(scene: *Scene) 
+		{
+			log "Scene Removed";
+			sceneID := scene.id;
+			map := meshGroupsByScene.Get(sceneID)~;
+			for (meshArr in map.Values()) delete meshArr;
+			delete map;
+			meshGroupsByScene.Remove(sceneID);
+		}
+	);
+
+	return true;
+}
+_ := AddSceneCallbacks();
 
 UploadMesh(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer)
 {
@@ -84,10 +109,8 @@ UploadMesh(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer)
 	log "Uploading mesh: ", entity;
 
 	primCount := mesh.primitives.count;
-	vulkanMesh := VulkanMesh();
-	vulkanMesh.geos.Alloc(primCount);
-	vulkanMesh.mats.Alloc(primCount);
-	vulkanMesh.count = primCount;
+
+	meshMap := meshGroupsByScene.Get(scene.id);
 
 	for (i .. primCount)
 	{
@@ -95,11 +118,19 @@ UploadMesh(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer)
 		geo := primitive.geometry;
 		mat := primitive.material;
 
-		vulkanGeo := UploadGeometry(geo, renderer);
-		vulkanMesh.geos[i]~ = vulkanGeo;
+		vulkanMesh := VulkanMesh();
+		vulkanMesh.geometry = UploadGeometry(geo, renderer);
+		vulkanMesh.entity = entity;
+
+		pipelineKey := vulkanMesh.GetPipelineKey();
+		if (!meshMap.Has(pipelineKey))
+		{
+			meshMap.Insert(pipelineKey, Array<VulkanMesh>())
+		}
+
+		meshArr := meshMap.Find(pipelineKey);
+		meshArr.Add(vulkanMesh);
 	}
-	
-	scene.SetComponentDirect<VulkanMesh>(entity, vulkanMesh, VulkanMeshComponent);
 }
 
 VkBufferCreateInfo VertexBufferCreateInfo(size: uint32)

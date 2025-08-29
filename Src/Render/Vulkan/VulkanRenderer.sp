@@ -49,6 +49,7 @@ state VulkanRenderer
 	physicalDevice: *VkPhysicalDevice_T
 	allocator: *VulkanAllocator,
 	stagingBuffer: *VulkanStagingBuffer,
+	pipelineCache: *VulkanPipelineCache,
 
 	swapchain: VulkanSwapchain,
 	graphicsCommands: VulkanCommands,
@@ -76,6 +77,9 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 								    deviceIndex: uint32 = vulkanInstance.defaultDevice)
 {
 	log "Creating Vulkan renderer";
+
+	vulkanInstance.InitializeDevice(deviceIndex);
+
 	vulkanRenderer := VulkanRenderer();
 	vulkanRenderer.vkInstance = vulkanInstance@;
 
@@ -88,6 +92,7 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	vulkanRenderer.physicalDevice = vulkanInstance.physicalDevices[deviceIndex]~;
 	vulkanRenderer.allocator = vulkanInstance.allocators[deviceIndex];
 	vulkanRenderer.stagingBuffer = vulkanInstance.GetStagingBuffer(deviceIndex);
+	vulkanRenderer.pipelineCache = vulkanInstance.pipelineCaches[deviceIndex];
 
 	vulkanRenderer.swapchain.Create(vulkanRenderer@);
 	resourceManager := vulkanInstance.resourceManagers[deviceIndex];

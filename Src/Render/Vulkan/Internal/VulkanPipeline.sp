@@ -4,22 +4,60 @@ import Resource
 import SDL
 
 MaxDynamicStates := 8;
+MaxVertexAttributes := 16;
 
-state PipelineKey
+state VulkanVertexInputBinding
+{
+	binding: ubyte,
+	inputRate: ubyte,
+	stride: uint16
+}
+
+state VulkanVertexAttributeBinding
+{
+	location: ubyte,
+	binding: ubyte,
+	format: uint16,
+	offset: uint32,
+}
+
+state VulkanPipelineKey
 {
 	geometryFlags: GeometryAttributeFlags,
 }
 
 state VulkanPipeline
 {
-	device: *VkDevice_T,
 	pipeline: *VkPipeline_T,
-	layout: *VkPipelineLayout_T,
+	layout: *VkPipelineLayout_T
+}
 
+uint HashPipelineKey(key: VulkanPipelineKey)
+{
+	return MHash<VulkanPipelineKey>(key);
+}
+
+state VulkanPipelineCache
+{
+	pipelineMap := Map<VulkanPipelineKey, VulkanPipeline, HashPipelineKey>()
+}
+
+VulkanPipeline FindOrCreatePipeline(device: *VkDevice_T, key: VulkanPipelineKey, cache: VulkanPipelineCache)
+{
+	pipeline := cache.pipelineMap.Find(key);
+	if (pipeline) return pipeline~;
+
+	return VulkanPipeline();
+}
+
+state VulkanPipelineBuilder
+{
     vertexShaderHandle: ResourceHandle,
 	fragmentShaderHandle: ResourceHandle,
 
-    vertexInput: VkPipelineVertexInputStateCreateInfo,
+	vertexInputBindings: [MaxVertexAttributes]VulkanVertexInputBinding,
+	vertexInputAttributes: [MaxVertexAttributes]VulkanVertexAttributeBinding,
+
     inputAssembly: VkPipelineInputAssemblyStateCreateInfo,
     viewportState: VkPipelineViewportStateCreateInfo,
     rasterizer: VkPipelineRasterizationStateCreateInfo,
@@ -27,20 +65,12 @@ state VulkanPipeline
     depthStencil: VkPipelineDepthStencilStateCreateInfo,
     colorBlend: VkPipelineColorBlendStateCreateInfo,
     dynamicStates: [MaxDynamicStates]VkDynamicState,
-	dynamicStateCount: uint32
+	
+	dynamicStateCount: uint32,
 }
 
-VulkanPipeline::delete
+VulkanPipelineBuilder::()
 {
-	vkDestroyPipeline(this.device, this.pipeline, null);
-	vkDestroyPipelineLayout(this.device, this.layout, null);
-}
-
-VulkanPipeline::()
-{
-	this.vertexInput = VkPipelineVertexInputStateCreateInfo();
-	this.vertexInput.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
 	this.inputAssembly = VkPipelineInputAssemblyStateCreateInfo();
 	this.inputAssembly.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 
@@ -60,30 +90,40 @@ VulkanPipeline::()
 	this.colorBlend.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 }
 
-ref VulkanPipeline VulkanPipeline::SetVertexShader(vertexShaderHandle: ResourceHandle)
+ref VulkanPipelineBuilder VulkanPipelineBuilder::SetVertexShader(vertexShaderHandle: ResourceHandle)
 {
 	this.vertexShaderHandle = vertexShaderHandle;
 	return this;
 }
 
-ref VulkanPipeline VulkanPipeline::SetFragmentShader(fragmentShaderHandle: ResourceHandle)
+ref VulkanPipelineBuilder VulkanPipelineBuilder::SetFragmentShader(fragmentShaderHandle: ResourceHandle)
 {
 	this.fragmentShaderHandle = fragmentShaderHandle;
 	return this;
 }
 
-ref VulkanPipeline VulkanPipeline::SetVertexInput(vertexBindingDescriptions: []VkVertexInputBindingDescription, 
-	                                              vertexAttributeDescriptions: []VkVertexInputAttributeDescription)
+ref VulkanPipelineBuilder VulkanPipelineBuilder::SetVertexInput(
+	vertexInputBindings: []VulkanVertexInputBinding
+	vertexInputAttributes: []VulkanVertexAttributeBinding
+)
 {
-	this.vertexInput.vertexBindingDescriptionCount = vertexBindingDescriptions.count;
-	this.vertexInput.pVertexBindingDescriptions = vertexBindingDescriptions[0]@;
-	this.vertexInput.vertexAttributeDescriptionCount = vertexAttributeDescriptions.count;
-	this.vertexInput.pVertexAttributeDescriptions = vertexAttributeDescriptions[0]@;
+	assert vertexInputBindings.count > MaxVertexAttributes, "VulkanPipelineBuilder::SetVertexInput Exceeded max number for vertex input bindings";
+	assert vertexInputAttributes.count > MaxVertexAttributes, "VulkanPipelineBuilder::SetVertexInput Exceeded max number for vertex input attributes";
+
+	for (i .. vertexInputBindings.count)
+	{
+		this.vertexInputBindings[i] = vertexInputBindings[i];
+	}
+
+	for (i .. vertexInputAttributes.count)
+	{
+		this.vertexInputAttributes[i] = vertexInputAttributes[i];
+	}
 
 	return this;
 }
 
-ref VulkanPipeline VulkanPipeline::SetInputAssembly(topology: VkPrimitiveTopology = VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+ref VulkanPipelineBuilder VulkanPipelineBuilder::SetInputAssembly(topology: VkPrimitiveTopology = VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
 	                                                primitiveRestartEnable: bool = false)
 {
 	this.inputAssembly.topology = topology;
@@ -92,7 +132,7 @@ ref VulkanPipeline VulkanPipeline::SetInputAssembly(topology: VkPrimitiveTopolog
 	return this;
 }
 
-ref VulkanPipeline VulkanPipeline::SetViewportState(viewportCount: uint32, scissorCount: uint32,
+ref VulkanPipelineBuilder VulkanPipelineBuilder::SetViewportState(viewportCount: uint32, scissorCount: uint32,
 													viewports: *VkViewport = null, scissors: *VkRect2D = null)
 {
 	this.viewportState.viewportCount = viewportCount;
@@ -103,7 +143,7 @@ ref VulkanPipeline VulkanPipeline::SetViewportState(viewportCount: uint32, sciss
 	return this;
 }
 
-ref VulkanPipeline VulkanPipeline::SetRasterizer(depthClampEnable: uint32 = VkFalse,
+ref VulkanPipelineBuilder VulkanPipelineBuilder::SetRasterizer(depthClampEnable: uint32 = VkFalse,
 	                                            rasterizerDiscardEnable: uint32 = VkFalse,
 	                                            polygonMode: VkPolygonMode = VkPolygonMode.VK_POLYGON_MODE_FILL,
 	                                            lineWidth: float32 = 1.0,
@@ -128,7 +168,7 @@ ref VulkanPipeline VulkanPipeline::SetRasterizer(depthClampEnable: uint32 = VkFa
     return this;
 }
 
-ref VulkanPipeline VulkanPipeline::SetMultisampling(rasterizationSamples: VkSampleCountFlagBits = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT,
+ref VulkanPipelineBuilder VulkanPipelineBuilder::SetMultisampling(rasterizationSamples: VkSampleCountFlagBits = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT,
 	                                                sampleShadingEnable: uint32 = VkFalse,
 	                                                minSampleShading: float32 = 0.0,
 	                                                sampleMask: []uint32 = []uint32,
@@ -145,7 +185,7 @@ ref VulkanPipeline VulkanPipeline::SetMultisampling(rasterizationSamples: VkSamp
     return this;
 }
 
-ref VulkanPipeline VulkanPipeline::SetDepthStencil(depthTestEnable: uint32 = VkFalse,
+ref VulkanPipelineBuilder VulkanPipelineBuilder::SetDepthStencil(depthTestEnable: uint32 = VkFalse,
 	                                               depthWriteEnable: uint32 = VkFalse,
 	                                               depthCompareOp: VkCompareOp = VkCompareOp.VK_COMPARE_OP_LESS,
 	                                               depthBoundsTestEnable: uint32 = VkFalse,
@@ -168,7 +208,7 @@ ref VulkanPipeline VulkanPipeline::SetDepthStencil(depthTestEnable: uint32 = VkF
     return this;
 }
 
-ref VulkanPipeline VulkanPipeline::SetColorBlend(attachments: []VkPipelineColorBlendAttachmentState,
+ref VulkanPipelineBuilder VulkanPipelineBuilder::SetColorBlend(attachments: []VkPipelineColorBlendAttachmentState,
 	                                             logicOpEnable: uint32 = VkFalse,
 	                                             logicOp: VkLogicOp = VkLogicOp.VK_LOGIC_OP_COPY,
 	                                             blendConstants: [4]float32 = float32:[0.0, 0.0, 0.0, 0.0])
@@ -182,33 +222,33 @@ ref VulkanPipeline VulkanPipeline::SetColorBlend(attachments: []VkPipelineColorB
     return this;
 }
 
-ref VulkanPipeline VulkanPipeline::AddDynamicState(dynamicState: VkDynamicState)
+ref VulkanPipelineBuilder VulkanPipelineBuilder::AddDynamicState(dynamicState: VkDynamicState)
 {
-	assert this.dynamicStateCount < MaxDynamicStates, "VulkanPipeline::AddDynamicState Exceed allow dynamicState count";
+	assert this.dynamicStateCount < MaxDynamicStates, "VulkanPipelineBuilder::AddDynamicState Exceed allow dynamicState count";
 	this.dynamicStates[this.dynamicStateCount] = dynamicState;
 	this.dynamicStateCount += 1;
 
 	return this;
 }
 
-ref VulkanPipeline VulkanPipeline::CreatePipelineLayout(setLayouts: []*VkDescriptorSetLayout_T, pushConstantRanges: []VkPushConstantRange = []VkPushConstantRange)
-{
-    pipelineLayoutInfo := VkPipelineLayoutCreateInfo();
-	pipelineLayoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = setLayouts.count;
-	pipelineLayoutInfo.pSetLayouts = setLayouts[0]@;
-	pipelineLayoutInfo.pushConstantRangeCount = pushConstantRanges.count;
-	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges[0]@;
+//ref VulkanPipelineBuilder VulkanPipelineBuilder::CreatePipelineLayout(setLayouts: []*VkDescriptorSetLayout_T, pushConstantRanges: []VkPushConstantRange = []VkPushConstantRange)
+//{
+//    pipelineLayoutInfo := VkPipelineLayoutCreateInfo();
+//	pipelineLayoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+//	pipelineLayoutInfo.setLayoutCount = setLayouts.count;
+//	pipelineLayoutInfo.pSetLayouts = setLayouts[0]@;
+//	pipelineLayoutInfo.pushConstantRangeCount = pushConstantRanges.count;
+//	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges[0]@;
+//
+//    CheckResult(
+//		vkCreatePipelineLayout(this.device, pipelineLayoutInfo@, null, this.layout@),
+//		"Error creating Vulkan pipeline layout"
+//	);
+//
+//	return this;
+//}
 
-    CheckResult(
-		vkCreatePipelineLayout(this.device, pipelineLayoutInfo@, null, this.layout@),
-		"Error creating Vulkan pipeline layout"
-	);
-
-	return this;
-}
-
-//ref VulkanPipeline VulkanPipeline::Create(renderPass: VulkanRenderPass, subpass: uint32,
+//ref VulkanPipelineBuilder VulkanPipelineBuilder::Create(renderPass: VulkanRenderPass, subpass: uint32,
 //										  basePipelineHandle: *VkPipeline_T = null, basePipelineIndex: int32 = -1)
 //{
 //    dynamicState := VkPipelineDynamicStateCreateInfo();
