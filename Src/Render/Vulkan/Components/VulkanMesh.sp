@@ -3,16 +3,17 @@ package VulkanRenderer
 import Render
 import Array
 
-enum GeometryAttributeFlags: uint16
-{
-	None = 0,
-	Tangent = 1 << 0,
-    Color = 1 << 1,
-    UV0 = 1 << 2,
-    UV1 = 1 << 3,
-    UV2 = 1 << 4,
-    UV3= 1 << 5,
-}
+geometryKindToTopologyTable := [
+	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+
+	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
+	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
+	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
+
+	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
+];
 
 state VulkanGeometry
 {
@@ -31,7 +32,7 @@ state VulkanGeometry
 		VulkanAllocHandle()
 	],
 
-	geoKind: GeometryKind,
+	topology: VkPrimitiveTopology,
 	indexKind: VkIndexType,
 }
 
@@ -64,15 +65,15 @@ state VulkanMesh
 	entity: Entity
 }
 
-VulkanPipelineKey VulkanMesh::GetPipelineKey()
+VulkanPipelineMeshState VulkanMesh::GetPipelineMeshState()
 {
-	pipelineKey := VulkanPipelineKey();
-	pipelineKey.geometryFlags = this.geometry.GetAttributesFlags();
+	rasterState := VulkanPipelineMeshState();
+	rasterState.geometryFlags = this.geometry.GetAttributesFlags();
 
-	return pipelineKey;
+	return rasterState;
 }
 
-meshGroupsByScene := SparseSet<Map<VulkanPipelineKey, Array<VulkanMesh>>>();
+meshGroupsByScene := SparseSet<Map<VulkanPipelineMeshState, Array<VulkanMesh>>>();
 
 bool AddSceneCallbacks()
 {
@@ -81,7 +82,7 @@ bool AddSceneCallbacks()
 		{
 			log "Scene Created";
 			sceneID := scene.id;
-			meshGroupsByScene.Insert(sceneID, Map<VulkanPipelineKey, Array<VulkanMesh>>());
+			meshGroupsByScene.Insert(sceneID, Map<VulkanPipelineMeshState, Array<VulkanMesh>>());
 		}
 	);
 
@@ -122,13 +123,14 @@ UploadMesh(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer)
 		vulkanMesh.geometry = UploadGeometry(geo, renderer);
 		vulkanMesh.entity = entity;
 
-		pipelineKey := vulkanMesh.GetPipelineKey();
-		if (!meshMap.Has(pipelineKey))
+		pipelineMeshKey := vulkanMesh.GetPipelineMeshState();
+
+		if (!meshMap.Has(pipelineMeshKey))
 		{
-			meshMap.Insert(pipelineKey, Array<VulkanMesh>())
+			meshMap.Insert(pipelineMeshKey, Array<VulkanMesh>())
 		}
 
-		meshArr := meshMap.Find(pipelineKey);
+		meshArr := meshMap.Find(pipelineMeshKey);
 		meshArr.Add(vulkanMesh);
 	}
 }
@@ -152,6 +154,8 @@ VulkanGeometry UploadGeometry(geo: Geometry, renderer: *VulkanRenderer)
 	queue := renderer.queues.transferQueue;
 
 	vulkanGeo := VulkanGeometry();
+
+	vulkanGeo.topology = geometryKindToTopologyTable[geo.kind];
 
 	vertexSize := uint(geo.vertices.count * (#sizeof Vec3));
 	indexSize := uint(geo.indices.count * (#sizeof uint16));

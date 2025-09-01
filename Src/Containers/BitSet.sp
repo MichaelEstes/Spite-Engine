@@ -1,7 +1,7 @@
 package BitSet
 
 bitsInByte := 8;
-initialBytes := 128;
+initialBytes := 8;
 
 state BitSet
 {

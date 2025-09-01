@@ -70,7 +70,7 @@ state ResourceTables<Renderer>
 {
 	textureTable: ResourceTable<Renderer, TextureDesc>,
 	bufferTable: ResourceTable<Renderer, BufferDesc>,
-	textureToLayout: Map<*any, GPUTextureLayout>,
+	textureToLayout := Map<*any, GPUTextureLayout>(),
 	createTexture: ::*any(TextureDesc, *Renderer),
 	createBuffer: ::*any(BufferDesc, *Renderer)
 }

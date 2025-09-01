@@ -2,9 +2,21 @@ package VulkanRenderer
 
 import Resource
 import SDL
+import BitArray
 
 MaxDynamicStates := 8;
 MaxVertexAttributes := 16;
+
+enum GeometryAttributeFlags: uint16
+{
+	None = 0,
+	Tangent = 1 << 0,
+    Color = 1 << 1,
+    UV0 = 1 << 2,
+    UV1 = 1 << 3,
+    UV2 = 1 << 4,
+    UV3= 1 << 5,
+}
 
 state VulkanVertexInputBinding
 {
@@ -21,9 +33,28 @@ state VulkanVertexAttributeBinding
 	offset: uint32,
 }
 
-state VulkanPipelineKey
+state VulkanPipelineMeshState
 {
 	geometryFlags: GeometryAttributeFlags,
+	// Topology 4 bits			: 4
+	// Polygon mode 2 bits		: 6
+	// Alpha mode 2 bits		: 8
+	// Cull mode 2 bits			: 10
+	// Sample count 4 bits		: 14
+	// Depth bias enable 1 bit	: 15
+	// Depth write enable 1 bit	: 16
+	data: BitArray<16>
+
+}
+
+state VulkanPipelineKey
+{
+	vertexShaderHandle: ResourceHandle,
+	fragmentShaderHandle: ResourceHandle,
+	vertexInputBindings: [MaxVertexAttributes]VulkanVertexInputBinding,
+	vertexInputAttributes: [MaxVertexAttributes]VulkanVertexAttributeBinding,
+
+	meshState: VulkanPipelineMeshState,
 }
 
 state VulkanPipeline
