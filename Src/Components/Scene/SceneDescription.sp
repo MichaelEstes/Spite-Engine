@@ -87,9 +87,8 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 				);
 				scene.SetSingleton<SDLRenderer>(renderer);
 			}
-			
-			log "Scene description added";
 		}, param, handle@);
 		WaitForHandle(handle);
+		log "Scene description added";
 	}
 );

@@ -31,6 +31,7 @@ _ := SceneRegistry.RegisterScene(
 			}
 		});
 
+		log "Loading Box GLTF";
 		boxGLTFHandle := LoadGLTFResource(
 			"./Resource/Models/Box/Box.gltf", 
 			scene, 

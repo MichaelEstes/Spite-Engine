@@ -17,7 +17,8 @@ state PassResourceArray
 state RenderPassContext<Renderer>
 {
 	renderer: *Renderer,
-	handles: *RenderResourceHandles<Renderer>
+	handles: *RenderResourceHandles<Renderer>,
+	driverRenderpass: *any
 }
 
 *Texture RenderPassContext::UseTexture<Texture>(handle: RenderResourceHandle)
@@ -369,6 +370,7 @@ RenderGraph::Execute()
 		{
 			renderPass := this.CreateRenderPass(pass, i);
 			value := this.beginRenderPass(pass, renderPass, this.renderer);
+			context.driverRenderpass = value;
 			pass.exec(context@, pass.data);
 			this.endRenderPass(value, this.renderer);
 		}

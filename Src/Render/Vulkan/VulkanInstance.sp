@@ -82,6 +82,7 @@ VulkanInstance::InitializeDevice(deviceIndex: uint32)
 	vulkanInstance.resourceManagers[i]~ = VulkanResourceManager();
 	vulkanInstance.renderPassCaches[i]~ = VulkanRenderPassCache();
 	vulkanInstance.frameBufferCaches[i]~ = VulkanFrameBufferCache();
+	vulkanInstance.pipelineCaches[i]~ = VulkanPipelineCache();
 	vulkanInstance.stagingBuffers[i]~ = VulkanStagingBuffer();
 
 	physicalDevice := vulkanInstance.physicalDevices[i]~;
@@ -256,6 +257,7 @@ InitializeVulkanInstance()
 		MeshAddedEvent, 
 		::(sceneEntity: SceneEntity)
 		{
+			log "Mesh Added";
 			scene := sceneEntity.scene;
 			entity := sceneEntity.entity;
 

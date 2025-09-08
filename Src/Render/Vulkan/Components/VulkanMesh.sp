@@ -67,10 +67,13 @@ state VulkanMesh
 
 VulkanPipelineMeshState VulkanMesh::GetPipelineMeshState()
 {
-	rasterState := VulkanPipelineMeshState();
-	rasterState.geometryFlags = this.geometry.GetAttributesFlags();
+	meshState := VulkanPipelineMeshState();
+	meshState.geometryFlags = this.geometry.GetAttributesFlags();
 
-	return rasterState;
+	meshState.SetTopology(this.geometry.topology);
+	meshState.SetTopology(VkPolygonMode.VK_POLYGON_MODE_FILL);
+
+	return meshState;
 }
 
 meshGroupsByScene := SparseSet<Map<VulkanPipelineMeshState, Array<VulkanMesh>>>();
@@ -80,7 +83,7 @@ bool AddSceneCallbacks()
 	ECS.OnSceneCreated(
 		::(scene: *Scene) 
 		{
-			log "Scene Created";
+			//log "Scene Created";
 			sceneID := scene.id;
 			meshGroupsByScene.Insert(sceneID, Map<VulkanPipelineMeshState, Array<VulkanMesh>>());
 		}
@@ -89,7 +92,7 @@ bool AddSceneCallbacks()
 	ECS.OnSceneRemoved(
 		::(scene: *Scene) 
 		{
-			log "Scene Removed";
+			//log "Scene Removed";
 			sceneID := scene.id;
 			map := meshGroupsByScene.Get(sceneID)~;
 			for (meshArr in map.Values()) delete meshArr;

@@ -227,6 +227,11 @@ VulkanRenderer::CreateSurface()
 	}
 }
 
+*VkRenderPass_T VulkanRenderer::CastDriverRenderPass(renderPass: *any)
+{
+	return renderPass as *VkRenderPass_T;
+}
+
 uint32 VulkanRenderer::Frame() => this.currentFrame % FrameCount;
 
 enum CommandBufferKind: uint32

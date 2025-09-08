@@ -197,7 +197,7 @@ WaitForHandle(handle: *JobHandle)
 	// Waiting on a non fiber thread, spin
 	while (!handle.Finished()) 
 	{
-		Thread.Sleep(0);
+		//Thread.Sleep(0);
 	}
 }
 
