@@ -49,6 +49,7 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 	},
 	::(entity: Entity, sceneDesc: *SceneDesc, scene: Scene) 
 	{
+		log "Scene description entered";
 		param := AllocThreadParam<SceneDescParam>();
 		param.sceneDesc = sceneDesc;
 		param.scene = scene@;

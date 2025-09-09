@@ -9,7 +9,10 @@ enum VulkanMemoryFlags: uint32
 	Shared = VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 	Coherent = VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 	Cached = VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-	GPULazy = VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT
+	GPULazy = VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT,
+
+	// Allocator specific flags
+	Mapped = 1 << 16
 }
 
 state VulkanAllocHandle
@@ -19,6 +22,7 @@ state VulkanAllocHandle
 
 state VulkanAllocation
 {
+	buffer: *VkBuffer_T,
 	size: uint64
 	offset: uint64,
 	index: uint64,
@@ -29,6 +33,7 @@ state VulkanAllocation
 state VulkanBlock
 {
 	memory: *VkDeviceMemory_T,
+	mappedPtr: *void,
 	size: uint64,
 	currentOffset: uint64,
 	allocations: Array<VulkanAllocHandle>,
@@ -46,6 +51,19 @@ state VulkanAllocator
 	memoryProps: VkPhysicalDeviceMemoryProperties,
 	blocks: Array<VulkanBlock>,
 	allocationHandles := HandleSet<VulkanAllocation>()
+}
+
+*VulkanAllocation VulkanAllocator::GetAllocation(allocHandle: VulkanAllocHandle)
+{
+	return this.allocationHandles.Get(allocHandle.handle);
+}
+
+*VulkanBlock VulkanAllocator::GetAllocationBlock(allocHandle: VulkanAllocHandle)
+{
+	alloc := this.GetAllocation(allocHandle);
+	if (!alloc) return null;
+
+	return this.blocks[alloc.blockIndex]@;
 }
 
 VulkanAllocator::Create(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T)
@@ -67,6 +85,7 @@ VulkanAllocHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags:
 	}
 
 	alloc := VulkanAllocation();
+	alloc.buffer = buffer;
 	alloc.size = memoryRequirements.size;
 	alloc.offset = block.currentOffset;
 	alloc.index = block.allocations.count;
@@ -100,7 +119,7 @@ VulkanAllocHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags:
 	return null;
 }
 
-int32 VulkanAllocator::FindMemoryTypeIndex(memoryFlags: uint32, memoryTypeIndexBits: uint32)
+int32 VulkanAllocator::FindMemoryTypeIndex(memoryFlags: uint16, memoryTypeIndexBits: uint32)
 {
 	for (i .. this.memoryProps.memoryTypeCount)
 	{
@@ -119,7 +138,7 @@ int32 VulkanAllocator::FindMemoryTypeIndex(memoryFlags: uint32, memoryTypeIndexB
 {
 	while (size < memoryRequirements.size) size *= 2;
 
-	memoryTypeIndex := this.FindMemoryTypeIndex(memoryFlags, memoryRequirements.memoryTypeBits);
+	memoryTypeIndex := this.FindMemoryTypeIndex(memoryFlags as uint16, memoryRequirements.memoryTypeBits);
 	assert memoryTypeIndex != -1, "Failed to find memory type";
 
 	allocInfo := VkMemoryAllocateInfo();
@@ -136,6 +155,11 @@ int32 VulkanAllocator::FindMemoryTypeIndex(memoryFlags: uint32, memoryTypeIndexB
 		vkAllocateMemory(this.device, allocInfo@, null, block.memory@),
 		"Error allocating Vulkan block memory"
 	);
+
+	if (memoryFlags & VulkanMemoryFlags.Mapped)
+	{
+		vkMapMemory(this.device, block.memory, 0, size, 0, block.mappedPtr@);
+	}
 
 	index := this.blocks.Add(block);
 	return this.blocks[index]@;

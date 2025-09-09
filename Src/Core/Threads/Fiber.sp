@@ -254,7 +254,7 @@ Job GetNextJob(index: uint)
 {
 	job := Job();
 
-	fibers.locks[index].Lock();
+	if (fibers.locks[index].TryLock())
 	{
 		for (jobArr in fibers.jobs)
 		{
@@ -265,8 +265,8 @@ Job GetNextJob(index: uint)
 				break;
 			}
 		}
+		fibers.locks[index].Unlock();
 	}
-	fibers.locks[index].Unlock();
 
 	return job;
 }

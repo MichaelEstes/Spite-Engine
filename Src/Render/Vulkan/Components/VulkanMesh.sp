@@ -15,6 +15,11 @@ geometryKindToTopologyTable := [
 	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
 ];
 
+indexKindToByteCount := [
+	2,
+	4
+];
+
 state VulkanGeometry
 {
 	vertexHandle: VulkanAllocHandle,
@@ -71,7 +76,6 @@ VulkanPipelineMeshState VulkanMesh::GetPipelineMeshState()
 	meshState.geometryFlags = this.geometry.GetAttributesFlags();
 
 	meshState.SetTopology(this.geometry.topology);
-	meshState.SetTopology(VkPolygonMode.VK_POLYGON_MODE_FILL);
 
 	return meshState;
 }
@@ -150,6 +154,18 @@ VkBufferCreateInfo VertexBufferCreateInfo(size: uint32)
 	return createInfo;
 }
 
+VkBufferCreateInfo IndexBufferCreateInfo(size: uint32)
+{
+	createInfo := VkBufferCreateInfo();
+	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	createInfo.usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+					   VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	createInfo.size = size;
+	createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+
+	return createInfo;
+}
+
 VulkanGeometry UploadGeometry(geo: Geometry, renderer: *VulkanRenderer)
 {
 	device := renderer.device;
@@ -180,7 +196,7 @@ VulkanGeometry UploadGeometry(geo: Geometry, renderer: *VulkanRenderer)
 
 	if (indexSize)
 	{
-		indexBuffer := CreateVkBuffer(device, VertexBufferCreateInfo(vertexSize));
+		indexBuffer := CreateVkBuffer(device, IndexBufferCreateInfo(indexSize));
 		indexBufferHandle := renderer.allocator.AllocBuffer(indexBuffer, VulkanMemoryFlags.GPU);
 		renderer.stagingBuffer.StagedCopy(
 			renderer.device,

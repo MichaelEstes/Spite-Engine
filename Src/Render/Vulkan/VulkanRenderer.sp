@@ -232,6 +232,32 @@ VulkanRenderer::CreateSurface()
 	return renderPass as *VkRenderPass_T;
 }
 
+VulkanRenderer::SetViewportAndScissor(commandBuffer: *VkCommandBuffer_T)
+{
+	this.SetViewport(commandBuffer);
+	this.SetScissor(commandBuffer);
+}
+
+VulkanRenderer::SetViewport(commandBuffer: *VkCommandBuffer_T)
+{
+	viewport := VkViewport();
+	viewport.x = float32(0.0);
+	viewport.y = float32(0.0);
+	viewport.width = this.swapchain.extent.width as float32;
+	viewport.height = this.swapchain.extent.height as float32;
+	viewport.minDepth = float32(0.0);
+	viewport.maxDepth = float32(1.0);
+	vkCmdSetViewport(commandBuffer, uint32(0), uint32(1), viewport@);
+}
+
+VulkanRenderer::SetScissor(commandBuffer: *VkCommandBuffer_T)
+{
+	scissor := VkRect2D();
+	scissor.offset = {int32(0), int32(0)};
+	scissor.extent = this.swapchain.extent;
+	vkCmdSetScissor(commandBuffer, uint32(0), uint32(1), scissor@);
+}
+
 uint32 VulkanRenderer::Frame() => this.currentFrame % FrameCount;
 
 enum CommandBufferKind: uint32

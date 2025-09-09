@@ -249,6 +249,7 @@ Scene::RemoveComponentDirect<Type>(entity: Entity, component: Component)
 
 Scene::SetSingleton<Type>(value: Type)
 {
+	log "Singleton set";
 	this.singletonComponents.Insert<Type>(value);
 	component := instance.GetComponent<Type>();
 

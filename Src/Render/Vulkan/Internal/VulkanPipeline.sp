@@ -82,13 +82,19 @@ state VulkanPipelineKey
 	renderPass: *VkRenderPass_T,
 	layout: *VkPipelineLayout_T,
 
-	vertexInputBindings := [MaxVertexAttributes]VulkanVertexInputBinding(),
-	vertexInputAttributes := [MaxVertexAttributes]VulkanVertexAttributeBinding(),
+	vertexInputBindings: [MaxVertexAttributes]VulkanVertexInputBinding,
+	vertexInputAttributes: [MaxVertexAttributes]VulkanVertexAttributeBinding,
 
 	meshState: VulkanPipelineMeshState,
 
 	vertexShaderHandle: ResourceHandle,
 	fragmentShaderHandle: ResourceHandle,
+}
+
+VulkanPipelineKey::()
+{
+	zero_out_bytes(fixed this.vertexInputBindings, (#sizeof VulkanVertexInputBinding) * MaxVertexAttributes);
+	zero_out_bytes(fixed this.vertexInputAttributes, (#sizeof VulkanVertexAttributeBinding) * MaxVertexAttributes);
 }
 
 state VulkanPipeline
@@ -110,9 +116,13 @@ state VulkanPipelineCache
 VulkanPipeline FindOrCreatePipeline(device: *VkDevice_T, key: VulkanPipelineKey, cache: VulkanPipelineCache)
 {
 	pipeline := cache.pipelineMap.Find(key);
-	if (pipeline) return pipeline~;
+	if (pipeline) 
+	{
+		return pipeline~;
+	}
 	
 	createdPipeline := CreatePipelineFromKey(device, key);
+	cache.pipelineMap.Insert(key, createdPipeline);
 	return createdPipeline;
 }
 
@@ -126,12 +136,15 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 					key.vertexInputAttributes,
 				)
 				.SetInputAssembly(key.meshState.GetTopology())
+				.SetViewportState(1, 1)
 				.SetRasterizer()
 				.SetMultisampling()
 				.SetDepthStencil(VkTrue, VkTrue)
 				.SetColorBlend(
 					VkPipelineColorBlendAttachmentState:[ColorBlendAttachment(),]
 				)
+				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT)
+				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_SCISSOR)
 				.SetPipelineLayout(key.layout);	
 	
 	return builder.Create(device, key.renderPass, 0);
@@ -330,7 +343,6 @@ ref VulkanPipelineBuilder VulkanPipelineBuilder::SetPipelineLayout(pipelineLayou
 VulkanPipeline VulkanPipelineBuilder::Create(device: *VkDevice_T, renderPass: *VkRenderPass_T, 
 											 subpass: uint32)
 {
-	log "Creating pipeline";
 	pipeline := VulkanPipeline();
 
 	shaderStages := [2]VkPipelineShaderStageCreateInfo;
