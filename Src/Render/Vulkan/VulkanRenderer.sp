@@ -7,9 +7,6 @@ import SDL
 import Image
 import SparseSet
 import Event
-import Vertex
-import UniformBufferObject
-import Time
 import ArrayView
 
 import ECS
@@ -94,17 +91,7 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	vulkanRenderer.stagingBuffer = vulkanInstance.GetStagingBuffer(deviceIndex);
 	vulkanRenderer.pipelineCache = vulkanInstance.pipelineCaches[deviceIndex];
 
-	vulkanRenderer.swapchain.Create(vulkanRenderer@);
-	resourceManager := vulkanInstance.resourceManagers[deviceIndex];
-	for (i .. vulkanRenderer.swapchain.imageCount)
-	{
-		image := vulkanRenderer.swapchain.images[i]~;
-		imageView := vulkanRenderer.swapchain.imageViews[i]~;
-		renderTarget := VulkanRenderTarget();
-		renderTarget.image = image;
-		renderTarget.imageView = imageView;
-		resourceManager.renderTargetMap.Insert(image, renderTarget);
-	}
+	vulkanRenderer.CreateSwapchain();
 
 	for (i := 0 .. FrameCount)
 	{
@@ -216,6 +203,44 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	);
 
 	return vulkanRenderer;
+}
+
+VulkanRenderer::CreateSwapchain()
+{
+	this.swapchain.Create(this@);
+	resourceManager := vulkanInstance.resourceManagers[this.deviceIndex];
+	for (i .. this.swapchain.imageCount)
+	{
+		image := this.swapchain.images[i]~;
+		imageView := this.swapchain.imageViews[i]~;
+		renderTarget := VulkanRenderTarget();
+		renderTarget.image = image;
+		renderTarget.imageView = imageView;
+		resourceManager.renderTargetMap.Insert(image, renderTarget);
+	}
+}
+
+VulkanRenderer::RecreateSwapchain()
+{
+	vkDeviceWaitIdle(this.device);
+
+	resourceManager := vulkanInstance.resourceManagers[this.deviceIndex];
+	for (i .. this.swapchain.imageCount)
+	{
+		image := this.swapchain.images[i]~;
+		resourceManager.renderTargetMap.Remove(image);
+	}
+
+	frameBufferCache := vulkanInstance.frameBufferCaches[this.deviceIndex]~;
+	for (kv in frameBufferCache.frameBufferMap)
+	{
+		vkDestroyFramebuffer(this.device, kv.value~, null);
+	}
+	frameBufferCache.frameBufferMap.Clear();
+
+	this.swapchain.Destroy(this.device);
+
+	this.CreateSwapchain();
 }
 
 VulkanRenderer::CreateSurface()

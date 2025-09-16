@@ -222,3 +222,13 @@ TextureDesc VulkanSwapchain::GetSwapchainDesc()
 
 	return desc;
 }
+
+VulkanSwapchain::Destroy(device: *VkDevice_T)
+{
+	for (i .. this.imageCount) 
+	{
+		vkDestroyImageView(device, this.imageViews[i]~, null);
+	}
+
+	vkDestroySwapchainKHR(device, this.swapchain, null);
+}

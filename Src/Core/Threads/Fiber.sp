@@ -3,7 +3,7 @@ package Fiber
 import FixedArray
 import Thread
 import SystemInfo
-import Queue
+import SingleConsumerQueue
 import Atomic
 import BucketAllocator
 import Mutex
@@ -45,14 +45,16 @@ state Fibers
 {
 	threads: FixedArray<uint>,
 	threadIDs: FixedArray<uint32>,
-	locks: FixedArray<Mutex>,
 
 	// Jobs indexed by priority
-	jobs := [FixedArray<Queue<Job>>(), FixedArray<Queue<Job>>(), FixedArray<Queue<Job>>()],
+	jobs := [
+		FixedArray<SingleConsumerQueue<Job>>(), 
+		FixedArray<SingleConsumerQueue<Job>>(), 
+		FixedArray<SingleConsumerQueue<Job>>()
+	],
 	
 	// Jobs to run on the main thread
-	mainThreadJobs := Queue<Job>(),
-	mainLock := Mutex(),
+	mainThreadJobs := SingleConsumerQueue<Job>(),
 	mainThreadID: uint32,
 
 	handleAllocator: BucketAllocator,
@@ -79,21 +81,18 @@ InitalizeFibers()
 
 	fibers.threads = FixedArray<uint>(totalProcessCount);
 	fibers.threadIDs = FixedArray<uint32>(totalProcessCount);
-	fibers.locks = FixedArray<Mutex>(totalProcessCount);
 
 	for (jobArr in fibers.jobs)
 	{
-		jobArr = FixedArray<Queue<Job>>(totalProcessCount);
+		jobArr = FixedArray<SingleConsumerQueue<Job>>(totalProcessCount);
 		for (i .. totalProcessCount)
 		{
-			jobArr[i]~ = Queue<Job>();
+			jobArr[i]~ = SingleConsumerQueue<Job>();
 		}
 	}
 
 	for (i .. totalProcessCount)
 	{
-		fibers.locks[i]~ = Mutex();
-
 		thread := CreateFiberThread(i);
 		fibers.threads[i]~ = thread;
 	}
@@ -131,11 +130,7 @@ DeallocJobHandle(handle: *JobHandle)
 
 AddJobForIndex(job: Job, priority: JobPriority, index: uint32)
 {
-	fibers.locks[index].Lock();
-	{
-		fibers.jobs[priority][index].Enqueue(job);
-	}
-	fibers.locks[index].Unlock();
+	fibers.jobs[priority][index].Enqueue(job);
 }
 
 uint32 GetNextFiberIndex() => fibers.currentProcess.Add(1) % fibers.processCount;
@@ -226,46 +221,35 @@ RunOnMainThread(func: ::(*any), data: *any, handle: **JobHandle = null)
 	jobHandle := GetJobHandle(1, handle, 0);
 	job := {func, data, jobHandle} as Job;
 
-	fibers.mainLock.Lock();
-	{
-		fibers.mainThreadJobs.Enqueue(job);
-	}
-	fibers.mainLock.Unlock();
+	fibers.mainThreadJobs.Enqueue(job);
 }
 
 FlushMainThreadJobs()
 {
-	fibers.mainLock.Lock();
+	count := fibers.mainThreadJobs.count.Load();
+	for (i .. count)
 	{
-		while (fibers.mainThreadJobs.count)
+		job := fibers.mainThreadJobs.Dequeue();
+		job.func(job.data);
+		if (job.handle)
 		{
-			job := fibers.mainThreadJobs.Dequeue();
-			job.func(job.data);
-			if (job.handle)
-			{
-				job.handle.Decrement();
-			}
+			job.handle.Decrement();
 		}
 	}
-	fibers.mainLock.Unlock();
 }
 
 Job GetNextJob(index: uint)
 {
 	job := Job();
 
-	if (fibers.locks[index].TryLock())
+	for (jobArr in fibers.jobs)
 	{
-		for (jobArr in fibers.jobs)
+		jobQueue := jobArr[index];
+		if (jobQueue.count.Load())
 		{
-			jobQueue := jobArr[index];
-			if (jobQueue.count)
-			{
-				job = jobQueue.Dequeue();
-				break;
-			}
+			job = jobQueue.Dequeue();
+			break;
 		}
-		fibers.locks[index].Unlock();
 	}
 
 	return job;

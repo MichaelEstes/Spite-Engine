@@ -33,8 +33,9 @@ _ := SceneRegistry.RegisterScene(
 
 		log "Loading Box GLTF";
 		boxGLTFHandle := LoadGLTFResource(
-			"./Resource/Models/Box/Box.gltf", 
-			scene, 
+			"./Resource/Models/Box/Box.gltf",
+			//"./Resource/Models/BrainStem/BrainStem.gltf",
+			scene,
 			::(handle: ResourceHandle) 
 			{
 				log "Loaded gltf: ", boxEntities;

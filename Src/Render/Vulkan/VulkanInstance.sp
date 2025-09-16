@@ -284,8 +284,8 @@ InitializeVulkanInstance()
 					renderer := scene.GetSingleton<VulkanRenderer>();
 					if (renderer.window.id == windowID)
 					{
-						log "Window resized";
-						//renderer.RecreateSwapchain();
+						log "Window Resized";
+						renderer.RecreateSwapchain();
 					}
 				}
 			}

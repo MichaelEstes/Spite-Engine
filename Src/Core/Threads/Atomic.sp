@@ -121,6 +121,11 @@ state Atomic<Type>
 	value: Type
 }
 
+Atomic::(value: Type)
+{
+	this.Init(value);
+}
+
 _CheckValidAtomicType(type: *_Type)
 {
 	assert type.IsInteger() || type.IsPointer(), "Not a valid type for atomic operations";

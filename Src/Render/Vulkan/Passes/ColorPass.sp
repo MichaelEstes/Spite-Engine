@@ -6,6 +6,9 @@ import ECS
 import Vec
 import SparseSet
 import UniformBufferObject
+import Time
+import Math
+import Transform
 
 state ColorPassState
 {
@@ -23,6 +26,27 @@ state ColorPassState
 }
 
 colorStateSet := SparseSet<ColorPassState, 4>();
+
+UpdateColorPassUniformBuffer(currentFrame: uint32, renderer: *VulkanRenderer, colorPassState: ColorPassState) 
+{
+	time := Time.TicksSinceStart() / 10000000.0;
+
+	width := renderer.swapchain.extent.width;
+	height := renderer.swapchain.extent.height;
+
+	ubo := UniformBufferObject();
+	ubo.model.Rotate(time * Math.Deg2Rad(90.0), Vec3(0.0, 0.0, 1.0) as Norm<Vec3>);
+	ubo.view.LookAt(Vec3(2.0, 2.0, 2.0), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 1.0));
+	ubo.projection.Perspective(
+		Math.Deg2Rad(45.0), 
+		width / height as float32, 
+		0.1,
+		10.0
+	);
+	ubo.projection[1][1] *= -1;
+
+	copy_bytes(colorPassState.uniformBuffersMapped[currentFrame], ubo@, (#sizeof ubo));
+}
 
 VulkanPipelineKey CreateColorPassPipelineKey(meshState: VulkanPipelineMeshState, 
 											 renderPass: *VkRenderPass_T,
@@ -99,10 +123,17 @@ colorPass := RegisterRenderPass(
 
 					for (mesh in meshArr)
 					{
+						entity := mesh.entity;
 						geo := mesh.geometry;
+
+						transform := scene.GetComponentDirect<Transform>(entity, TransformComponent);
+
+						log "Transform: ", transform;
 
 						vertexAlloc := allocator.GetAllocation(geo.vertexHandle);
 						indexAlloc := allocator.GetAllocation(geo.indexHandle);
+
+						UpdateColorPassUniformBuffer(frame, renderer, colorPassState);
 
 						vertexBuffers := [vertexAlloc.buffer,];
 						offsets:= [uint64(0),];
@@ -140,6 +171,8 @@ colorPass := RegisterRenderPass(
 						
 						}
 					}
+
+					log "End Color Pass";
 				}
 
 			},
@@ -238,7 +271,7 @@ InitializeColorPassUniformBuffers(device: *VkDevice_T, allocator: *VulkanAllocat
 
 		block := allocator.GetAllocationBlock(bufHandle);
 
-		colorPassState.uniformBuffersMapped[i] = block.mappedPtr + alloc.offset;
+		colorPassState.uniformBuffersMapped[i] = (block.mappedPtr + alloc.offset);
 	}
 }
 

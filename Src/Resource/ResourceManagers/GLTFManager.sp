@@ -10,6 +10,7 @@ import Array
 import URIManager
 import ImageManager
 import Hierarchy
+import Transform
 
 state GLTFResource
 {
@@ -313,6 +314,21 @@ NodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uint32, 
 	ParentEntity(parentEntity, entity, scene);
 
 	if (outEntities) outEntities.Add(entity);
+
+	if (gltfNode.trs)
+	{
+		trs := gltfNode.transform.trs;
+		scene.SetComponent<Transform>(entity, Transform(trs.translation, trs.rotation, trs.scale));
+	}
+	else
+	{
+		matrix := gltfNode.transform.matrix;
+		pos := Vec3();
+		rot := Quaternion();
+		scale := Vec3();
+		matrix.Decompose(pos@, rot@, scale@);
+		scene.SetComponent<Transform>(entity, Transform(pos, rot, scale));
+	}
 
 	if (gltfNode.mesh != InvalidGLTFIndex)
 	{

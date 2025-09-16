@@ -1,18 +1,22 @@
 package Transform
 
+import Matrix
 import Vec
 import ECS
+import Quaternion
 
 state Transform
 {
-	pos: Vec3
+	rotation: Quaternion,
+	position: Vec3,
+	scale: Vec3
 }
 
-Transform::(x: float, y: float, z: float)
+Transform::(pos: Vec3, rot: Quaternion = Quaternion(), scale: Vec3 = Vec3(1.0, 1.0, 1.0))
 {
-	this.pos.x = x;
-	this.pos.y = y;
-	this.pos.z = z;
+	this.position = pos;
+	this.rotation = rot;
+	this.scale = scale;
 }
 
 TransformComponent := ECS.RegisterComponent<Transform>(
