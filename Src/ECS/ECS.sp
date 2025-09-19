@@ -16,9 +16,9 @@ SceneRemovedEvent := RegisterEvent<*Scene>();
 
 enum ComponentKind: uint32
 {
-	Common,
-	Sparse,
-	Singleton
+	Common = 0,
+	Sparse = 1,
+	Singleton = 2
 }
 
 state Component
@@ -28,12 +28,24 @@ state Component
 	size: uint32
 }
 
+state TagComponent
+{
+	id: uint32,
+	kind: ComponentKind
+}
+
 state SceneSystem { scene: *Scene, system: *System, time: float64 }
 
 Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
 								  onRemove: ::(Entity, *Type, Scene) = null, 
 								  onEnter: ::(Entity, *Type, Scene) = null)
 			=> instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
+
+TagComponent RegisterTagComponent(serializeName: string
+								  componentKind: ComponentKind = ComponentKind.Sparse,
+								  onRemove: ::(Entity, Scene) = null, 
+								  onEnter: ::(Entity, Scene) = null)
+			=> instance.RegisterTagComponent(serializeName, componentKind, onRemove, onEnter);
 
 {id: uint32, step: SystemStep} RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
 			=> instance.RegisterSystem(run, step);
@@ -67,16 +79,24 @@ state ECS
 	frameAllocator := FrameAllocator(),
 	scenes := SparseSet<Scene>(),
 	systems: Systems,
+
 	componentTypeMap := Map<*_Type, Component>(),
 	componentIDMap := SparseSet<Component>(),
+	tagComponentNameMap := Map<string, TagComponent>(),
+	tagComponentSerializeMap := SparseSet<string>(),
+	
 	componentRemoveCallbacks := SparseSet<::(Entity, *any, Scene)>(),
 	componentEnterCallbacks := SparseSet<::(Entity, *any, Scene)>(),
+	tagComponentRemoveCallbacks := SparseSet<::(Entity, Scene)>(),
+	tagComponentEnterCallbacks := SparseSet<::(Entity, Scene)>(),
+
 	recycledScenes := Stack<uint16>(),
 	systemBuffer := RingBuffer<SceneSystem>(),
 	events := Event.Emitter(),
 	frameCount: uint,
 	lastFrameTime: float,
 	componentCount: uint32,
+	tagComponentCount: uint32,
 	sceneCount: uint16
 }
 
@@ -94,6 +114,22 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 	if (onEnter) this.componentEnterCallbacks.Insert(component.id, onEnter);
 	this.componentCount += 1;
 	return component;
+}
+
+TagComponent ECS::RegisterTagComponent(serializeName: string
+									   componentKind: ComponentKind = ComponentKind.Sparse,
+									   onRemove: ::(Entity, Scene) = null, 
+									   onEnter: ::(Entity, Scene) = null)
+{
+	assert !this.tagComponentNameMap.Has(serializeName), "Tag component names must be unique";
+
+	tagComponent := { this.tagComponentCount, componentKind } as TagComponent;
+	this.tagComponentNameMap.Insert(serializeName, tagComponent);
+	this.tagComponentSerializeMap.Insert(tagComponent.id, serializeName);
+	if (onRemove) this.tagComponentRemoveCallbacks.Insert(tagComponent.id, onRemove);
+	if (onEnter) this.tagComponentEnterCallbacks.Insert(tagComponent.id, onEnter);
+	this.tagComponentCount += 1;
+	return tagComponent;
 }
 
 {id: uint, step: SystemStep} ECS::RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
@@ -201,6 +237,22 @@ ECS::OnComponentEnter(id: uint32, entity: Entity, componentData: *any, scene: Sc
 
 	callback := this.componentEnterCallbacks.Get(id)~;
 	callback(entity, componentData, scene);
+}
+
+ECS::OnTagComponentRemove(id: uint32, entity: Entity, scene: Scene)
+{
+	if (!this.tagComponentRemoveCallbacks.Has(id)) return;
+
+	callback := this.tagComponentRemoveCallbacks.Get(id)~;
+	callback(entity, scene);
+}
+
+ECS::OnTagComponentEnter(id: uint32, entity: Entity, scene: Scene)
+{
+	if (!this.tagComponentEnterCallbacks.Has(id)) return;
+
+	callback := this.tagComponentEnterCallbacks.Get(id)~;
+	callback(entity, scene);
 }
 
 ECS::RunSystems(systems: Array<System>)

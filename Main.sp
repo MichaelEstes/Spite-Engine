@@ -27,7 +27,7 @@ state SingletonTest
 testComponent := ECS.RegisterComponent<Test>(
 	ComponentKind.Sparse, 
 	::(entity: Entity, test: *Test, scene: Scene) {
-		log "Removing test component: ", test;
+		//log "Removing test component: ", test;
 	}
 );
 
@@ -35,7 +35,29 @@ singletonTestComponent := ECS.RegisterComponent<SingletonTest>(
 	ComponentKind.Singleton
 );
 
-transformSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
+tagSparseTestComponent := ECS.RegisterTagComponent(
+	"Test sparse tag",
+	ComponentKind.Sparse,
+	::(entity: Entity, scene: Scene) {
+		//log "Removing test sparse tag component: ", entity;
+	}
+	::(entity: Entity, scene: Scene) {
+		//log "Adding test sparse tag component: ", entity;
+	}
+);
+
+tagCommonTestComponent := ECS.RegisterTagComponent(
+	"Test common tag",
+	ComponentKind.Common,
+	::(entity: Entity, scene: Scene) {
+		//log "Removing test common tag component: ", entity;
+	}
+	::(entity: Entity, scene: Scene) {
+		//log "Adding test common tag component: ", entity;
+	}
+);
+
+queryTestSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	//log "Transform System called", dt;
 	
 	for (item in scene.Iterate<Transform>())
@@ -62,6 +84,18 @@ testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	for (item in scene.Iterate<Test>())
 	{
 		//log item;
+	}
+
+	for (sparseTagEntity in scene.IterateTagComponent(tagSparseTestComponent))
+	{
+		//log "Sparse tag entity: ", sparseTagEntity;
+		//scene.RemoveTagComponent(sparseTagEntity, tagSparseTestComponent);
+	}
+
+	for (commonTagEntity in scene.IterateTagComponent(tagCommonTestComponent))
+	{
+		//log "Common tag entity: ", commonTagEntity;
+		//scene.RemoveTagComponent(commonTagEntity, tagCommonTestComponent);
 	}
 
 	data := 0;
@@ -95,12 +129,17 @@ Main()
 		if (i > 5)
 		{
 			scene.SetComponent<Test>(entity, i as Test);
+			scene.SetTagComponent(entity, tagSparseTestComponent);
+		}
+		else
+		{
+			scene.SetTagComponent(entity, tagCommonTestComponent);
 		}
 	}
 	
-	//scene.RemoveEntity(Entity(5));
-	//scene.RemoveComponent<Transform>(Entity(6));
-	//scene.RemoveComponent<Test>(Entity(7));
+	scene.RemoveEntity(Entity(5));
+	scene.RemoveComponent<Transform>(Entity(6));
+	scene.RemoveComponent<Test>(Entity(7));
 
 	Core.Initialize();
 	Core.Start();

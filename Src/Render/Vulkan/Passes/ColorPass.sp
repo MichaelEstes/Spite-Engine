@@ -9,6 +9,7 @@ import UniformBufferObject
 import Time
 import Math
 import Transform
+import Matrix
 
 state ColorPassState
 {
@@ -27,7 +28,8 @@ state ColorPassState
 
 colorStateSet := SparseSet<ColorPassState, 4>();
 
-UpdateColorPassUniformBuffer(currentFrame: uint32, renderer: *VulkanRenderer, colorPassState: ColorPassState) 
+UpdateColorPassUniformBuffer(currentFrame: uint32, modelMat: Matrix4,
+							 renderer: *VulkanRenderer, colorPassState: ColorPassState) 
 {
 	time := Time.TicksSinceStart() / 10000000.0;
 
@@ -35,10 +37,11 @@ UpdateColorPassUniformBuffer(currentFrame: uint32, renderer: *VulkanRenderer, co
 	height := renderer.swapchain.extent.height;
 
 	ubo := UniformBufferObject();
+	ubo.model = modelMat;
 	ubo.model.Rotate(time * Math.Deg2Rad(90.0), Vec3(0.0, 0.0, 1.0) as Norm<Vec3>);
 	ubo.view.LookAt(Vec3(2.0, 2.0, 2.0), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 1.0));
 	ubo.projection.Perspective(
-		Math.Deg2Rad(45.0), 
+		Math.Deg2Rad(45.0),
 		width / height as float32, 
 		0.1,
 		10.0
@@ -126,14 +129,15 @@ colorPass := RegisterRenderPass(
 						entity := mesh.entity;
 						geo := mesh.geometry;
 
-						transform := scene.GetComponentDirect<Transform>(entity, TransformComponent);
-
-						log "Transform: ", transform;
+						worldTransform := scene.GetComponentDirect<WorldTransform>(entity, WorldTransformComponent);
+						if (!worldTransform) continue;
+				
+						//log "World Transform: ", worldTransform;
 
 						vertexAlloc := allocator.GetAllocation(geo.vertexHandle);
 						indexAlloc := allocator.GetAllocation(geo.indexHandle);
 
-						UpdateColorPassUniformBuffer(frame, renderer, colorPassState);
+						UpdateColorPassUniformBuffer(frame, worldTransform.mat, renderer, colorPassState);
 
 						vertexBuffers := [vertexAlloc.buffer,];
 						offsets:= [uint64(0),];
@@ -171,10 +175,7 @@ colorPass := RegisterRenderPass(
 						
 						}
 					}
-
-					log "End Color Pass";
 				}
-
 			},
 			RenderPassStage.Graphics,
 			scene

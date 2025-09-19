@@ -92,7 +92,7 @@ state GLTFTRS
 {
 	translation: Vec3,
 	rotation: Quaternion,
-	scale: Vec3
+	scale := Vec3(1.0, 1.0, 1.0)
 }
 
 state GLTFNode

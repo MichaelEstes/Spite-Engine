@@ -17,6 +17,12 @@ EntityComponentArray::()
 	this.capacity = InitialCapacity;
 }
 
+EntityComponentArray::delete
+{
+	delete this.entitySet;
+	this.componentArr.Dealloc(this.capacity);
+}
+
 []EntityComponent<Type> EntityComponentArray::log()
 {
 	arr := []EntityComponent<Type>;

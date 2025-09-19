@@ -7,6 +7,10 @@ state Scene
 {
 	commonComponents := SparseSet<EntityComponentArray<any>>(),
 	sparseComponents := SparseSet<EntityComponentMap<any>>(),
+
+	commonTagComponents := SparseSet<BitSet>(),
+	sparseTagComponents := SparseSet<EntitySet>(),
+
 	singletonComponents := SingletonComponentMap(),
 	currEntity: uint32,
 	id: uint16
@@ -19,6 +23,26 @@ Scene::(id: uint16)
 
 Scene::delete
 {
+	for (kv in this.commonComponents)
+	{
+		delete kv.value~;
+	}
+
+	for (kv in this.sparseComponents)
+	{
+		delete kv.value~;
+	}
+
+	for (kv in this.commonTagComponents)
+	{
+		delete kv.value~;
+	}
+
+	for (kv in this.sparseTagComponents)
+	{
+		delete kv.value~;
+	}
+
 	delete this.commonComponents;
 	delete this.sparseComponents;
 	delete this.singletonComponents;
@@ -115,6 +139,29 @@ Scene::RemoveEntity(entity: Entity)
 			keyValue.value.RemoveUntyped(entity, component.size);
 		}
 	}
+
+	for (keyValue in this.commonTagComponents)
+	{
+		componentID := keyValue.key;
+		bitSet := keyValue.value~;
+		id := entity.id;
+		if (bitSet[id])
+		{
+			bitSet.Clear(id);
+			instance.OnTagComponentRemove(componentID, entity, this);
+		}
+	}
+
+	for (keyValue in this.sparseTagComponents)
+	{
+		componentID := keyValue.key;
+		entitySet := keyValue.value;
+		if (entitySet.Has(entity))
+		{
+			entitySet.Remove(entity)
+			instance.OnTagComponentRemove(componentID, entity, this);
+		}
+	}
 }
 
 Scene::RemoveEntities(entities: []Entity)
@@ -145,6 +192,35 @@ Scene::RemoveEntities(entities: []Entity)
 				componentData := keyValue.value.GetUntyped(entity, component.size);
 				instance.OnComponentRemove(componentID, entity, componentData, this);
 				keyValue.value.RemoveUntyped(entity, component.size);
+			}
+		}
+	}
+
+	for (keyValue in this.commonTagComponents)
+	{
+		componentID := keyValue.key;
+		bitSet := keyValue.value~;
+		for (entity in entities) 
+		{
+			id := entity.id;
+			if (bitSet[id])
+			{
+				bitSet.Clear(id);
+				instance.OnTagComponentRemove(componentID, entity, this);
+			}
+		}
+	}
+
+	for (keyValue in this.sparseTagComponents)
+	{
+		componentID := keyValue.key;
+		entitySet := keyValue.value;
+		for (entity in entities) 
+		{
+			if (entitySet.Has(entity))
+			{
+				entitySet.Remove(entity)
+				instance.OnTagComponentRemove(componentID, entity, this);
 			}
 		}
 	}
@@ -245,6 +321,115 @@ Scene::RemoveComponentDirect<Type>(entity: Entity, component: Component)
 			}
 		}
 	}
+}
+
+Scene::SetTagComponent(entity: Entity, tagComponent: TagComponent)
+{
+	id := tagComponent.id;
+
+	switch (tagComponent.kind)
+	{
+		case (ComponentKind.Common)
+		{
+			if (!this.commonTagComponents.Has(id))
+			{
+				this.commonTagComponents.Insert(id, BitSet());
+			}
+
+			bitSet := this.commonTagComponents.Get(id)
+			bitSet.Set(entity.id);
+		}
+		case (ComponentKind.Sparse)
+		{
+			if (!this.sparseTagComponents.Has(id))
+			{
+				this.sparseTagComponents.Insert(id, EntitySet());
+			}
+			
+			entitySet := this.sparseTagComponents.Get(id);
+			entitySet.Insert(entity);
+		}
+	}
+
+	instance.OnTagComponentEnter(id, entity, this);
+}
+
+Scene::RemoveTagComponent(entity: Entity, tagComponent: TagComponent)
+{
+	id := tagComponent.id;
+	removed := false;
+
+	switch (tagComponent.kind)
+	{
+		case (ComponentKind.Common)
+		{
+			if (!this.commonTagComponents.Has(id)) break;
+
+			bitSet := this.commonTagComponents.Get(id)
+			bitSet.Clear(entity.id);
+			removed = true;
+		}
+		case (ComponentKind.Sparse)
+		{
+			if (!this.sparseTagComponents.Has(id)) break;
+			
+			entitySet := this.sparseTagComponents.Get(id);
+			entitySet.Remove(entity);
+			removed = true;
+		}
+	}
+
+	if (removed) instance.OnTagComponentRemove(id, entity, this);
+}
+
+bool Scene::HasTagComponent(entity: Entity, tagComponent: TagComponent)
+{
+	id := tagComponent.id;
+
+	switch (tagComponent.kind)
+	{
+		case (ComponentKind.Common)
+		{
+			if (!this.commonTagComponents.Has(id)) return false;
+
+			bitSet := this.commonTagComponents.Get(id)~;
+			return bitSet[entity.id];
+		}
+		case (ComponentKind.Sparse)
+		{
+			if (!this.sparseTagComponents.Has(id)) return false;
+			
+			entitySet := this.sparseTagComponents.Get(id);
+			return entitySet.Has(entity);
+		}
+	}
+
+	return false;
+}
+
+EntityTagComponentIterator Scene::IterateTagComponent(tagComponent: TagComponent)
+{
+	id := tagComponent.id;
+
+	switch (tagComponent.kind)
+	{
+		case (ComponentKind.Common)
+		{
+			if (!this.commonTagComponents.Has(id)) break;
+
+			bitSet := this.commonTagComponents.Get(id);
+			return EntityTagComponentIterator(ComponentKind.Common, bitSet);
+		}
+		case (ComponentKind.Sparse)
+		{
+			if (!this.sparseTagComponents.Has(id)) break;
+			
+			entitySet := this.sparseTagComponents.Get(id);
+			return EntityTagComponentIterator(ComponentKind.Sparse, entitySet);
+		}
+	}
+
+	return EntityTagComponentIterator(ComponentKind.Singleton, null);
 }
 
 Scene::SetSingleton<Type>(value: Type)
