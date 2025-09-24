@@ -20,6 +20,12 @@ Transform::(pos: Vec3, rot: Quaternion = Quaternion(), scale: Vec3 = Vec3(1.0, 1
 	this.scale = scale;
 }
 
+Transform::RotateAround(axis: Norm<Vec3>, angle: float32)
+{
+	rot := Quaternion(axis, angle);
+	this.rotation = this.rotation * rot;
+}
+
 state WorldTransform
 {
 	mat: Matrix4
@@ -34,6 +40,11 @@ TransformDirtyTag := ECS.RegisterTagComponent(
 	ComponentKind.Common
 );
 
+SetTransformDirty(scene: Scene, entity: Entity) =>
+{
+	scene.SetTagComponent(entity, TransformDirtyTag);
+}
+
 TransformComponent := ECS.RegisterComponent<Transform>(
 	ComponentKind.Common, 
 	::(entity: Entity, transform: *Transform, scene: Scene) 
@@ -42,7 +53,7 @@ TransformComponent := ECS.RegisterComponent<Transform>(
 	}
 	::(entity: Entity, transform: *Transform, scene: Scene) 
 	{
-		scene.SetTagComponent(entity, TransformDirtyTag);
+		SetTransformDirty(scene, entity);
 	}
 );
 
@@ -53,7 +64,7 @@ UpdateWorldTransform(entity: Entity, scene: Scene)
 	if (!transform) return;
 
 	worldMatrix := WorldTransform();
-	worldMatrix.mat.Compose(transform.position, transform.rotation.Normalize(), transform.scale);
+	worldMatrix.mat.Compose(transform.position, transform.rotation, transform.scale);
 	hierarchy := scene.GetComponentDirect<Hierarchy>(entity, HierarchyComponent);
 	if (hierarchy && hierarchy.parent.id)
 	{

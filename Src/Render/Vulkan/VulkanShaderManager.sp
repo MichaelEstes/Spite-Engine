@@ -87,5 +87,5 @@ ResourceHandle UseShader(device: *VkDevice_T, path: string, stage: GPUShaderStag
 	shaderParam.stage = stage;
 	shaderParam.entry = entry;
 
-	return ShaderResourceManager.LoadResource(shaderParam, ::(handle: ResourceHandle){});
+	return ShaderResourceManager.LoadResource(shaderParam);
 }

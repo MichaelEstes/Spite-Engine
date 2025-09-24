@@ -4,12 +4,13 @@ import VulkanRenderer
 import RenderGraph
 import ECS
 import Vec
-import SparseSet
+import Array
 import UniformBufferObject
 import Time
 import Math
 import Transform
 import Matrix
+import Render
 
 state ColorPassState
 {
@@ -26,9 +27,9 @@ state ColorPassState
 	fragShaderHandle: ResourceHandle
 }
 
-colorStateSet := SparseSet<ColorPassState, 4>();
+colorStateSet := [ColorPassState(), ColorPassState(), ColorPassState(), ColorPassState()];
 
-UpdateColorPassUniformBuffer(currentFrame: uint32, modelMat: Matrix4,
+UpdateColorPassUniformBuffer(currentFrame: uint32, modelMat: Matrix4, viewMat: Matrix4, camera: *Camera
 							 renderer: *VulkanRenderer, colorPassState: ColorPassState) 
 {
 	time := Time.TicksSinceStart() / 10000000.0;
@@ -38,13 +39,15 @@ UpdateColorPassUniformBuffer(currentFrame: uint32, modelMat: Matrix4,
 
 	ubo := UniformBufferObject();
 	ubo.model = modelMat;
-	ubo.model.Rotate(time * Math.Deg2Rad(90.0), Vec3(0.0, 0.0, 1.0) as Norm<Vec3>);
-	ubo.view.LookAt(Vec3(2.0, 2.0, 2.0), Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 1.0));
+	//ubo.model.Rotate(time * Math.Deg2Rad(90.0), Vec3(0.0, 0.0, 1.0) as Norm<Vec3>);
+
+	ubo.view = viewMat;
+
 	ubo.projection.Perspective(
-		Math.Deg2Rad(45.0),
-		width / height as float32, 
-		0.1,
-		10.0
+		camera.fov,
+		camera.aspect, 
+		camera.near,
+		camera.far
 	);
 	ubo.projection[1][1] *= -1;
 
@@ -92,10 +95,14 @@ colorPass := RegisterRenderPass(
 			::(context: *RenderPassContext<VulkanRenderer>, scene: *Scene) 
 			{
 				//log "Vulkan Color pass exec";
+				if (!scene.HasSingleton<Camera>()) return;
+				camera := scene.GetSingleton<Camera>();
+				cameraViewMatrix := camera.GetViewMatrix();
 
 				renderer := context.renderer;
 				device := renderer.device;
-				colorPassState := colorStateSet.Get(renderer.deviceIndex)~;
+				colorPassState := colorStateSet[renderer.deviceIndex];
+
 				renderPass := renderer.CastDriverRenderPass(context.driverRenderpass);
 				allocator := renderer.allocator;
 				frame := renderer.Frame();
@@ -137,7 +144,14 @@ colorPass := RegisterRenderPass(
 						vertexAlloc := allocator.GetAllocation(geo.vertexHandle);
 						indexAlloc := allocator.GetAllocation(geo.indexHandle);
 
-						UpdateColorPassUniformBuffer(frame, worldTransform.mat, renderer, colorPassState);
+						UpdateColorPassUniformBuffer(
+							frame, 
+							worldTransform.mat, 
+							cameraViewMatrix, 
+							camera, 
+							renderer, 
+							colorPassState
+						);
 
 						vertexBuffers := [vertexAlloc.buffer,];
 						offsets:= [uint64(0),];
@@ -187,7 +201,7 @@ colorPass := RegisterRenderPass(
 
 		deviceIndex := renderer.deviceIndex;
 
-		if (colorStateSet.Has(deviceIndex)) return;
+		if (colorStateSet[deviceIndex].pipelineLayout) return;
 
 		device := renderer.device;
 		allocator := renderer.allocator;
@@ -201,7 +215,7 @@ colorPass := RegisterRenderPass(
 		InitializeColorPassUniformBuffers(device, allocator, colorPassState);
 		InitializeColorPassDescriptorSets(device, allocator, colorPassState);
 
-		colorStateSet.Insert(deviceIndex, colorPassState);
+		colorStateSet[deviceIndex] = colorPassState;
 	}
 );
 

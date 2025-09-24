@@ -12,6 +12,8 @@ import ImageManager
 import Hierarchy
 import Transform
 
+import RotateComponent
+
 state GLTFResource
 {
 	buffers: Array<ResourceHandle>,
@@ -95,7 +97,7 @@ GLTFManagerLoad(param: *ResourceParam<GLTFResource, GLTFLoadParam>)
 	}, param);
 }
 
-ResourceHandle LoadGLTFResource(file: string, scene: *Scene, onLoad: ::(ResourceHandle), outEntities: *Array<Entity> = null)
+ResourceHandle LoadGLTFResource(file: string, scene: *Scene, onLoad: ::(ResourceHandle, *GLTFLoadParam), outEntities: *Array<Entity> = null)
 {
 	gltfParam := GLTFLoadParam();
 	gltfParam.file = file;

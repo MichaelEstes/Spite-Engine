@@ -65,5 +65,5 @@ ResourceHandle LoadImageResource(uri: string, basePath: string = "", parent: Res
 	textureParam.basePath = basePath;
 	textureParam.parent = parent;
 
-	return ImageResourceManager.LoadResource(textureParam, ::(handle: ResourceHandle){});
+	return ImageResourceManager.LoadResource(textureParam, null);
 }

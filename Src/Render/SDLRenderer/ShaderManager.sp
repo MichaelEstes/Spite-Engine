@@ -69,5 +69,5 @@ ResourceHandle UseShader(uri: string, stage: GPUShaderStage, entry: string)
 	shaderParam.stage = stage;
 	shaderParam.entry = entry;
 
-	return ShaderResourceManager.LoadResource(shaderParam, ::(handle: ResourceHandle){});
+	return ShaderResourceManager.LoadResource(shaderParam);
 }

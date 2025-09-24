@@ -34,7 +34,7 @@ state TagComponent
 	kind: ComponentKind
 }
 
-state SceneSystem { scene: *Scene, system: *System, time: float64 }
+state SceneSystem { scene: *Scene, system: *System }
 
 Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
 								  onRemove: ::(Entity, *Type, Scene) = null, 
@@ -95,6 +95,7 @@ state ECS
 	events := Event.Emitter(),
 	frameCount: uint,
 	lastFrameTime: float,
+	dt: float,
 	componentCount: uint32,
 	tagComponentCount: uint32,
 	sceneCount: uint16
@@ -260,18 +261,16 @@ ECS::RunSystems(systems: Array<System>)
 	count := this.scenes.count * systems.count
 	if (!count) return;
 
-	time := Time.SecondsSinceStart();
-	dt := time - instance.lastFrameTime;
 	handle: *Fiber.JobHandle = null;
 	for (scene in this.scenes.Values())
 	{
 		for (system in systems) 
 		{
-			sceneSystem := instance.systemBuffer.Insert({scene@, system@, dt} as SceneSystem);
+			sceneSystem := instance.systemBuffer.Insert({scene@, system@} as SceneSystem);
 			Fiber.AddJob(::(data: *SceneSystem) {
 				scene := data.scene;
 				system := data.system;
-				dt := data.time;
+				dt := instance.dt;
 				
 				system.run(scene~, dt);
 			}, sceneSystem, handle@, Fiber.JobPriority.High);
@@ -286,15 +285,13 @@ ECS::RunFrameSystems(systems: Array<FrameSystem>)
 {
 	if (!systems.count) return;
 
-	time := Time.SecondsSinceStart();
-	dt := time - instance.lastFrameTime;
 	handle: *Fiber.JobHandle = null;
 	for (system in systems) 
 	{
-		sceneSystem := instance.systemBuffer.Insert({null, system@, dt} as SceneSystem);
+		sceneSystem := instance.systemBuffer.Insert({null, system@} as SceneSystem);
 		Fiber.AddJob(::(data: *SceneSystem) {
 			system := data.system;
-			dt := data.time;
+			dt := instance.dt;
 			
 			(system~ as FrameSystem).run(dt);
 		}, sceneSystem, handle@, Fiber.JobPriority.High);
@@ -316,6 +313,10 @@ ECS::Stop()
 
 ECS::PreFrame()
 {
+	time := Time.SecondsSinceStart();
+	this.dt = time - this.lastFrameTime;
+	this.lastFrameTime = time;
+
 	this.RunFrameSystems(this.systems.frameStart);
 	this.RunSystems(this.systems.onPreFrame);
 }
@@ -340,7 +341,6 @@ ECS::PostFrame()
 	this.RunSystems(this.systems.onPostFrame);
 	this.RunFrameSystems(this.systems.frameEnd);
 
-	this.lastFrameTime = Time.SecondsSinceStart();
 	this.frameAllocator.Clear();
 	this.frameCount += 1;
 }

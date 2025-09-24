@@ -67,5 +67,5 @@ ResourceHandle LoadURIResource(uri: string, basePath: string = "", parent: Resou
 	uriParam.basePath = basePath;
 	uriParam.parent = parent;
 
-	return URIResourceManager.LoadResource(uriParam, ::(handle: ResourceHandle){});
+	return URIResourceManager.LoadResource(uriParam, null);
 }

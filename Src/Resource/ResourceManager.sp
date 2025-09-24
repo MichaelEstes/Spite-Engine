@@ -81,7 +81,7 @@ state ResourceParam<Type, ParamType>
 	key: ResourceKey,
 	manager: *ResourceManager<Type, ParamType>,
 	onResourceLoad: ::(*ResourceParam<Type, ParamType>, ResourceResult),
-	onLoad: ::(ResourceHandle),
+	onLoad: ::(ResourceHandle, *ParamType),
 	param: ParamType,
 	handle: ResourceHandle
 }
@@ -142,14 +142,14 @@ ResourceManager::RemoveResource(handle: ResourceHandle)
 	}
 }
 
-ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(ResourceHandle))
+ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(ResourceHandle, *ParamType) = null)
 {
 	resourceKey := this.getResourceKey(param);
 
 	if (this.resourceKeyToHandle.Has(resourceKey))
 	{
 		handle := this.resourceKeyToHandle[resourceKey]~;
-		onLoad(handle);
+		if (onLoad) onLoad(handle, param@);
 		delete resourceKey;
 		return handle;
 	}
@@ -173,7 +173,7 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 	resourceParam.param = param;
 	resourceParam.handle = handle;
 
-	resourceParam.onResourceLoad = ::(param: *ResourceParam<Type,ParamType>, result: ResourceResult) {
+	resourceParam.onResourceLoad = ::(param: *ResourceParam<Type, ParamType>, result: ResourceResult) {
 		defer DeallocThreadParam<ResourceParam<Type, ParamType>>(param);
 
 		handle := param.handle;
@@ -182,7 +182,7 @@ ResourceHandle ResourceManager::LoadResource(param: ParamType, onLoad: ::(Resour
 		resource := resourceManager.GetResource(handle);
 		resource.result = result;
 		
-		param.onLoad(handle);
+		if (param.onLoad) param.onLoad(handle, param.param@);
 	};
 
 	this.loader(resourceParam);
