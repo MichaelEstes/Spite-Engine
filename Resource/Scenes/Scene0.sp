@@ -10,11 +10,9 @@ import SDLRenderPass
 import VulkanRenderPass
 
 import GLTFManager
-import Render
+import RenderComponents
 
 import ThreadParamAllocator
-
-boxEntities := Array<Entity>();
 
 _ := SceneRegistry.RegisterScene(
 	0,
@@ -44,11 +42,12 @@ _ := SceneRegistry.RegisterScene(
 			}
 		});
 
-		log "Loading Box GLTF";
+		model := "./Resource/Models/Box/Box.gltf";
+		//model := "./Resource/Models/BrainStem/BrainStem.gltf";
+		log "Loading GLTF: ", model;
 		gltfEntities := AllocThreadParam<Array<Entity>>();
 		boxGLTFHandle := LoadGLTFResource(
-			"./Resource/Models/Box/Box.gltf",
-			//"./Resource/Models/BrainStem/BrainStem.gltf",
+			model,
 			scene,
 			::(handle: ResourceHandle, param: *GLTFLoadParam) 
 			{
@@ -60,7 +59,7 @@ _ := SceneRegistry.RegisterScene(
 				}
 
 				scene := param.scene;
-				log "Loaded gltf: ", boxEntities;
+				log "Loaded gltf: ", outEntities~;
 
 				for (entity in outEntities)
 				{

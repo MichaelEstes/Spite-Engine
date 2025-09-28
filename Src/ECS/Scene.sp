@@ -432,6 +432,30 @@ EntityTagComponentIterator Scene::IterateTagComponent(tagComponent: TagComponent
 	return EntityTagComponentIterator(ComponentKind.Singleton, null);
 }
 
+// Does not call the "on remove" callback for the tag component
+Scene::ClearTagComponent(tagComponent: TagComponent)
+{
+	id := tagComponent.id;
+
+	switch (tagComponent.kind)
+	{
+		case (ComponentKind.Common)
+		{
+			if (!this.commonTagComponents.Has(id)) break;
+
+			bitSet := this.commonTagComponents.Get(id);
+			bitSet.ClearAll();
+		}
+		case (ComponentKind.Sparse)
+		{
+			if (!this.sparseTagComponents.Has(id)) break;
+			
+			entitySet := this.sparseTagComponents.Get(id);
+			entitySet.Clear();
+		}
+	}
+}
+
 Scene::SetSingleton<Type>(value: Type)
 {
 	log "Singleton set";

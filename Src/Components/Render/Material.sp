@@ -1,4 +1,4 @@
-package Render
+package RenderComponents
 
 import Vec
 import Common
@@ -34,7 +34,14 @@ state TextureMap
 
 state Material
 {
-	maps: Array<TextureMap>,
+	color: TextureMap,
+	normal: TextureMap,
+	metallicRoughness: TextureMap,
+	occlusion: TextureMap,
+	emissive: TextureMap,
+
+	vertShader: string,
+	fragShader: string,
 
 	baseColor: Color,
 	emissiveFactor: Vec3,
@@ -45,12 +52,6 @@ state Material
 	occlusionStrength := float32(1.0),
 	alphaCutoff := float32(0.5),
 
-	color := ubyte(-1),
-	normal := ubyte(-1),
-	metallicRoughness := ubyte(-1),
-	occlusion := ubyte(-1),
-	emissive := ubyte(-1),
-
 	alphaMode: AlphaMode = AlphaMode.Opaque,
 	cullMode: CullModeFlags = CullModeFlags.Back,
 	polygonMode: PolygonMode = PolygonMode.Fill
@@ -58,5 +59,5 @@ state Material
 
 Material::delete
 {
-	delete this.maps;
+
 }

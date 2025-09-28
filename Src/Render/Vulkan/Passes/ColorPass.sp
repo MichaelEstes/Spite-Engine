@@ -10,7 +10,7 @@ import Time
 import Math
 import Transform
 import Matrix
-import Render
+import RenderComponents
 
 state ColorPassState
 {
@@ -22,9 +22,6 @@ state ColorPassState
 
 	uniformBufferHandles: [FrameCount]VulkanAllocHandle,
 	uniformBuffersMapped: [FrameCount]*void,
-
-	vertShaderHandle: ResourceHandle,
-	fragShaderHandle: ResourceHandle
 }
 
 colorStateSet := [ColorPassState(), ColorPassState(), ColorPassState(), ColorPassState()];
@@ -62,8 +59,6 @@ VulkanPipelineKey CreateColorPassPipelineKey(meshState: VulkanPipelineMeshState,
 	key.meshState = meshState;
 	key.renderPass = renderPass;
 	key.layout = colorPassState.pipelineLayout;
-	key.vertexShaderHandle = colorPassState.vertShaderHandle;
-	key.fragmentShaderHandle = colorPassState.fragShaderHandle;
 
 	key.vertexInputBindings[0] = {ubyte(0), ubyte(VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX), uint16(#sizeof Vec3)};
 	//key.vertexInputBindings[1] = {ubyte(1), ubyte(VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX), uint16(#sizeof Vec3)};
@@ -207,8 +202,6 @@ colorPass := RegisterRenderPass(
 		allocator := renderer.allocator;
 
 		colorPassState := ColorPassState();
-		colorPassState.vertShaderHandle = UseShader(device, "./Resource/Shaders/Compiled/vert.spv", GPUShaderStage.VERTEX);
-		colorPassState.fragShaderHandle = UseShader(device, "./Resource/Shaders/Compiled/frag.spv", GPUShaderStage.FRAGMENT);
 
 		InitializeColorPassDescriptorSetLayout(device, colorPassState);
 		InitializeColorPassPipelineLayout(device, colorPassState);

@@ -1,4 +1,4 @@
-package Render
+package RenderComponents
 
 import ECS
 import Vec

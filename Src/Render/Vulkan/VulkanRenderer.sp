@@ -10,7 +10,7 @@ import Event
 import ArrayView
 
 import ECS
-import Render
+import RenderComponents
 
 CheckResult(result: VkResult, errorMsg: string)
 {

@@ -1,7 +1,8 @@
 package VulkanRenderer
 
-import Render
+import RenderComponents
 import Array
+import Resource
 
 geometryKindToTopologyTable := [
 	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
@@ -60,7 +61,12 @@ GeometryAttributeFlags VulkanGeometry::GetAttributesFlags()
 
 state VulkanMaterial
 {
-	test: uint
+	vertShaderHandle: ResourceHandle,
+	fragShaderHandle: ResourceHandle,
+
+	polygonMode: VkPolygonMode,
+	cullMode: VkCullModeFlagBits,
+	alphaMode: VulkanAlphaMode
 }
 
 state VulkanMesh
@@ -70,17 +76,30 @@ state VulkanMesh
 	entity: Entity
 }
 
+VulkanMesh::delete
+{
+	log "Removing Vulkan mesh";
+}
+
 VulkanPipelineMeshState VulkanMesh::GetPipelineMeshState()
 {
 	meshState := VulkanPipelineMeshState();
+
+	meshState.vertShaderHandle = this.material.vertShaderHandle;
+	meshState.fragShaderHandle = this.material.fragShaderHandle;
+
 	meshState.geometryFlags = this.geometry.GetAttributesFlags();
 
 	meshState.SetTopology(this.geometry.topology);
 
+	meshState.SetPolygonMode(this.material.polygonMode);
+	meshState.SetAlphaMode(this.material.alphaMode);
+	meshState.SetCullMode(this.material.cullMode);
+
 	return meshState;
 }
 
-meshGroupsByScene := SparseSet<Map<VulkanPipelineMeshState, Array<VulkanMesh>>>();
+meshGroupsByScene := SparseSet<Map<VulkanPipelineMeshState, Array<VulkanMesh>, HashPipelineMeshState>>();
 
 bool AddSceneCallbacks()
 {
@@ -99,7 +118,10 @@ bool AddSceneCallbacks()
 			//log "Scene Removed";
 			sceneID := scene.id;
 			map := meshGroupsByScene.Get(sceneID)~;
-			for (meshArr in map.Values()) delete meshArr;
+			for (meshArr in map.Values()) 
+			{
+				delete meshArr;
+			}
 			delete map;
 			meshGroupsByScene.Remove(sceneID);
 		}
@@ -128,6 +150,7 @@ UploadMesh(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer)
 
 		vulkanMesh := VulkanMesh();
 		vulkanMesh.geometry = UploadGeometry(geo, renderer);
+		vulkanMesh.material = UploadMaterial(mat, renderer);
 		vulkanMesh.entity = entity;
 
 		pipelineMeshKey := vulkanMesh.GetPipelineMeshState();
@@ -215,6 +238,21 @@ VulkanGeometry UploadGeometry(geo: Geometry, renderer: *VulkanRenderer)
 	}
 
 	return vulkanGeo;
+}
+
+VulkanMaterial UploadMaterial(mat: Material, renderer: *VulkanRenderer)
+{
+	device := renderer.device;
+
+	vulkanMat := VulkanMaterial();
+	vulkanMat.vertShaderHandle = UseShader(device, mat.vertShader);
+	vulkanMat.fragShaderHandle = UseShader(device, mat.fragShader);
+
+	vulkanMat.polygonMode = mat.polygonMode;
+	vulkanMat.cullMode = mat.cullMode;
+	vulkanMat.alphaMode = mat.alphaMode;
+
+	return vulkanMat;
 }
 
 

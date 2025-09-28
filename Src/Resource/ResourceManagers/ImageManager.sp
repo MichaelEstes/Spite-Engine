@@ -1,7 +1,7 @@
 package ImageManager
 
 import Resource
-import Render
+import RenderComponents
 import Image
 import SDL
 

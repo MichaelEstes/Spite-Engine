@@ -1,4 +1,4 @@
-package Hierarchy
+package SceneComponents
 
 import ECS
 import Array

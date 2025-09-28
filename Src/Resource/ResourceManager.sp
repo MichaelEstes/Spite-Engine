@@ -220,7 +220,7 @@ ResourceManager::ReleaseResourceRef(handle: ResourceHandle)
 resourceManagers := Map<uint32, *ResourceManager<any, any>>();
 
 ResourceManager<ResourceType, ParamType> CreateResourceManager<ResourceType, ParamType>(
-		name: [4]byte
+		name: [4]byte,
 		getResourceKey: ::ResourceKey(ParamType), 
 		loader: ::(*ResourceParam<ResourceType, ParamType>),
 		onRelease: ::(ResourceHandle) = null,

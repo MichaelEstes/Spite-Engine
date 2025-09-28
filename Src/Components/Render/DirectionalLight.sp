@@ -1,4 +1,4 @@
-package Scene
+package RenderComponents
 
 import Common
 import Vec

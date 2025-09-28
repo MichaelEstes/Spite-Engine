@@ -160,7 +160,7 @@ state JSON
 
 JSON::delete
 {
-	delete this.root~;
+	if (this.root) delete this.root~;
 	delete this.mem;
 	delete this.strs;
 }
@@ -176,17 +176,27 @@ JSON ParseJSONFile(file: string)
 {
 	contents := OS.ReadFile(file);
 	defer delete contents;
-	return ParseJSON(OS.ReadFile(file));
+	return ParseJSON(contents);
 }
 
 bool IsJSONWhitespace(char: byte)
 {
-	return char == byte(0x20) || char == byte(0x09) || char == byte(0x0A) || char == byte(0x0D);
+	return char == byte(0x20) || 
+		   char == byte(0x09) || 
+		   char == byte(0x0A) || 
+		   char == byte(0x0D) ||
+		   char == byte(0);
 }
 
 JSONEatWhitespace(view: StringView)
 {
-	while (IsJSONWhitespace(view[0]~)) view.Increment();
+	while (IsJSONWhitespace(view[0]~)) 
+	{
+		if (!view.Increment()) 
+		{
+			return;
+		}
+	}
 }
 
 *JSONValue ParseJSONValue(view: StringView, json: JSON)
@@ -234,6 +244,7 @@ JSONEatWhitespace(view: StringView)
 		return nullValue;
 	}
 
+	log "ParseJSONValue Invalid JSON character: ", char;
 	return null;
 }
 

@@ -1,4 +1,4 @@
-package Render
+package RenderComponents
 
 import Vec
 import Common
@@ -46,6 +46,4 @@ state Geometry
 
 Geometry::delete
 {
-    delete this.uvs;
-    delete this.colors;
 }

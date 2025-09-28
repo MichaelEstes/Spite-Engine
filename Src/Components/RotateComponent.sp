@@ -23,9 +23,7 @@ RotateOverTimeSystem := ECS.RegisterSystem(::(scene: Scene, dt: float)
 		if (!transform) continue;
 		
 		angle := rotate.speed * dt;
-		delta := Quaternion(rotate.axis, angle);
-		transform.rotation = delta * transform.rotation;
-		transform.rotation.Normalize();
+		transform.RotateAround(rotate.axis, angle);
 		SetTransformDirty(scene, entity);
 	}
 });

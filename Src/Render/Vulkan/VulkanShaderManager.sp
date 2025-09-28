@@ -2,22 +2,20 @@ package VulkanRenderer
 
 import Resource
 import OS
-import SDL
+import SpirvReflect
 
 state ShaderResource
 {
 	device: *VkDevice_T,
 	shaderModule: *VkShaderModule_T,
-	metadata: *GraphicsShaderMetadata,
+	reflectModule: SpvReflectShaderModule,
 	shaderStageInfo: VkPipelineShaderStageCreateInfo
 }
 
 state ShaderParam
 {
 	device: *VkDevice_T,
-	path: string,
-	stage: GPUShaderStage,
-	entry: string
+	path: string
 }
 
 vkStageFlagTable := [
@@ -39,12 +37,16 @@ ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderPa
 
 		device := param.device;
 		path := param.path;
-		stage := param.stage;
-		entry := param.entry;
 		resourceData := resource.data;
 		
 		shaderFile := ReadFile(path);
-		metadata := ReflectGraphicsSPIRV(shaderFile[0] as *ubyte, shaderFile.count, 0);
+
+		reflectModule := SpvReflectShaderModule();
+		result := spvReflectCreateShaderModule(shaderFile.count, shaderFile[0], reflectModule@);
+		if (result != SpvReflectResult.SPV_REFLECT_RESULT_SUCCESS)
+		{
+			log "VulkanShaderManager Unable to create reflection module";
+		}
 
 		createInfo := VkShaderModuleCreateInfo();
 		createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -56,14 +58,16 @@ ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderPa
 			"Error creating Vulkan shader module"
 		);
 
+		log "SHADER STAGE: ", reflectModule.shader_stage;
+
 		shaderStageInfo := VkPipelineShaderStageCreateInfo();
         shaderStageInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStageInfo.stage = vkStageFlagTable[stage];
         shaderStageInfo.module = resourceData.shaderModule;
-        shaderStageInfo.pName = entry[0];
+        shaderStageInfo.stage = reflectModule.shader_stage;
+        shaderStageInfo.pName = reflectModule.entry_point_name;
 
 		resourceData.shaderStageInfo = shaderStageInfo;
-		resourceData.metadata = metadata;
+		resourceData.reflectModule = reflectModule;
 		resourceData.device = device;
 
 		shaderResourceParam.onResourceLoad(shaderResourceParam, ResourceResult.Loaded)
@@ -71,21 +75,18 @@ ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderPa
 	::(handle: ResourceHandle) 
 	{
 		resource := Resource.GetResource<ShaderResource>(handle).data;
-		delete resource.metadata;
+		spvReflectDestroyShaderModule(resource.reflectModule@);
 		vkDestroyShaderModule(resource.device, resource.shaderModule, null);
 	}
 );
 
 ShaderResourceManagerID := Resource.RegisterResourceManager(ShaderResourceManager@);
 
-ResourceHandle UseShader(device: *VkDevice_T, path: string, stage: GPUShaderStage, 
-						 entry: string = "main")
+ResourceHandle UseShader(device: *VkDevice_T, path: string)
 {
 	shaderParam := ShaderParam();
 	shaderParam.device = device;
 	shaderParam.path = path;
-	shaderParam.stage = stage;
-	shaderParam.entry = entry;
 
 	return ShaderResourceManager.LoadResource(shaderParam);
 }

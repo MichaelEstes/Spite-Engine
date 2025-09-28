@@ -74,8 +74,8 @@ InitalizeFibers()
 	fibers.mainThreadID = GetCurrentThreadID();
 
 	sysInfo := GetSystemInfo();
-	// - 2 - executable start thread, main (IO) fiber thread
-	fibers.processCount = Math.Max(sysInfo.processorCount - 2, 1);
+	// - 3 - executable start thread, main (IO) fiber thread, OS scheduling thread
+	fibers.processCount = Math.Max(sysInfo.processorCount - 3, 1);
 	totalProcessCount := fibers.processCount + 1;
 	fibers.handleAllocator = BucketAllocator(#sizeof JobHandle, 32, totalProcessCount);
 
@@ -193,8 +193,8 @@ WaitForHandle(handle: *JobHandle)
 	// Waiting on a non fiber thread, spin
 	while (!handle.Finished()) 
 	{
-		//log "Waiting Non Fiber thread";
-		Thread.Sleep(1);
+		//log "Waiting Non Fiber thread", handle;
+		//Thread.Sleep(1);
 	}
 }
 

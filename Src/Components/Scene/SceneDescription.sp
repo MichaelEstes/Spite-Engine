@@ -5,7 +5,6 @@ import Window
 import SDL
 import SDLRenderer
 import VulkanRenderer
-import Scene
 import ThreadParamAllocator
 import Fiber
 

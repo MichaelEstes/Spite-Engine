@@ -1,8 +1,9 @@
-package ParseVulkan
+package ParseHeader
 
 import JSON
+import OS
 
-enum VulkanTypeKind
+enum HeaderTypeKind
 {
 	Named,
 	Pointer,
@@ -11,58 +12,121 @@ enum VulkanTypeKind
 	Union
 }
 
-state VulkanPrimitiveType
+state HeaderContext
+{
+	typeDefLookup := Map<string, *JSONObject>(),
+	unionLookup := Map<string, *JSONObject>()
+}
+
+HeaderContext::delete
+{
+	delete this.typeDefLookup;
+	delete this.unionLookup;
+}
+
+state HeaderPrimitiveType
 {
 	size: uint,
 	signed: bool
 }
 
-state VulkanType
+state HeaderType
 {
-	kind: VulkanTypeKind,
+	kind: HeaderTypeKind,
 	type: ?{
 		name: string,
-		pointer: *VulkanType,
-		array: {size: uint, type: *VulkanType},
-		primitive: VulkanPrimitiveType,
-		union: []{name: string, type: *VulkanType}
+		pointer: *HeaderType,
+		array: {size: uint, type: *HeaderType},
+		primitive: HeaderPrimitiveType,
+		union: []{name: string, type: *HeaderType}
 	}
 }
 
-state VulkanFunction
+HeaderType::delete
 {
-	name: string,
-	params: []{name: string, type: *VulkanType},
-	returnType: *VulkanType
+	if(this.kind == HeaderTypeKind.Union)
+	{
+		for (union in this.type.union) delete union.type;
+		delete this.type.union;
+	}
+	else if (this.kind == HeaderTypeKind.Pointer)
+	{
+		delete this.type.pointer;
+	}
+	else if (this.kind == HeaderTypeKind.Array)
+	{
+		delete this.type.array.type;
+	}
 }
 
-state VulkanStruct
+state HeaderFunction
 {
 	name: string,
-	members: []{name: string, type: *VulkanType}
+	params: []{name: string, type: *HeaderType},
+	returnType: *HeaderType
 }
 
-state VulkanEnum
+HeaderFunction::delete
+{
+	for (param in this.params) delete param.type;
+	delete this.params;
+	delete this.returnType;
+}
+
+state HeaderStruct
+{
+	name: string,
+	members: []{name: string, type: *HeaderType}
+}
+
+HeaderStruct::delete
+{
+	for (member in this.members) delete member.type;
+	delete this.members;
+}
+
+state HeaderEnum
 {
 	name: string,
 	fields: []{name: string, value: uint}
+}
+
+HeaderEnum::delete
+{
+	delete this.fields;
 }
 
 string GetTag(obj: *JSONObject) => obj.GetMember("tag").String().value;
 string GetName(obj: *JSONObject) => obj.GetMember("name").String().value;
 *JSONObject GetType(obj: *JSONObject) => obj.GetMember("type").Object();
 
-typeDefLookup := Map<string, *JSONObject>();
-unionLookup := Map<string, *JSONObject>();
-
-ParseHeaderJSON(file: string)
+ParseHeaderJSON(file: string, outFile: string)
 {
-	functions := []VulkanFunction;
-	structs := []VulkanStruct;
-	enums := []VulkanEnum;
 	json := JSON.ParseJSONFile(file);
+	defer delete json;
+	if (!json.root)
+	{
+		log "ParseHeaderJSON Unable to read JSON file";
+		return;
+	}
+
+	context := HeaderContext();
+	functions := []HeaderFunction;
+	structs := []HeaderStruct;
+	enums := []HeaderEnum;
+
 	arr := json.root.Array();
-	log arr.values.count;
+
+	defer 
+	{
+		for (function in functions) delete function;
+		for (struct in structs) delete struct;
+		for (enum_ in enums) delete enum_;
+		delete context;
+		delete functions;
+		delete structs;
+		delete enums;
+	}
 
 	for (val in arr.values)
 	{
@@ -72,13 +136,13 @@ ParseHeaderJSON(file: string)
 		{
 			name := GetName(obj);
 			type := obj.GetMember("type").Object();
-			typeDefLookup.Insert(name, type);
+			context.typeDefLookup.Insert(name, type);
 		}
 
 		if (tag == "union")
 		{
 			name := GetName(obj);
-			unionLookup.Insert(name, obj);
+			context.unionLookup.Insert(name, obj);
 		}
 	}
 
@@ -86,29 +150,35 @@ ParseHeaderJSON(file: string)
 	{
 		obj := val.Object();
 		tag := GetTag(obj);
-		//if (tag == "function")
-		//{
-		//	ParseVulkanFunction(obj, functions);
-		//}
+		if (tag == "function")
+		{
+			ParseHeaderFunction(obj, functions, context);
+		}
 
 		if (tag == "struct")
 		{
-			ParseVulkanStruct(obj, structs);
+			ParseHeaderStruct(obj, structs, context);
 		}
 
-		//if (tag == "enum")
-		//{
-		//	ParseVulkanEnum(obj, enums);
-		//}
+		if (tag == "enum")
+		{
+			ParseHeaderEnum(obj, enums);
+		}
 	}
 
-	//PrintFunctions(functions);
-	//PrintStructs(structs);
+	str := "";
+
+	str.AppendIn(PrintFunctions(functions));
+	str.AppendIn("\n");
+	str.AppendIn(PrintEnums(enums));
+	str.AppendIn(PrintStructs(structs));
+
+	OS.WriteFile(outFile, str);
 }
 
-ParseVulkanFunction(obj: *JSONObject, functions: []VulkanFunction)
+ParseHeaderFunction(obj: *JSONObject, functions: []HeaderFunction, context: HeaderContext)
 {
-	function := VulkanFunction();
+	function := HeaderFunction();
 	function.name = GetName(obj);
 	params := obj.GetMember("parameters").Array();
 	for (param in params.values)
@@ -116,139 +186,138 @@ ParseVulkanFunction(obj: *JSONObject, functions: []VulkanFunction)
 		paramObj := param.Object();
 		paramName := GetName(paramObj);
 		typeObj := GetType(paramObj);
-		type := ParseVulkanType(typeObj);
+		type := ParseHeaderType(typeObj, context);
 		function.params.Add({paramName, type});
 	}
-	function.returnType = ParseVulkanType(obj.GetMember("return-type").Object());
+	function.returnType = ParseHeaderType(obj.GetMember("return-type").Object(), context);
 
-	log PrintFunction(function);
 	functions.Add(function);
 }
 
-*VulkanType ParseVulkanType(obj: *JSONObject)
+*HeaderType ParseHeaderType(obj: *JSONObject, context: HeaderContext)
 {
 	tag := GetTag(obj);
-	type := new VulkanType();
+	type := new HeaderType();
 	if (tag == ":pointer")
 	{
-		type.kind = VulkanTypeKind.Pointer;
-		type.type.pointer = ParseVulkanType(GetType(obj));
+		type.kind = HeaderTypeKind.Pointer;
+		type.type.pointer = ParseHeaderType(GetType(obj), context);
 	}
 	else if (tag == ":array")
 	{
-		type.kind = VulkanTypeKind.Array;
+		type.kind = HeaderTypeKind.Array;
 		type.type.array.size = obj.GetMember("size").Number().value as uint;
-		type.type.array.type = ParseVulkanType(GetType(obj));
+		type.type.array.type = ParseHeaderType(GetType(obj), context);
 	}
 	else if (tag == ":void")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "void";
 	}
 	else if (tag == ":float")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "float32";
 	}
 	else if (tag == ":int")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "int32";
 	}
 	else if (tag == ":unsigned-int")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "uint32";
 	}
 	else if (tag == ":long")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "int64";
 	}
 	else if (tag == ":unsigned-long")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "uint64";
 	}
 	else if (tag == ":signed-char")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "byte";
 	}
 	else if (tag == ":char")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "byte";
 	}
 	else if (tag == ":unsigned-char")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "ubyte";
 	}
 	else if (tag == ":short")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "int16";
 	}
 	else if (tag == ":unsigned-short")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "uint16";
 	}
 	else if (tag == ":function-pointer")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = "::()";
 	}
 	else if (tag == ":enum" || tag == ":struct" || tag == "struct")
 	{
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = GetName(obj);
 	}
 	else if (tag == ":union")
 	{
-		type.kind = VulkanTypeKind.Union;
+		type.kind = HeaderTypeKind.Union;
 
 		unionName := GetName(obj);
-		unionObj := unionLookup.Find(unionName)~;
+		unionObj := context.unionLookup.Find(unionName)~;
 
 		fields := unionObj.GetMember("fields").Array();
-		unionValues := []{name: string, type: *VulkanType};
+		unionValues := []{name: string, type: *HeaderType};
 
 		for (field in fields.values)
 		{
 			fieldObj := field.Object();
 			name := GetName(fieldObj);
 			unionType := GetType(fieldObj);
-			value := {name, ParseVulkanType(unionType)};
+			value := {name, ParseHeaderType(unionType, context)};
 			unionValues.Add(value);
 		}
 		type.type.union = unionValues;
 	}
 	else
 	{
-		if (typeDefLookup.Has(tag))
+		if (context.typeDefLookup.Has(tag))
 		{
-			return ParseVulkanType(typeDefLookup[tag]~);
+			return ParseHeaderType(context.typeDefLookup[tag]~, context);
 		}
-		type.kind = VulkanTypeKind.Named;
+		type.kind = HeaderTypeKind.Named;
 		type.type.name = tag;
 	}
 
 	return type;
 }
 
-string PrintType(type: *VulkanType)
+string PrintType(type: *HeaderType)
 {
-	if (type.kind == VulkanTypeKind.Pointer)
+	if (type.kind == HeaderTypeKind.Pointer)
 	{
 		return "*" + PrintType(type.type.pointer);
 	}
-	else if (type.kind == VulkanTypeKind.Array)
+	else if (type.kind == HeaderTypeKind.Array)
 	{
 		return "[" + IntToString(type.type.array.size) + "]" + PrintType(type.type.array.type);
 	}
-	else if (type.kind == VulkanTypeKind.Union)
+	else if (type.kind == HeaderTypeKind.Union)
 	{
 		str := "?{";
 		for (i .. type.type.union.count)
@@ -269,7 +338,7 @@ string PrintType(type: *VulkanType)
 	return type.type.name;
 }
 
-string PrintFunction(function: VulkanFunction)
+string PrintFunction(function: HeaderFunction)
 {
 	str := PrintType(function.returnType) + " ";
 	str = str + function.name;
@@ -288,7 +357,7 @@ string PrintFunction(function: VulkanFunction)
 	return str;
 }
 
-PrintFunctions(functions: []VulkanFunction)
+string PrintFunctions(functions: []HeaderFunction)
 {
 	str := ""
 
@@ -297,12 +366,12 @@ PrintFunctions(functions: []VulkanFunction)
 		str = str + PrintFunction(function) + "\n";
 	}
 
-	log str;
+	return str;
 }
 
-ParseVulkanStruct(obj: *JSONObject, structs: []VulkanStruct)
+ParseHeaderStruct(obj: *JSONObject, structs: []HeaderStruct, context: HeaderContext)
 {
-	struct := VulkanStruct();
+	struct := HeaderStruct();
 	struct.name = GetName(obj);
 	fields := obj.GetMember("fields").Array();
 	for (field in fields.values)
@@ -310,15 +379,14 @@ ParseVulkanStruct(obj: *JSONObject, structs: []VulkanStruct)
 		fieldObj := field.Object();
 		fieldName := GetName(fieldObj);
 		typeObj := GetType(fieldObj);
-		type := ParseVulkanType(typeObj);
+		type := ParseHeaderType(typeObj, context);
 		struct.members.Add({fieldName, type});
 	}
 
-	log PrintStruct(struct);
 	structs.Add(struct);
 }
 
-string PrintStruct(struct: VulkanStruct)
+string PrintStruct(struct: HeaderStruct)
 {
 	str := "state ";
 	str = str + struct.name;
@@ -338,11 +406,11 @@ string PrintStruct(struct: VulkanStruct)
 	{
 		str = str + "opaque: any";
 	}
-	str = str + "\n}\n";
+	str = str + "\n}\n\n";
 	return str;
 }
 
-PrintStructs(structs: []VulkanStruct)
+string PrintStructs(structs: []HeaderStruct)
 {
 	str := ""
 
@@ -351,12 +419,12 @@ PrintStructs(structs: []VulkanStruct)
 		str = str + PrintStruct(struct);
 	}
 
-	log str;
+	return str;
 }
 
-ParseVulkanEnum(obj: *JSONObject, enums: []VulkanEnum)
+ParseHeaderEnum(obj: *JSONObject, enums: []HeaderEnum)
 {
-	_enum := VulkanEnum();
+	_enum := HeaderEnum();
 	_enum.name = GetName(obj);
 	fields := obj.GetMember("fields").Array();
 	for (field in fields.values)
@@ -367,11 +435,10 @@ ParseVulkanEnum(obj: *JSONObject, enums: []VulkanEnum)
 		_enum.fields.Add({fieldName, value});
 	}
 
-	log PrintEnum(_enum);
 	enums.Add(_enum);
 }
 
-string PrintEnum(_enum: VulkanEnum)
+string PrintEnum(_enum: HeaderEnum)
 {
 	str := "enum ";
 	str = str + _enum.name;
@@ -387,11 +454,11 @@ string PrintEnum(_enum: VulkanEnum)
 			str = str + ",\n";
 		}
 	}
-	str = str + "\n}\n";
+	str = str + "\n}\n\n";
 	return str;
 }
 
-PrintEnums(enums: []VulkanEnum)
+string PrintEnums(enums: []HeaderEnum)
 {
 	str := ""
 
@@ -400,5 +467,5 @@ PrintEnums(enums: []VulkanEnum)
 		str = str + PrintEnum(_enum);
 	}
 
-	log str;
+	return str;
 }

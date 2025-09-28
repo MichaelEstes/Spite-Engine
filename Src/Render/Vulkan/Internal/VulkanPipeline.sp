@@ -18,6 +18,13 @@ enum GeometryAttributeFlags: uint16
     UV3= 1 << 5,
 }
 
+enum VulkanAlphaMode: ubyte
+{
+	Opaque,
+	Mask,
+	Blend
+}
+
 state VulkanVertexInputBinding
 {
 	binding: ubyte,
@@ -45,6 +52,8 @@ bool VulkanVertexAttributeBinding::Valid()
 
 state VulkanPipelineMeshState
 {
+	vertShaderHandle: ResourceHandle,
+	fragShaderHandle: ResourceHandle,
 	geometryFlags: GeometryAttributeFlags,
 	// size : offset
 	// Topology				4 : 0
@@ -77,6 +86,31 @@ VulkanPipelineMeshState::SetPolygonMode(polygonMode: VkPolygonMode) =>
 	this.data.SetRange<VkPolygonMode>(4, 6, polygonMode);
 }
 
+VulkanAlphaMode VulkanPipelineMeshState::GetAlphaMode() =>
+{
+	return this.data.Range<VulkanAlphaMode>(6, 8);
+}
+
+VulkanPipelineMeshState::SetAlphaMode(alphaMode: VulkanAlphaMode) =>
+{
+	this.data.SetRange<VulkanAlphaMode>(6, 8, alphaMode);
+}
+
+VkPolygonMode VulkanPipelineMeshState::GetCullMode() =>
+{
+	return this.data.Range<VkCullModeFlagBits>(8, 10);
+}
+
+VulkanPipelineMeshState::SetCullMode(cullMode: VkCullModeFlagBits) =>
+{
+	this.data.SetRange<VkPolygonMode>(8, 10, cullMode);
+}
+
+uint HashPipelineMeshState(key: VulkanPipelineMeshState)
+{
+	return MHash<VulkanPipelineMeshState>(key);
+}
+
 state VulkanPipelineKey
 {
 	renderPass: *VkRenderPass_T,
@@ -85,10 +119,7 @@ state VulkanPipelineKey
 	vertexInputBindings: [MaxVertexAttributes]VulkanVertexInputBinding,
 	vertexInputAttributes: [MaxVertexAttributes]VulkanVertexAttributeBinding,
 
-	meshState: VulkanPipelineMeshState,
-
-	vertexShaderHandle: ResourceHandle,
-	fragmentShaderHandle: ResourceHandle,
+	meshState: VulkanPipelineMeshState
 }
 
 VulkanPipelineKey::()
@@ -128,20 +159,35 @@ VulkanPipeline FindOrCreatePipeline(device: *VkDevice_T, key: VulkanPipelineKey,
 
 VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey)
 {
+	depthTestEnable := VkTrue;
+	depthWriteEnable := VkTrue;
+	blendState := ColorBlendAttachment();
+
+	if (key.meshState.GetAlphaMode() == VulkanAlphaMode.Blend)
+	{
+		depthWriteEnable = VkFalse;
+	}
+
 	builder := VulkanPipelineBuilder()
-				.SetVertexShader(key.vertexShaderHandle)
-				.SetFragmentShader(key.fragmentShaderHandle)
+				.SetVertexShader(key.meshState.vertShaderHandle)
+				.SetFragmentShader(key.meshState.fragShaderHandle)
 				.SetVertexInput(
 					key.vertexInputBindings,
 					key.vertexInputAttributes,
 				)
 				.SetInputAssembly(key.meshState.GetTopology())
 				.SetViewportState(1, 1)
-				.SetRasterizer()
+				.SetRasterizer(
+					VkFalse, 
+					VkFalse, 
+					key.meshState.GetPolygonMode(),
+					1.0,
+					key.meshState.GetCullMode(),
+				)
 				.SetMultisampling()
-				.SetDepthStencil(VkTrue, VkTrue)
+				.SetDepthStencil(depthTestEnable, depthWriteEnable)
 				.SetColorBlend(
-					VkPipelineColorBlendAttachmentState:[ColorBlendAttachment(),]
+					VkPipelineColorBlendAttachmentState:[blendState,]
 				)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_SCISSOR)

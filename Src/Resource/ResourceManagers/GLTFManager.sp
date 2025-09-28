@@ -5,12 +5,13 @@ import Fiber
 import ThreadParamAllocator
 import GLTF
 import ECS
-import Render
+import RenderComponents
 import Array
 import URIManager
 import ImageManager
-import Hierarchy
+import SceneComponents
 import Transform
+import Shaders
 
 import RotateComponent
 
@@ -227,6 +228,8 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 	gltfMaterial := gltf.materials[materialIndex];
 	
 	material := Material();
+	material.vertShader = DefaultVertShader;
+	material.fragShader = DefaultFragShader;
 
 	if (gltfMaterial.pbrMetallicRoughness)
 	{
@@ -235,13 +238,13 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 		if (pbr.baseColorTexture)
 		{
 			baseColorTextureMap := LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
-			material.color = material.maps.Add(baseColorTextureMap);
+			material.color = baseColorTextureMap;
 		}
 
 		if (pbr.metallicRoughnessTexture)
 		{
 			metallicRoughnessTextureMap := LoadTexture(gltfData, gltf, pbr.metallicRoughnessTexture.index);
-			material.metallicRoughness = material.maps.Add(metallicRoughnessTextureMap);
+			material.metallicRoughness = metallicRoughnessTextureMap;
 		}
 
 		material.metallicFactor = pbr.metallicFactor;
@@ -251,19 +254,19 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 	if (gltfMaterial.normalTexture)
 	{
 		normalTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.normalTexture.info.index);
-		material.normal = material.maps.Add(normalTextureMap);
+		material.normal = normalTextureMap;
 	}
 
 	if (gltfMaterial.occlusionTexture)
 	{
 		occlusionTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.occlusionTexture.info.index);
-		material.occlusion = material.maps.Add(occlusionTextureMap);
+		material.occlusion = occlusionTextureMap;
 	}
 
 	if (gltfMaterial.emissiveTexture)
 	{
 		emissiveTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.emissiveTexture.index);
-		material.emissive = material.maps.Add(emissiveTextureMap);
+		material.emissive = emissiveTextureMap;
 	}
 
 	material.emissiveFactor = gltfMaterial.emissiveFactor;
