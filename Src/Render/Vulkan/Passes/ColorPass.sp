@@ -51,6 +51,14 @@ UpdateColorPassUniformBuffer(currentFrame: uint32, modelMat: Matrix4, viewMat: M
 	copy_bytes(colorPassState.uniformBuffersMapped[currentFrame], ubo@, (#sizeof ubo));
 }
 
+UpdateDescriptorSet(device: *VkDevice_T, descSet: *VkDescriptorSet_T, )
+{
+	descCount := 0;
+	descriptorWrites := [16]VkWriteDescriptorSet;
+
+
+}
+
 VulkanPipelineKey CreateColorPassPipelineKey(meshState: VulkanPipelineMeshState, 
 											 renderPass: *VkRenderPass_T,
 											 colorPassState: ColorPassState)
@@ -60,11 +68,11 @@ VulkanPipelineKey CreateColorPassPipelineKey(meshState: VulkanPipelineMeshState,
 	key.renderPass = renderPass;
 	key.layout = colorPassState.pipelineLayout;
 
-	key.vertexInputBindings[0] = {ubyte(0), ubyte(VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX), uint16(#sizeof Vec3)};
+	key.vertexInputBindings[0] = VulkanVertexInputBinding(0, uint16(#sizeof Vec3), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
 	//key.vertexInputBindings[1] = {ubyte(1), ubyte(VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX), uint16(#sizeof Vec3)};
 	//key.vertexInputBindings[2] = {ubyte(2), ubyte(VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX), uint16(#sizeof Vec2)};
 	
-	key.vertexInputAttributes[0] = {ubyte(0), ubyte(0), uint16(VkFormat.VK_FORMAT_R32G32B32_SFLOAT), uint32(0)};
+	key.vertexInputAttributes[0] = VulkanVertexAttributeBinding(0, 0, VkFormat.VK_FORMAT_R32G32B32_SFLOAT, 0);
 	//key.vertexInputAttributes[1] = {ubyte(1), ubyte(1), uint16(VkFormat.VK_FORMAT_R32G32B32_SFLOAT), uint32(0)};
 	//key.vertexInputAttributes[2] = {ubyte(2), ubyte(2), uint16(VkFormat.VK_FORMAT_R32G32_SFLOAT), uint32(0)};
 
@@ -110,6 +118,9 @@ colorPass := RegisterRenderPass(
 					pipelineMeshState := kv.key~;
 					meshArr := kv.value~;
 
+					vertShaderRes := ShaderResourceManager.GetResource(pipelineMeshState.vertShaderHandle).data;
+					fragShaderRes := ShaderResourceManager.GetResource(pipelineMeshState.fragShaderHandle).data;
+
 					pipelineKey := CreateColorPassPipelineKey(pipelineMeshState, renderPass, colorPassState);
 					vulkanPipeline := FindOrCreatePipeline(
 						device,
@@ -148,7 +159,7 @@ colorPass := RegisterRenderPass(
 							colorPassState
 						);
 
-						vertexBuffers := [vertexAlloc.buffer,];
+						vertexBuffers := [vertexAlloc.data.buffer,];
 						offsets:= [uint64(0),];
 						vkCmdBindVertexBuffers(
 							commandBuffer, 
@@ -160,7 +171,12 @@ colorPass := RegisterRenderPass(
 						
 						if (indexAlloc)
 						{
-							vkCmdBindIndexBuffer(commandBuffer, indexAlloc.buffer, 0, geo.indexKind);
+							vkCmdBindIndexBuffer(
+								commandBuffer, 
+								indexAlloc.data.buffer, 
+								0, 
+								geo.indexKind
+							);
 						}
 
 						vkCmdBindDescriptorSets(
@@ -176,8 +192,7 @@ colorPass := RegisterRenderPass(
 						
 						if (indexAlloc)
 						{
-							indexCount := indexAlloc.size / indexKindToByteCount[geo.indexKind];
-							vkCmdDrawIndexed(commandBuffer, indexCount, uint32(1), uint32(0), uint32(0), uint32(0));
+							vkCmdDrawIndexed(commandBuffer, geo.indexCount, uint32(1), uint32(0), uint32(0), uint32(0));
 						}
 						else
 						{
@@ -324,7 +339,7 @@ InitializeColorPassDescriptorSets(device: *VkDevice_T, allocator: *VulkanAllocat
 		uniformBufferAlloc := allocator.GetAllocation(uniformBufferHandle);
 
 		bufferInfo := VkDescriptorBufferInfo();
-		bufferInfo.buffer = uniformBufferAlloc.buffer;
+		bufferInfo.buffer = uniformBufferAlloc.data.buffer;
 		bufferInfo.offset = 0;
 		bufferInfo.range = #sizeof UniformBufferObject;
 

@@ -27,9 +27,16 @@ enum VulkanAlphaMode: ubyte
 
 state VulkanVertexInputBinding
 {
+	stride: uint16,
 	binding: ubyte,
-	inputRate: ubyte,
-	stride: uint16
+	inputRate: ubyte
+}
+
+VulkanVertexInputBinding::(binding: ubyte, stride: uint16, inputRate: ubyte)
+{
+	this.binding = binding;
+	this.stride = stride;
+	this.inputRate = inputRate;
 }
 
 bool VulkanVertexInputBinding::Valid()
@@ -39,10 +46,18 @@ bool VulkanVertexInputBinding::Valid()
 
 state VulkanVertexAttributeBinding
 {
-	location: ubyte,
-	binding: ubyte,
-	format: uint16,
 	offset: uint32,
+	format: uint16,
+	location: ubyte,
+	binding: ubyte
+}
+
+VulkanVertexAttributeBinding::(location: ubyte, binding: ubyte, format: uint16, offset: uint32)
+{
+	this.location = location;
+	this.binding = binding;
+	this.format = format;
+	this.offset = offset;
 }
 
 bool VulkanVertexAttributeBinding::Valid()

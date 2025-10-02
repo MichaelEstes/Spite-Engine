@@ -30,6 +30,20 @@ FixedArray::delete
 	this.mem.Dealloc(this.count);
 }
 
+[]Type FixedArray::log()
+{
+	return this.AsBuiltin();
+}
+
+[]Type FixedArray::AsBuiltin()
+{
+	arr := []Type;
+	arr.count = this.count;
+	arr.capacity = this.count;
+	arr.memory = this.mem;
+	return arr;
+}
+
 *Type FixedArray::operator::[](index: uint) => this.mem[index];
 
 Iterator FixedArray::operator::in()

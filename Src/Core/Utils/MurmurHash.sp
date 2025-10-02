@@ -2,6 +2,13 @@ package MurmurHash
 
 uint MHash<Type>(value: Type, seed: uint = 0x9747B28C)
 {
+	size := #sizeof Type;
+	start := value@ as *ubyte;
+	return MHashDirect(start, size, seed);
+}
+
+uint MHashDirect(data: *void, size: uint, seed: uint = 0x9747B28C)
+{
 	c1 := 0xCC9E2D51;
     c2 := 0x1B873593;
     r1 := 15;
@@ -11,8 +18,7 @@ uint MHash<Type>(value: Type, seed: uint = 0x9747B28C)
 
 	hash := seed;
 
-	size := #sizeof Type;
-	start := value@ as *ubyte;
+	start := data as *ubyte;
 	index := 0;
 
 	while (index + 4 <= size)

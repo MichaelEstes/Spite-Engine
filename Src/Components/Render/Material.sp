@@ -32,6 +32,11 @@ state TextureMap
 	scale: Vec2
 }
 
+bool TextureMap::operator::!()
+{
+	return this.texture.imageHandle.id == 0;
+}
+
 state Material
 {
 	color: TextureMap,

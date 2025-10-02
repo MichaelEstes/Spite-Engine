@@ -187,7 +187,11 @@ WaitForHandle(handle: *JobHandle)
 	// Don't stall main thread
 	if (currThreadID == fibers.mainThreadID)
 	{
-		FlushMainThreadJobs();
+		while (!handle.Finished()) 
+		{
+			FlushMainThreadJobs();
+		}
+		return;
 	}
 
 	// Waiting on a non fiber thread, spin

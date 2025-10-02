@@ -42,7 +42,8 @@ _ := SceneRegistry.RegisterScene(
 			}
 		});
 
-		model := "./Resource/Models/Box/Box.gltf";
+		//model := "./Resource/Models/Box/Box.gltf";
+		model := "./Resource/Models/BoxTextured/BoxTextured.gltf";
 		//model := "./Resource/Models/BrainStem/BrainStem.gltf";
 		log "Loading GLTF: ", model;
 		gltfEntities := AllocThreadParam<Array<Entity>>();

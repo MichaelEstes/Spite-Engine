@@ -332,21 +332,42 @@ VulkanRenderer::End(commandBuffer: *VkCommandBuffer_T)
 	vkEndCommandBuffer(commandBuffer);
 }
 
-VulkanRenderer::TransitionTexture(image: *VkImage_T, currentLayout: GPUTextureLayout, targetLayout: GPUTextureLayout, 
-								  format: GPUFormat, renderer: *VulkanRenderer)
+VulkanRenderer::TransitionSwapchainPresent(image: *VkImage_T, currentLayout: GPUTextureLayout, 
+										   format: GPUFormat)
 {
 	oldLayout := GPUTextureLayoutToVkLayout(currentLayout);
-	newLayout := GPUTextureLayoutToVkLayout(targetLayout);
 	vkFormat := format;
-	//log "Transitioning image: ", oldLayout, newLayout, vkFormat;
+	device := this.device;
+	
+	barrier := VkImageMemoryBarrier();
+	barrier.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = image;
+	barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+	barrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	barrier.dstAccessMask = 0;
 
-	commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
-	TransitionImageLayout(
-		commandBuffer,
-		image,
-		oldLayout,
-		newLayout,
-		vkFormat
+	sourceStage := VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	destinationStage := VkPipelineStageFlagBits.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
+	vkCmdPipelineBarrier(
+		this.GetCommandBuffer(CommandBufferKind.Graphics),
+		sourceStage,
+		destinationStage,
+		0,
+		0, 
+		null,
+		0, 
+		null,
+		1, 
+		barrier@
 	);
 }
 
@@ -383,12 +404,10 @@ VulkanRenderer::Draw(scene: *Scene)
 		currentSwapchainLayout := resourceTables.GetCurrentTextureLayout(swapchainImage);
 		if (currentSwapchainLayout != GPUTextureLayout.Present)
 		{
-			this.TransitionTexture(
+			this.TransitionSwapchainPresent(
 				swapchainImage,
 				currentSwapchainLayout,
-				GPUTextureLayout.Present,
-				swapchainDesc.format,
-				this@
+				swapchainDesc.format
 			);
 		}
 	}

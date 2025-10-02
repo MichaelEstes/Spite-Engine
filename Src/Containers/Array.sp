@@ -31,10 +31,10 @@ Array::delete
 
 []Type Array::log()
 {
-	return this.AsArray()
+	return this.AsBuiltin();
 }
 
-[]Type Array::AsArray()
+[]Type Array::AsBuiltin()
 {
 	arr := []Type;
 	arr.count = this.count;

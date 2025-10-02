@@ -100,10 +100,13 @@ VkImageViewCreateInfo DefaultImageView(image: *VkImage_T, imageInfo: VkImageCrea
 	return viewCreateInfo;
 }
 
-TransitionImageLayout(commandBuffer: *VkCommandBuffer_T, image: *VkImage_T,  
+TransitionImageLayout(device: *VkDevice_T, commandPool: *VkCommandPool_T,
+					  queue: *VkQueue_T, image: *VkImage_T,  
 					  oldLayout: VkImageLayout, newLayout: VkImageLayout,
 					  format: VkFormat)
 {
+	commandBuffer := BeginCommands(device, commandPool);
+
 	barrier := VkImageMemoryBarrier();
 	barrier.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	barrier.oldLayout = oldLayout;
@@ -198,4 +201,6 @@ TransitionImageLayout(commandBuffer: *VkCommandBuffer_T, image: *VkImage_T,
 		1, 
 		barrier@
 	);
+
+	EndCommands(device, commandPool, commandBuffer, queue);
 }

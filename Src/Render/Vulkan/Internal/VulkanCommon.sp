@@ -331,3 +331,39 @@ VkBufferCreateInfo BufferDescToCreateInfo(createDesc: BufferDesc)
     CheckResult(vkCreateSemaphore(device, createInfo@, null, semaphore@), "Error creating Vulkan semaphore");
     return semaphore;
 }
+
+*VkCommandBuffer_T BeginCommands(device: *VkDevice_T, commandPool: *VkCommandPool_T)
+{
+	allocInfo := VkCommandBufferAllocateInfo();
+    allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPool;
+    allocInfo.commandBufferCount = 1;
+
+	commandBuffer: *VkCommandBuffer_T = null;
+    vkAllocateCommandBuffers(device, allocInfo@, commandBuffer@);
+
+	beginInfo := VkCommandBufferBeginInfo();
+	beginInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VkCommandBufferUsageFlagBits.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	
+	vkBeginCommandBuffer(commandBuffer, beginInfo@);
+
+	return commandBuffer;
+}
+
+EndCommands(device: *VkDevice_T, commandPool: *VkCommandPool_T, 
+            commandBuffer: *VkCommandBuffer_T, queue: *VkQueue_T)
+{
+	vkEndCommandBuffer(commandBuffer);
+
+	submitInfo := VkSubmitInfo();
+	submitInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = commandBuffer@;
+	
+	vkQueueSubmit(queue, 1, submitInfo@, null);
+    vkQueueWaitIdle(queue);
+
+    vkFreeCommandBuffers(device, commandPool, 1, commandBuffer@);
+}

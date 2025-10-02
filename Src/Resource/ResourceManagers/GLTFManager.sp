@@ -129,6 +129,44 @@ ArrayView<byte> GetBufferViewData(gltfData: GLTFLoadData, gltf: GLTF, bufferView
 	return ArrayView<byte>(data, gltfBufferView.byteLength);
 }
 
+uint GetAccessorItemByteLength(accessor: GLTFAccessor)
+{
+	switch (accessor.componentType)
+	{
+		case (5120) return 1;
+		case (5121) return 1;
+		case (5122) return 2;
+		case (5123) return 2;
+		case (5125) return 4;
+		case (5126) return 4;
+	}
+
+	return 1;
+}
+
+uint GetAccessorItemByteCount(accessor: GLTFAccessor)
+{
+	itemByteCount := 1;
+	if (accessor.type == "VEC2") itemByteCount = 2;
+	else if (accessor.type == "VEC3") itemByteCount = 3;
+	else if (accessor.type == "VEC4") itemByteCount = 4;
+	else if (accessor.type == "MAT2") itemByteCount = 4;
+	else if (accessor.type == "MAT3") itemByteCount = 9;
+	else if (accessor.type == "MAT4") itemByteCount = 16;
+
+	return itemByteCount;
+}
+
+uint GetAccessorByteCount(accessor: GLTFAccessor)
+{
+	count := accessor.count;
+
+	itemByteLength := GetAccessorItemByteLength(accessor);
+	itemByteCount := GetAccessorItemByteCount(accessor);
+	
+	return count * itemByteLength * itemByteCount;
+}
+
 ArrayView<byte> GetAccessorData(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32)
 {
 	gltfAccessor := gltf.accessors[accessor];
@@ -182,8 +220,26 @@ AssignAttributeToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, attrName: string,
 AssignIndiciesToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive)
 {
 	view := GetAccessorData(gltfData, gltf, accessor);
-	indices := ArrayView<uint16>(view[0]@, view.count);
 
+	count := view.count;
+	gltfAccessor := gltf.accessors[accessor];
+	itemLength := GetAccessorItemByteLength(gltfAccessor);
+
+	if (itemLength == 2)
+	{
+		primitive.geometry.indexKind = IndexKind.I16;
+	}
+	else if (itemLength == 4)
+	{
+		primitive.geometry.indexKind = IndexKind.I32;
+		count = count * 2;
+	}
+	else
+	{
+		log "AssignIndiciesToPrimitive Invalid item length for index buffer";
+	}
+
+	indices := ArrayView<uint16>(view[0]@, count);
 	primitive.geometry.indices = indices;
 }
 

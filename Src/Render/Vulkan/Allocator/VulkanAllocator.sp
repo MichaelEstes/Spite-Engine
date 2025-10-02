@@ -12,7 +12,7 @@ enum VulkanMemoryFlags: uint32
 	GPULazy = VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT,
 
 	// Allocator specific flags
-	Mapped = 1 << 16
+	Mapped = 1 << 16,
 }
 
 state VulkanAllocHandle
@@ -22,7 +22,10 @@ state VulkanAllocHandle
 
 state VulkanAllocation
 {
-	buffer: *VkBuffer_T,
+	data: ?{
+		buffer: *VkBuffer_T,
+		image: *VkImage_T
+	},
 	size: uint64
 	offset: uint64,
 	index: uint64,
@@ -84,8 +87,9 @@ VulkanAllocHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags:
 		block = this.CreateBlock(memoryFlags, memoryRequirements);
 	}
 
+	block.currentOffset = align_up(block.currentOffset, memoryRequirements.alignment);
 	alloc := VulkanAllocation();
-	alloc.buffer = buffer;
+	alloc.data.buffer = buffer;
 	alloc.size = memoryRequirements.size;
 	alloc.offset = block.currentOffset;
 	alloc.index = block.allocations.count;
@@ -101,6 +105,40 @@ VulkanAllocHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags:
 	allocHandleValue.value~ = alloc;
 
 	block.currentOffset += memoryRequirements.size;
+	block.allocations.Add(handle);
+
+	return handle;
+}
+
+VulkanAllocHandle VulkanAllocator::AllocImage(image: *VkImage_T, memoryFlags: uint32)
+{
+	memoryRequirements := VkMemoryRequirements();
+	vkGetImageMemoryRequirements(this.device, image, memoryRequirements@);
+
+	block := this.FindBlock(memoryRequirements.size, memoryFlags);
+	if (!block)
+	{
+		block = this.CreateBlock(memoryFlags, memoryRequirements);
+	}
+
+	block.currentOffset = align_up(block.currentOffset, memoryRequirements.alignment);
+	alloc := VulkanAllocation();
+	alloc.data.image = image;
+	alloc.size = memoryRequirements.size;
+	alloc.offset = block.currentOffset;
+	alloc.index = block.allocations.count;
+	alloc.blockIndex = block.index;
+
+	CheckResult(
+		vkBindImageMemory(this.device, image, block.memory, alloc.offset),
+		"Error binding image memory"
+	);
+
+	allocHandleValue := this.allocationHandles.GetNext();
+	handle := allocHandleValue.handle as VulkanAllocHandle;
+	allocHandleValue.value~ = alloc;
+
+	block.currentOffset = block.currentOffset + memoryRequirements.size;
 	block.allocations.Add(handle);
 
 	return handle;
