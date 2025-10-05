@@ -59,5 +59,5 @@ bool FixedArray::next(it: Iterator)
 
 ref Type FixedArray::current(it: Iterator)
 {
-	return this[it.index];	
+	return this[it.index]~;	
 }

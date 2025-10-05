@@ -8,3 +8,14 @@ state UniformBufferObject
 	view: Matrix4,
 	projection: Matrix4
 }
+
+state SceneUBO
+{
+	view: Matrix4,
+	projection: Matrix4
+}
+
+state ModelUBO
+{
+	model: Matrix4
+}

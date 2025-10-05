@@ -5,7 +5,7 @@ import SDL
 import BitArray
 
 MaxDynamicStates := 8;
-MaxVertexAttributes := 16;
+MaxVertexAttributes := 8;
 
 enum GeometryAttributeFlags: uint16
 {
@@ -129,18 +129,7 @@ uint HashPipelineMeshState(key: VulkanPipelineMeshState)
 state VulkanPipelineKey
 {
 	renderPass: *VkRenderPass_T,
-	layout: *VkPipelineLayout_T,
-
-	vertexInputBindings: [MaxVertexAttributes]VulkanVertexInputBinding,
-	vertexInputAttributes: [MaxVertexAttributes]VulkanVertexAttributeBinding,
-
 	meshState: VulkanPipelineMeshState
-}
-
-VulkanPipelineKey::()
-{
-	zero_out_bytes(fixed this.vertexInputBindings, (#sizeof VulkanVertexInputBinding) * MaxVertexAttributes);
-	zero_out_bytes(fixed this.vertexInputAttributes, (#sizeof VulkanVertexAttributeBinding) * MaxVertexAttributes);
 }
 
 state VulkanPipeline
@@ -159,7 +148,8 @@ state VulkanPipelineCache
 	pipelineMap := Map<VulkanPipelineKey, VulkanPipeline, HashPipelineKey>()
 }
 
-VulkanPipeline FindOrCreatePipeline(device: *VkDevice_T, key: VulkanPipelineKey, cache: VulkanPipelineCache)
+VulkanPipeline FindOrCreatePipeline(device: *VkDevice_T, key: VulkanPipelineKey,
+									cache: VulkanPipelineCache, layoutCache: VulkanPipelineLayoutCache)
 {
 	pipeline := cache.pipelineMap.Find(key);
 	if (pipeline) 
@@ -167,37 +157,73 @@ VulkanPipeline FindOrCreatePipeline(device: *VkDevice_T, key: VulkanPipelineKey,
 		return pipeline~;
 	}
 	
-	createdPipeline := CreatePipelineFromKey(device, key);
+	createdPipeline := CreatePipelineFromKey(device, key, layoutCache);
 	cache.pipelineMap.Insert(key, createdPipeline);
 	return createdPipeline;
 }
 
-VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey)
+VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey,
+									 layoutCache: VulkanPipelineLayoutCache)
 {
+	meshState := key.meshState;
 	depthTestEnable := VkTrue;
 	depthWriteEnable := VkTrue;
 	blendState := ColorBlendAttachment();
 
-	if (key.meshState.GetAlphaMode() == VulkanAlphaMode.Blend)
+	if (meshState.GetAlphaMode() == VulkanAlphaMode.Blend)
 	{
 		depthWriteEnable = VkFalse;
 	}
 
+	vertexInputBindings := [MaxVertexAttributes]VulkanVertexInputBinding();
+	vertexInputAttributes := [MaxVertexAttributes]VulkanVertexAttributeBinding();
+
+	layoutKey := PipelineLayoutKey(meshState.vertShaderHandle, meshState.fragShaderHandle);
+	layout := FindOrCreatePipelineLayout(device, layoutKey, layoutCache);
+
+	// position
+	vertexInputBindings[0] = VulkanVertexInputBinding(0, uint16(#sizeof Vec3), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	//normal
+	vertexInputBindings[1] = VulkanVertexInputBinding(1, uint16(#sizeof Vec3), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	//tangents
+	vertexInputBindings[2] = VulkanVertexInputBinding(2, uint16(#sizeof Vec4), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	//color
+	vertexInputBindings[3] = VulkanVertexInputBinding(3, uint16(#sizeof Vec4), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	//uv0-3
+	vertexInputBindings[4] = VulkanVertexInputBinding(4, uint16(#sizeof Vec2), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	vertexInputBindings[5] = VulkanVertexInputBinding(5, uint16(#sizeof Vec2), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	vertexInputBindings[6] = VulkanVertexInputBinding(6, uint16(#sizeof Vec2), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	vertexInputBindings[7] = VulkanVertexInputBinding(7, uint16(#sizeof Vec2), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	
+	// position
+	vertexInputAttributes[0] = VulkanVertexAttributeBinding(0, 0, VkFormat.VK_FORMAT_R32G32B32_SFLOAT, 0);
+	//normal
+	vertexInputAttributes[1] = VulkanVertexAttributeBinding(1, 1, VkFormat.VK_FORMAT_R32G32B32_SFLOAT, 0);
+	//tangents
+	vertexInputAttributes[2] = VulkanVertexAttributeBinding(2, 2, VkFormat.VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	//color
+	vertexInputAttributes[3] = VulkanVertexAttributeBinding(3, 3, VkFormat.VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	//uv0-3
+	vertexInputAttributes[4] = VulkanVertexAttributeBinding(4, 4, VkFormat.VK_FORMAT_R32G32_SFLOAT, 0);
+	vertexInputAttributes[5] = VulkanVertexAttributeBinding(5, 5, VkFormat.VK_FORMAT_R32G32_SFLOAT, 0);
+	vertexInputAttributes[6] = VulkanVertexAttributeBinding(6, 6, VkFormat.VK_FORMAT_R32G32_SFLOAT, 0);
+	vertexInputAttributes[7] = VulkanVertexAttributeBinding(7, 7, VkFormat.VK_FORMAT_R32G32_SFLOAT, 0);
+
 	builder := VulkanPipelineBuilder()
-				.SetVertexShader(key.meshState.vertShaderHandle)
-				.SetFragmentShader(key.meshState.fragShaderHandle)
+				.SetVertexShader(meshState.vertShaderHandle)
+				.SetFragmentShader(meshState.fragShaderHandle)
 				.SetVertexInput(
-					key.vertexInputBindings,
-					key.vertexInputAttributes,
+					vertexInputBindings,
+					vertexInputAttributes,
 				)
-				.SetInputAssembly(key.meshState.GetTopology())
+				.SetInputAssembly(meshState.GetTopology())
 				.SetViewportState(1, 1)
 				.SetRasterizer(
 					VkFalse, 
 					VkFalse, 
-					key.meshState.GetPolygonMode(),
+					meshState.GetPolygonMode(),
 					1.0,
-					key.meshState.GetCullMode(),
+					meshState.GetCullMode()
 				)
 				.SetMultisampling()
 				.SetDepthStencil(depthTestEnable, depthWriteEnable)
@@ -206,7 +232,7 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 				)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_SCISSOR)
-				.SetPipelineLayout(key.layout);	
+				.SetPipelineLayout(layout);
 	
 	return builder.Create(device, key.renderPass, 0);
 }

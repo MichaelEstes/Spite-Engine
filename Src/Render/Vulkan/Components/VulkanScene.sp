@@ -6,6 +6,9 @@ import Resource
 import ImageManager
 import Matrix
 
+
+MaxMaterialTextures := 8;
+
 geometryKindToTopologyTable := [
 	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
 	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
@@ -41,6 +44,7 @@ state VulkanGeometry
 		VulkanAllocHandle()
 	],
 
+
 	indexCount: uint32,
 	topology: VkPrimitiveTopology,
 	indexKind: VkIndexType,
@@ -67,6 +71,7 @@ state VulkanTexture
 {
 	image: *VkImage_T,
 	imageView: *VkImageView_T,
+	sampler: *VkSampler_T,
 	
 	layout: VkImageLayout,
 	imageAlloc: VulkanAllocHandle
@@ -74,7 +79,8 @@ state VulkanTexture
 
 state VulkanMaterial
 {
-	textures: [8]VulkanTexture,
+	textures: [MaxMaterialTextures]VulkanTexture,
+	textureDescSet: *VkDescriptorSet_T,
 
 	vertShaderHandle: ResourceHandle,
 	fragShaderHandle: ResourceHandle,
@@ -86,7 +92,7 @@ state VulkanMaterial
 
 VulkanMaterial::()
 {
-	for (i .. 8)
+	for (i .. MaxMaterialTextures)
 	{
 		this.textures[i] = VulkanTexture();
 	}
@@ -98,20 +104,6 @@ state VulkanMesh
 	material: VulkanMaterial,
 	entity: Entity
 }
-
-state VulkanMeshUniform
-{
-	model: Matrix4
-}
-
-state VulkanMeshUniformBuffer
-{
-	alloc: VulkanAllocHandle
-}
-
-VulkanMeshUniformBufferComponent := ECS.RegisterComponent<VulkanMeshUniformBuffer>(
-	ComponentKind.Common, 
-);
 
 VulkanMesh::delete
 {
@@ -350,8 +342,33 @@ VulkanTexture UploadTexture(textureMap: TextureMap, renderer: *VulkanRenderer, f
 
 	vulkanImageView := CreateVkImageView(device, imageViewCreateInfo);
 
+	samplerInfo := VkSamplerCreateInfo();
+	samplerInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VkFilter.VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VkFilter.VK_FILTER_LINEAR;
+	samplerInfo.addressModeU = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.anisotropyEnable = VkTrue;
+	samplerInfo.maxAnisotropy = vulkanInstance.deviceProperties[renderer.deviceIndex].limits.maxSamplerAnisotropy;
+	samplerInfo.borderColor = VkBorderColor.VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VkFalse;
+	samplerInfo.compareEnable = VkFalse;
+	samplerInfo.compareOp = VkCompareOp.VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VkSamplerMipmapMode.VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0;
+	samplerInfo.minLod = 0.0;
+	samplerInfo.maxLod = 0.0;
+
+	vulkanSampler: *VkSampler_T = null;
+	CheckResult(
+		vkCreateSampler(device, samplerInfo@, null, vulkanSampler@),
+		"UploadTexture Error creating Vulkan texture sampler"
+	);
+
 	vulkanTexture.image = vulkanImage;
 	vulkanTexture.imageView = vulkanImageView;
+	vulkanTexture.sampler = vulkanSampler;
 	vulkanTexture.layout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	vulkanTexture.imageAlloc = vulkanImageHandle;
 
@@ -377,5 +394,60 @@ VulkanMaterial UploadMaterial(mat: Material, renderer: *VulkanRenderer)
 	vulkanMat.cullMode = mat.cullMode;
 	vulkanMat.alphaMode = mat.alphaMode;
 
+	CreateMaterialDescSet(vulkanMat, renderer);
+
 	return vulkanMat;
+}
+
+CreateMaterialDescSet(mat: VulkanMaterial, renderer: *VulkanRenderer)
+{
+	device := renderer.device;
+	layoutCache := renderer.pipelineLayoutCache~;
+	pool := renderer.materialPool;
+	
+	key := PipelineLayoutKey(mat.vertShaderHandle, mat.fragShaderHandle);
+
+	FindOrCreatePipelineLayout(device, key, layoutCache);
+
+	setLayouts := layoutCache.descLayoutSetMap.Find(key);
+	assert setLayouts;
+
+	textureDescSetLayout := setLayouts~[2];
+
+	allocInfo := VkDescriptorSetAllocateInfo();
+	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = pool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = textureDescSetLayout@;
+
+	CheckResult(
+		vkAllocateDescriptorSets(device, allocInfo@, mat.textureDescSet@),
+		"CreateMaterialDescSet Error allocating material Vulkan descriptor sets"
+	);
+
+	descriptorWrites := [MaxMaterialTextures]VkWriteDescriptorSet;
+	imageInfos := [MaxMaterialTextures]VkDescriptorImageInfo;
+	descriptorWriteCount := 0;
+	for (i .. MaxMaterialTextures)
+	{
+		texture := mat.textures[i];
+		if (!texture.image) break;
+
+		descriptorWriteCount += 1;
+		imageInfos[i] = VkDescriptorImageInfo();
+		imageInfos[i].sampler = texture.sampler;   
+		imageInfos[i].imageView = texture.imageView;
+		imageInfos[i].imageLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		descriptorWrites[i] = VkWriteDescriptorSet();
+		descriptorWrites[i].sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[i].dstSet = mat.textureDescSet;
+		descriptorWrites[i].dstBinding = i;
+		descriptorWrites[i].dstArrayElement = 0;
+		descriptorWrites[i].descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[i].descriptorCount = 1;
+		descriptorWrites[i].pImageInfo = imageInfos[i]@;
+	}
+
+	vkUpdateDescriptorSets(device, descriptorWriteCount, fixed descriptorWrites, 0, null);
 }

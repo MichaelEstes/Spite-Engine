@@ -38,6 +38,7 @@ state VulkanInstance
 	renderPassCaches: Allocator<VulkanRenderPassCache>,
 	frameBufferCaches: Allocator<VulkanFrameBufferCache>,
 	pipelineCaches: Allocator<VulkanPipelineCache>,
+	pipelineLayoutCaches: Allocator<VulkanPipelineLayoutCache>,
 
 	allocators: Allocator<VulkanAllocator>,
 	stagingBuffers: Allocator<VulkanStagingBuffer>,
@@ -83,6 +84,7 @@ VulkanInstance::InitializeDevice(deviceIndex: uint32)
 	vulkanInstance.renderPassCaches[i]~ = VulkanRenderPassCache();
 	vulkanInstance.frameBufferCaches[i]~ = VulkanFrameBufferCache();
 	vulkanInstance.pipelineCaches[i]~ = VulkanPipelineCache();
+	vulkanInstance.pipelineLayoutCaches[i]~ = VulkanPipelineLayoutCache();
 	vulkanInstance.stagingBuffers[i]~ = VulkanStagingBuffer();
 
 	physicalDevice := vulkanInstance.physicalDevices[i]~;
@@ -247,6 +249,7 @@ InitializeVulkanInstance()
 	vulkanInstance.renderPassCaches.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.frameBufferCaches.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.pipelineCaches.Alloc(vulkanInstance.physicalDeviceCount);
+	vulkanInstance.pipelineLayoutCaches.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.allocators.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.stagingBuffers.Alloc(vulkanInstance.physicalDeviceCount);
 	vulkanInstance.devicesInitialized.Alloc(vulkanInstance.physicalDeviceCount);

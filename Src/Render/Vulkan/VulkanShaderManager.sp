@@ -10,10 +10,8 @@ state ShaderResource
 	device: *VkDevice_T,
 	shaderModule: *VkShaderModule_T,
 	reflectModule: SpvReflectShaderModule,
-	reflectDescSet: FixedArray<*SpvReflectDescriptorSet>
-	shaderStageInfo: VkPipelineShaderStageCreateInfo,
-	descSetLayouts: FixedArray<*VkDescriptorSetLayout_T>,
-	pipelineLayout: *VkPipelineLayout_T
+	reflectDescSet: FixedArray<*SpvReflectDescriptorSet>,
+	shaderStageInfo: VkPipelineShaderStageCreateInfo
 }
 
 state ShaderParam
@@ -50,11 +48,10 @@ ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderPa
 		{
 			log "VulkanShaderManager Unable to create reflection module";
 		}
-		FindOrCreateDescriptorSet(
-			device, resourceData.reflectModule@, 
-			resourceData.reflectDescSet@,
-			resourceData.descSetLayouts@,
-			resourceData.pipelineLayout@,
+		FindOrCreateDescriptorLayout(
+			device, 
+			resourceData.reflectModule@, 
+			resourceData.reflectDescSet@
 		);
 
 		createInfo := VkShaderModuleCreateInfo();

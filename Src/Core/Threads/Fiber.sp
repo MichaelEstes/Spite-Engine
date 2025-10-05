@@ -198,7 +198,7 @@ WaitForHandle(handle: *JobHandle)
 	while (!handle.Finished()) 
 	{
 		//log "Waiting Non Fiber thread", handle;
-		//Thread.Sleep(1);
+		Thread.Sleep(1);
 	}
 }
 

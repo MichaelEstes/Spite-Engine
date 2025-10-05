@@ -11,6 +11,7 @@ import ArrayView
 
 import ECS
 import RenderComponents
+import UniformBufferObject
 
 CheckResult(result: VkResult, errorMsg: string)
 {
@@ -47,18 +48,24 @@ state VulkanRenderer
 	allocator: *VulkanAllocator,
 	stagingBuffer: *VulkanStagingBuffer,
 	pipelineCache: *VulkanPipelineCache,
+	pipelineLayoutCache: *VulkanPipelineLayoutCache,
 
 	swapchain: VulkanSwapchain,
 	graphicsCommands: VulkanCommands,
 	computeCommands: VulkanCommands,
 	transferCommands: VulkanCommands,
 	
+	sceneShared: SharedUBO<SceneUBO>,
+	modelShared: SharedUBO<ModelUBO>,
+
+	materialPool: *VkDescriptorPool_T,
+
 	frameFences: [FrameCount]*VkFence_T,
 
 	passes: Array<VulkanRenderPass>,
 
 	renderGraph: RenderGraph<VulkanRenderer>,
-	
+
 	deviceIndex: uint32,
 	swapchainHandle: RenderResourceHandle,
 	swapchainImageIndex: uint32,
@@ -90,6 +97,7 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	vulkanRenderer.allocator = vulkanInstance.allocators[deviceIndex];
 	vulkanRenderer.stagingBuffer = vulkanInstance.GetStagingBuffer(deviceIndex);
 	vulkanRenderer.pipelineCache = vulkanInstance.pipelineCaches[deviceIndex];
+	vulkanRenderer.pipelineLayoutCache = vulkanInstance.pipelineLayoutCaches[deviceIndex];
 
 	vulkanRenderer.CreateSwapchain();
 
@@ -113,6 +121,10 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 		vulkanRenderer.queues.transferQueueIndex,
 		FrameCount
 	);
+
+	vulkanRenderer.sceneShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0);
+	vulkanRenderer.modelShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0);
+	vulkanRenderer.CreateMaterialDescPool();
 
 	for (passName in passes)
 	{
@@ -252,6 +264,24 @@ VulkanRenderer::CreateSurface()
 	}
 }
 
+VulkanRenderer::CreateMaterialDescPool()
+{
+	poolSizes := [VkDescriptorPoolSize(),];
+	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[0].descriptorCount = 1000;
+
+	poolInfo := VkDescriptorPoolCreateInfo();
+	poolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = 1;
+	poolInfo.pPoolSizes = fixed poolSizes;
+	poolInfo.maxSets = 1000;
+
+	CheckResult(
+		vkCreateDescriptorPool(this.device, poolInfo@, null, this.materialPool@),
+		"VulkanRenderer::CreateMaterialDescPool Error allocating Vulkan descriptor pool"
+	);
+}
+
 *VkRenderPass_T VulkanRenderer::CastDriverRenderPass(renderPass: *any)
 {
 	return renderPass as *VkRenderPass_T;
@@ -371,6 +401,25 @@ VulkanRenderer::TransitionSwapchainPresent(image: *VkImage_T, currentLayout: GPU
 	);
 }
 
+VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
+{
+	if (!scene.HasSingleton<Camera>()) return;
+	sceneUBO := SceneUBO();
+	camera := scene.GetSingleton<Camera>();
+	cameraViewMatrix := camera.GetViewMatrix();
+
+	sceneUBO.view = cameraViewMatrix;
+	sceneUBO.projection.Perspective(
+		camera.fov,
+		camera.aspect, 
+		camera.near,
+		camera.far
+	);
+	sceneUBO.projection[1][1] *= -1;
+
+	this.sceneShared.Update(frame, sceneUBO);
+}
+
 VulkanRenderer::Draw(scene: *Scene)
 {
 	frame := this.Frame();
@@ -378,6 +427,8 @@ VulkanRenderer::Draw(scene: *Scene)
 	renderGraph := this.renderGraph;
 	renderGraph.SetRenderer(this@);
 	resourceTables := renderGraph.handles.resourceTables;
+
+	this.UpdateSceneUBO(scene, frame);
 
 	this.WaitAndAcquireSwapchain(frame);
 

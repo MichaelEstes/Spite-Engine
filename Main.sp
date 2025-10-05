@@ -114,7 +114,7 @@ testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 });
 
 Main()
-{	
+{
 	scene := ECS.instance.CreateScene();
 	
 	scene.SetSingleton<SingletonTest>({9.0});

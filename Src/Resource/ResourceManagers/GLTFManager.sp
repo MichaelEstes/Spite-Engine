@@ -201,6 +201,15 @@ AssignTangentToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, p
 	primitive.geometry.tangents = tangents;
 }
 
+AssignUVToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive, attrName: string)
+{
+	view := GetAccessorData(gltfData, gltf, accessor);
+	uv := ArrayView<Vec2>(view[0]@, view.count);
+	
+	// TODO string to int
+	primitive.geometry.uvs[0] = uv;
+}
+
 AssignAttributeToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, attrName: string, accessor: uint32, primitive: Primitive)
 {
 	if (attrName == "POSITION")
@@ -214,6 +223,10 @@ AssignAttributeToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, attrName: string,
 	else if (attrName == "TANGENT")
 	{
 		AssignTangentToPrimitive(gltfData, gltf, accessor, primitive);
+	}
+	else if (attrName.StartsWith("TEXCOORD_"))
+	{
+		AssignUVToPrimitive(gltfData, gltf, accessor, primitive, attrName);
 	}
 }
 
