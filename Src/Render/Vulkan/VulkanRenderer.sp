@@ -60,6 +60,8 @@ state VulkanRenderer
 
 	materialPool: *VkDescriptorPool_T,
 
+	emptyVertexBuffers: EmptyVertexBuffers,
+
 	frameFences: [FrameCount]*VkFence_T,
 
 	passes: Array<VulkanRenderPass>,
@@ -125,6 +127,8 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	vulkanRenderer.sceneShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0);
 	vulkanRenderer.modelShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0);
 	vulkanRenderer.CreateMaterialDescPool();
+
+	vulkanRenderer.emptyVertexBuffers.Init(vulkanRenderer);
 
 	for (passName in passes)
 	{

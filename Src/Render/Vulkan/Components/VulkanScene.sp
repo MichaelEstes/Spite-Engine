@@ -8,6 +8,7 @@ import Matrix
 
 
 MaxMaterialTextures := 8;
+MaxUVs := 4;
 
 geometryKindToTopologyTable := [
 	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
@@ -37,13 +38,12 @@ state VulkanGeometry
 
 	color: VulkanAllocHandle,
 
-	uvs: [4]VulkanAllocHandle = [
+	uvs: [MaxUVs]VulkanAllocHandle = [
 		VulkanAllocHandle(),
 		VulkanAllocHandle(),
 		VulkanAllocHandle(),
 		VulkanAllocHandle()
 	],
-
 
 	indexCount: uint32,
 	topology: VkPrimitiveTopology,
@@ -53,15 +53,13 @@ state VulkanGeometry
 GeometryAttributeFlags VulkanGeometry::GetAttributesFlags()
 {
 	mask := GeometryAttributeFlags.None;
-	if (this.tangents.handle) mask |= GeometryAttributeFlags.Tangent;
-	if (this.color.handle) mask |= GeometryAttributeFlags.Color;
 
-	for (i .. 4)
+	mask |= (this.tangents.handle != 0) * GeometryAttributeFlags.Tangent;
+	mask |= (this.color.handle != 0) * GeometryAttributeFlags.Color;
+
+	for (i .. MaxUVs)
 	{
-		if (this.uvs[i].handle)
-		{
-			mask |= (GeometryAttributeFlags.UV0 << i);
-		}
+		mask |= (this.uvs[i].handle != 0) * (GeometryAttributeFlags.UV0 << i);
 	}
 
 	return mask;

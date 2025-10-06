@@ -114,6 +114,8 @@ colorPass := RegisterRenderPass(
 							null
 						);
 
+						geoAttrFlags := geo.GetAttributesFlags();
+
 						vertexAlloc := allocator.GetAllocation(geo.vertexHandle);
 						indexAlloc := allocator.GetAllocation(geo.indexHandle);
 
