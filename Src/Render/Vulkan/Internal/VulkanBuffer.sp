@@ -15,21 +15,15 @@ import Vec
 
 state EmptyVertexBuffers
 {
-	normal: *VkBuffer_T,
+	normals: *VkBuffer_T,
 	tangents: *VkBuffer_T,
 	color: *VkBuffer_T,
-	uv0: *VkBuffer_T,
-	uv1: *VkBuffer_T,
-	uv2: *VkBuffer_T,
-	uv3: *VkBuffer_T,
+	uv: *VkBuffer_T,
 
-	normalHandle: VulkanAllocHandle,
+	normalsHandle: VulkanAllocHandle,
 	tangentsHandle: VulkanAllocHandle,
 	colorHandle: VulkanAllocHandle,
-	uv0Handle: VulkanAllocHandle,
-	uv1Handle: VulkanAllocHandle,
-	uv2Handle: VulkanAllocHandle,
-	uv3Handle: VulkanAllocHandle
+	uvHandle: VulkanAllocHandle
 }
 
 EmptyVertexBuffers::CreateInternal<Type>(renderer: VulkanRenderer
@@ -57,7 +51,7 @@ EmptyVertexBuffers::Init(renderer: VulkanRenderer)
 {
 	this.CreateInternal<Vec3>(
 		renderer, 
-		this.normal@, this.normalHandle@, 
+		this.normals@, this.normalsHandle@, 
 		Vec3(0.0, 0.0, 1.0)
 	);
 
@@ -75,22 +69,7 @@ EmptyVertexBuffers::Init(renderer: VulkanRenderer)
 
 	this.CreateInternal<Vec2>(
 		renderer, 
-		this.uv0@, this.uv0Handle@, 
-		Vec2(0.0, 0.0)
-	);
-	this.CreateInternal<Vec2>(
-		renderer, 
-		this.uv1@, this.uv1Handle@, 
-		Vec2(0.0, 0.0)
-	);
-	this.CreateInternal<Vec2>(
-		renderer, 
-		this.uv2@, this.uv2Handle@, 
-		Vec2(0.0, 0.0)
-	);
-	this.CreateInternal<Vec2>(
-		renderer, 
-		this.uv3@, this.uv3Handle@, 
+		this.uv@, this.uvHandle@, 
 		Vec2(0.0, 0.0)
 	);
 }

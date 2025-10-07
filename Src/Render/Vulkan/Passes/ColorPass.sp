@@ -119,22 +119,43 @@ colorPass := RegisterRenderPass(
 						vertexAlloc := allocator.GetAllocation(geo.vertexHandle);
 						indexAlloc := allocator.GetAllocation(geo.indexHandle);
 
-						vertexBuffers := [vertexAlloc.data.buffer,];
-						offsets:= [uint64(0),];
+						vertexBuf := vertexAlloc.data.buffer;
+
+						normalBuf := geo.GetNormalBuffer(renderer);
+						tangentsBuf := geo.GetTagentBuffer(renderer);
+						colorBuf := geo.GetColorBuffer(renderer);
+						uv0Buf := geo.GetUVBuffer(0, renderer);
+						uv1Buf := geo.GetUVBuffer(1, renderer);
+						uv2Buf := geo.GetUVBuffer(2, renderer);
+						uv3Buf := geo.GetUVBuffer(3, renderer);
+
+						vertexBuffers := [
+							vertexBuf,
+							normalBuf,
+							tangentsBuf,
+							colorBuf,
+							uv0Buf,
+							uv1Buf,
+							uv2Buf,
+							uv3Buf
+						];
+						offsets:= uint64:[0, 0, 0, 0, 0, 0, 0, 0];
+
 						vkCmdBindVertexBuffers(
 							commandBuffer, 
 							uint32(0), 
-							uint32(1), 
+							uint32(8), 
 							fixed vertexBuffers, 
 							fixed offsets
 						);
 						
 						if (indexAlloc)
 						{
+							indexBuf := indexAlloc.data.buffer;
 							vkCmdBindIndexBuffer(
-								commandBuffer, 
-								indexAlloc.data.buffer, 
-								0, 
+								commandBuffer,
+								indexBuf,
+								0,
 								geo.indexKind
 							);
 						}

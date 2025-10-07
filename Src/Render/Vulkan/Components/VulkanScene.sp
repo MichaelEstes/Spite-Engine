@@ -5,7 +5,7 @@ import Array
 import Resource
 import ImageManager
 import Matrix
-
+import Common
 
 MaxMaterialTextures := 8;
 MaxUVs := 4;
@@ -32,10 +32,9 @@ state VulkanGeometry
 {
 	vertexHandle: VulkanAllocHandle,
 	indexHandle: VulkanAllocHandle,
+
 	normals: VulkanAllocHandle,
-
 	tangents: VulkanAllocHandle,
-
 	color: VulkanAllocHandle,
 
 	uvs: [MaxUVs]VulkanAllocHandle = [
@@ -54,6 +53,7 @@ GeometryAttributeFlags VulkanGeometry::GetAttributesFlags()
 {
 	mask := GeometryAttributeFlags.None;
 
+	mask |= (this.normals.handle != 0) * GeometryAttributeFlags.Normal;
 	mask |= (this.tangents.handle != 0) * GeometryAttributeFlags.Tangent;
 	mask |= (this.color.handle != 0) * GeometryAttributeFlags.Color;
 
@@ -63,6 +63,30 @@ GeometryAttributeFlags VulkanGeometry::GetAttributesFlags()
 	}
 
 	return mask;
+}
+
+*VkBuffer_T VulkanGeometry::GetNormalBuffer(renderer: *VulkanRenderer) =>
+{
+	if (this.normals.handle) return renderer.allocator.GetAllocation(this.normals).data.buffer;
+	return renderer.emptyVertexBuffers.normals;
+}
+
+*VkBuffer_T VulkanGeometry::GetTagentBuffer(renderer: *VulkanRenderer) =>
+{
+	if (this.tangents.handle) return renderer.allocator.GetAllocation(this.tangents).data.buffer;
+	return renderer.emptyVertexBuffers.tangents;
+}
+
+*VkBuffer_T VulkanGeometry::GetColorBuffer(renderer: *VulkanRenderer) =>
+{
+	if (this.color.handle) return renderer.allocator.GetAllocation(this.color).data.buffer;
+	return renderer.emptyVertexBuffers.color;
+}
+
+*VkBuffer_T VulkanGeometry::GetUVBuffer(index: uint32, renderer: *VulkanRenderer) =>
+{
+	if (this.uvs[index].handle) return renderer.allocator.GetAllocation(this.uvs[index]).data.buffer;
+	return renderer.emptyVertexBuffers.uv;
 }
 
 state VulkanTexture
@@ -231,6 +255,14 @@ VulkanGeometry UploadGeometry(geo: Geometry, renderer: *VulkanRenderer)
 
 	normalSize := uint(geo.normals.count * (#sizeof Vec3));
 	tangentSize := uint(geo.tangents.count * (#sizeof Vec4));
+	colorSize := uint(geo.colors.count * (#sizeof Color));
+
+	uvSizes := uint:[
+		geo.uvs[0].count * (#sizeof Vec2),
+		geo.uvs[1].count * (#sizeof Vec2),
+		geo.uvs[2].count * (#sizeof Vec2),
+		geo.uvs[3].count * (#sizeof Vec2)
+	];
 	
 	vertexBuffer := CreateVkBuffer(device, VertexBufferCreateInfo(vertexSize));
 	vertexBufferHandle := renderer.allocator.AllocBuffer(vertexBuffer, VulkanMemoryFlags.GPU);
@@ -262,6 +294,27 @@ VulkanGeometry UploadGeometry(geo: Geometry, renderer: *VulkanRenderer)
 		if (geo.indexKind == IndexKind.I32)
 		{
 			vulkanGeo.indexKind = VkIndexType.VK_INDEX_TYPE_UINT32;
+		}
+	}
+
+	for (i .. MaxUVs)
+	{
+		uvSize := uvSizes[i];
+		if (uvSize)
+		{
+			uvArr := geo.uvs[i];
+
+			uvBuffer := CreateVkBuffer(device, VertexBufferCreateInfo(uvSize));
+			uvBufferHandle := renderer.allocator.AllocBuffer(uvBuffer, VulkanMemoryFlags.GPU);
+			renderer.stagingBuffer.StagedBufferCopy(
+				renderer.device,
+				geo.uvs[i][0]@ as *byte
+				uvSize,
+				uvBuffer,
+				commands,
+				queue
+			);
+			vulkanGeo.uvs[i] = uvBufferHandle;
 		}
 	}
 
@@ -304,7 +357,7 @@ VulkanTexture UploadTexture(textureMap: TextureMap, renderer: *VulkanRenderer, f
 	vulkanImage := CreateVkImage(device, imageInfo);
 	vulkanImageHandle := renderer.allocator.AllocImage(vulkanImage, VulkanMemoryFlags.GPU);
 	
-	vkQueueWaitIdle(graphicsQueue);
+	//vkQueueWaitIdle(graphicsQueue);
 	
 	TransitionImageLayout(
 		device, commandPool, graphicsQueue, vulkanImage, 
@@ -381,7 +434,11 @@ VulkanMaterial UploadMaterial(mat: Material, renderer: *VulkanRenderer)
 	vulkanMat.vertShaderHandle = UseShader(device, mat.vertShader);
 	vulkanMat.fragShaderHandle = UseShader(device, mat.fragShader);
 
-	if (!!mat.color)
+	if (!mat.color)
+	{
+		vulkanMat.textures[0] = renderer.emptyTextures.color
+	}
+	else
 	{
 		log "Uploading color texture";
 		colorTex := UploadTexture(mat.color, renderer, VkFormat.VK_FORMAT_R8G8B8A8_SRGB);

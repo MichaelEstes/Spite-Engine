@@ -204,3 +204,147 @@ TransitionImageLayout(device: *VkDevice_T, commandPool: *VkCommandPool_T,
 
 	EndCommands(device, commandPool, commandBuffer, queue);
 }
+
+state EmptyTextures
+{
+	color: VulkanTexture, 
+	normal: VulkanTexture, 
+	metallicRoughness: VulkanTexture, 
+	occlusion: VulkanTexture, 
+	emissive: VulkanTexture, 
+}
+
+EmptyTextures::CreateInternal(textureRef: *VulkanTexture, renderer: VulkanRenderer,
+							  format: VkFormat, pixel: *byte, size: uint32)
+{
+	vulkanTexture := VulkanTexture();
+
+	device := renderer.device;
+	commands := renderer.transferCommands;
+	transferQueue := renderer.queues.transferQueue;
+	commandPool := renderer.graphicsCommands.commandPool;
+	graphicsQueue := renderer.queues.graphicsQueue;
+
+	imageInfo := VkImageCreateInfo();
+    imageInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VkImageType.VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = 1;
+    imageInfo.extent.height = 1;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;
+    imageInfo.tiling = VkImageTiling.VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+					  VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageInfo.samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+
+	vulkanImage := CreateVkImage(device, imageInfo);
+	vulkanImageHandle := renderer.allocator.AllocImage(vulkanImage, VulkanMemoryFlags.GPU);
+
+	TransitionImageLayout(
+		device, commandPool, graphicsQueue, vulkanImage, 
+		VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+		format
+	);
+
+	renderer.stagingBuffer.StagedImageCopy(
+		device,
+		pixel,
+		size,
+		vulkanImage,
+		1, 
+		1,
+		commands,
+		transferQueue
+	);
+
+	TransitionImageLayout(
+		device, commandPool, graphicsQueue, vulkanImage,
+		VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+		format
+	);
+
+	imageViewCreateInfo := VkImageViewCreateInfo();
+	imageViewCreateInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageViewCreateInfo.image = vulkanImage;
+	imageViewCreateInfo.viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
+	imageViewCreateInfo.format = format;
+	imageViewCreateInfo.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+	imageViewCreateInfo.subresourceRange.levelCount = uint32(1);
+	imageViewCreateInfo.subresourceRange.layerCount = uint32(1);
+
+	vulkanImageView := CreateVkImageView(device, imageViewCreateInfo);
+
+	samplerInfo := VkSamplerCreateInfo();
+	samplerInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VkFilter.VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VkFilter.VK_FILTER_LINEAR;
+	samplerInfo.addressModeU = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.anisotropyEnable = VkTrue;
+	samplerInfo.maxAnisotropy = vulkanInstance.deviceProperties[renderer.deviceIndex].limits.maxSamplerAnisotropy;
+	samplerInfo.borderColor = VkBorderColor.VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VkFalse;
+	samplerInfo.compareEnable = VkFalse;
+	samplerInfo.compareOp = VkCompareOp.VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VkSamplerMipmapMode.VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0;
+	samplerInfo.minLod = 0.0;
+	samplerInfo.maxLod = 0.0;
+
+	vulkanSampler: *VkSampler_T = null;
+	CheckResult(
+		vkCreateSampler(device, samplerInfo@, null, vulkanSampler@),
+		"EmptyTextures::CreateInternal Error creating Vulkan texture sampler"
+	);
+
+	vulkanTexture.image = vulkanImage;
+	vulkanTexture.imageView = vulkanImageView;
+	vulkanTexture.sampler = vulkanSampler;
+	vulkanTexture.layout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	vulkanTexture.imageAlloc = vulkanImageHandle;
+
+	textureRef~ = vulkanTexture;
+}
+
+EmptyTextures::Init(renderer: VulkanRenderer)
+{
+	this.CreateInternal(
+		this.color@, renderer, 
+		VkFormat.VK_FORMAT_R8G8B8A8_SRGB,
+		uint32(0xFFFFFFFF)@ as *byte, 
+		4
+	);
+
+	this.CreateInternal(
+		this.normal@, renderer, 
+		VkFormat.VK_FORMAT_R8G8B8A8_UNORM,
+		fixed ubyte:[128, 128, 255, 255], 
+		4
+	);
+
+	this.CreateInternal(
+		this.metallicRoughness@, renderer, 
+		VkFormat.VK_FORMAT_R8G8B8A8_UNORM,
+		fixed ubyte:[0, 255, 0, 255], 
+		4
+	);
+
+	this.CreateInternal(
+		this.occlusion@, renderer, 
+		VkFormat.VK_FORMAT_R8G8B8A8_UNORM,
+		uint32(0xFFFFFFFF)@ as *byte, 
+		4
+	);
+
+	this.CreateInternal(
+		this.emissive@, renderer, 
+		VkFormat.VK_FORMAT_R8G8B8A8_SRGB,
+		fixed ubyte:[0, 0, 0, 255],
+		4
+	);
+}

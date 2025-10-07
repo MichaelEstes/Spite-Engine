@@ -27,7 +27,7 @@ layout(location = 1) out vec2 outUv0;
 void main() 
 {
     gl_Position = scene.proj * scene.view * model.model * vec4(position, 1.0);
-    outColor = vec4(1.0, 0.0, 0.0, 1.0);
-    //outColor = color;
+
+    outColor = color;
     outUv0 = uv0;
 }

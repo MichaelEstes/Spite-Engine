@@ -10,12 +10,13 @@ MaxVertexAttributes := 8;
 enum GeometryAttributeFlags: uint16
 {
 	None = 0,
-	Tangent = 1 << 0,
-    Color = 1 << 1,
-    UV0 = 1 << 2,
-    UV1 = 1 << 3,
-    UV2 = 1 << 4,
-    UV3= 1 << 5,
+	Normal = 1 << 0,
+	Tangent = 1 << 1,
+    Color = 1 << 2,
+    UV0 = 1 << 3,
+    UV1 = 1 << 4,
+    UV2 = 1 << 5,
+    UV3= 1 << 6,
 }
 
 enum VulkanAlphaMode: ubyte
