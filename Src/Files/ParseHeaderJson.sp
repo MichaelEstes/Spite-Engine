@@ -168,8 +168,9 @@ ParseHeaderJSON(file: string, outFile: string)
 
 	str := "";
 
+	str.AppendIn("extern\n{")
 	str.AppendIn(PrintFunctions(functions));
-	str.AppendIn("\n");
+	str.AppendIn("}\n");
 	str.AppendIn(PrintEnums(enums));
 	str.AppendIn(PrintStructs(structs));
 

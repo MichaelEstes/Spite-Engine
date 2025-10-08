@@ -1,6 +1,7 @@
 package VulkanRenderer
 
 import Vec
+import Common
 
 *VkBuffer_T CreateVkBuffer(device: *VkDevice_T, createInfo: VkBufferCreateInfo)
 {
@@ -61,10 +62,10 @@ EmptyVertexBuffers::Init(renderer: VulkanRenderer)
 		Vec4(1.0, 0.0, 0.0, 1.0)
 	);
 
-	this.CreateInternal<Vec4>(
+	this.CreateInternal<Color>(
 		renderer, 
 		this.color@, this.colorHandle@, 
-		Vec4(1.0, 1.0, 1.0, 1.0)
+		Color(1.0, 1.0, 1.0, 1.0)
 	);
 
 	this.CreateInternal<Vec2>(

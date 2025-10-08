@@ -170,6 +170,7 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 	depthTestEnable := VkTrue;
 	depthWriteEnable := VkTrue;
 	blendState := ColorBlendAttachment();
+	geoFlags := meshState.geometryFlags;
 
 	if (meshState.GetAlphaMode() == VulkanAlphaMode.Blend)
 	{
@@ -182,19 +183,33 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 	layoutKey := PipelineLayoutKey(meshState.vertShaderHandle, meshState.fragShaderHandle);
 	layout := FindOrCreatePipelineLayout(device, layoutKey, layoutCache);
 
+	perVertex := VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX;
+	perInstance := VkVertexInputRate.VK_VERTEX_INPUT_RATE_INSTANCE;
+	rates := [perInstance, perVertex];
+
+	normalRate := rates[(geoFlags & GeometryAttributeFlags.Normal) != 0];
+	tangentRate := rates[(geoFlags & GeometryAttributeFlags.Tangent) != 0];
+	colorRate := rates[(geoFlags & GeometryAttributeFlags.Color) != 0];
+	uvRates := [
+		rates[(geoFlags & GeometryAttributeFlags.UV0) != 0],
+		rates[(geoFlags & GeometryAttributeFlags.UV1) != 0],
+		rates[(geoFlags & GeometryAttributeFlags.UV2) != 0],
+		rates[(geoFlags & GeometryAttributeFlags.UV3) != 0],
+	];
+
 	// position
-	vertexInputBindings[0] = VulkanVertexInputBinding(0, uint16(#sizeof Vec3), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	vertexInputBindings[0] = VulkanVertexInputBinding(0, uint16(#sizeof Vec3), perVertex);
 	//normal
-	vertexInputBindings[1] = VulkanVertexInputBinding(1, uint16(#sizeof Vec3), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	vertexInputBindings[1] = VulkanVertexInputBinding(1, uint16(#sizeof Vec3), normalRate);
 	//tangents
-	vertexInputBindings[2] = VulkanVertexInputBinding(2, uint16(#sizeof Vec4), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	vertexInputBindings[2] = VulkanVertexInputBinding(2, uint16(#sizeof Vec4), tangentRate);
 	//color
-	vertexInputBindings[3] = VulkanVertexInputBinding(3, uint16(#sizeof Vec4), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	vertexInputBindings[3] = VulkanVertexInputBinding(3, uint16(#sizeof Vec4), colorRate);
 	//uv0-3
-	vertexInputBindings[4] = VulkanVertexInputBinding(4, uint16(#sizeof Vec2), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
-	vertexInputBindings[5] = VulkanVertexInputBinding(5, uint16(#sizeof Vec2), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
-	vertexInputBindings[6] = VulkanVertexInputBinding(6, uint16(#sizeof Vec2), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
-	vertexInputBindings[7] = VulkanVertexInputBinding(7, uint16(#sizeof Vec2), VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX);
+	vertexInputBindings[4] = VulkanVertexInputBinding(4, uint16(#sizeof Vec2), uvRates[0]);
+	vertexInputBindings[5] = VulkanVertexInputBinding(5, uint16(#sizeof Vec2), uvRates[1]);
+	vertexInputBindings[6] = VulkanVertexInputBinding(6, uint16(#sizeof Vec2), uvRates[2]);
+	vertexInputBindings[7] = VulkanVertexInputBinding(7, uint16(#sizeof Vec2), uvRates[3]);
 	
 	// position
 	vertexInputAttributes[0] = VulkanVertexAttributeBinding(0, 0, VkFormat.VK_FORMAT_R32G32B32_SFLOAT, 0);

@@ -104,6 +104,8 @@ state VulkanMaterial
 	textures: [MaxMaterialTextures]VulkanTexture,
 	textureDescSet: *VkDescriptorSet_T,
 
+	matData: MaterialUBO,
+
 	vertShaderHandle: ResourceHandle,
 	fragShaderHandle: ResourceHandle,
 
@@ -434,6 +436,14 @@ VulkanMaterial UploadMaterial(mat: Material, renderer: *VulkanRenderer)
 	vulkanMat.vertShaderHandle = UseShader(device, mat.vertShader);
 	vulkanMat.fragShaderHandle = UseShader(device, mat.fragShader);
 
+	vulkanMat.matData.baseColor = mat.baseColor;
+	vulkanMat.matData.emissiveFactor = mat.emissiveFactor;
+	vulkanMat.matData.normalScale = mat.normalScale;
+	vulkanMat.matData.metallicFactor = mat.metallicFactor;
+	vulkanMat.matData.roughnessFactor = mat.roughnessFactor;
+	vulkanMat.matData.occlusionStrength = mat.occlusionStrength;
+	vulkanMat.matData.alphaCutoff = mat.alphaCutoff;
+
 	if (!mat.color)
 	{
 		vulkanMat.textures[0] = renderer.emptyTextures.color
@@ -467,7 +477,7 @@ CreateMaterialDescSet(mat: VulkanMaterial, renderer: *VulkanRenderer)
 	setLayouts := layoutCache.descLayoutSetMap.Find(key);
 	assert setLayouts;
 
-	textureDescSetLayout := setLayouts~[2];
+	textureDescSetLayout := setLayouts~[3];
 
 	allocInfo := VkDescriptorSetAllocateInfo();
 	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;

@@ -41,7 +41,7 @@ state SharedUBO<Type>
 	UBOs: [FrameCount]*Type,
 }
 
-SharedUBO::Init(device: *VkDevice_T, allocator: *VulkanAllocator, binding: uint32)
+SharedUBO::Init(device: *VkDevice_T, allocator: *VulkanAllocator, binding: uint32, stageFlags: VkShaderStageFlagBits)
 {
 	poolSizes := [VkDescriptorPoolSize(),];
 	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -61,8 +61,7 @@ SharedUBO::Init(device: *VkDevice_T, allocator: *VulkanAllocator, binding: uint3
 	layoutBinding.binding = 0;
 	layoutBinding.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	layoutBinding.descriptorCount = 1;
-	layoutBinding.stageFlags = VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT;
-							   //| VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT;
+	layoutBinding.stageFlags = stageFlags;
 	
 	layoutInfo := VkDescriptorSetLayoutCreateInfo();
 	layoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;

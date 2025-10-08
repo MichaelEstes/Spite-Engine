@@ -57,7 +57,8 @@ state VulkanRenderer
 	
 	sceneShared: SharedUBO<SceneUBO>,
 	modelShared: SharedUBO<ModelUBO>,
-
+	materialShared: SharedUBO<MaterialUBO>,
+	
 	materialPool: *VkDescriptorPool_T,
 
 	emptyVertexBuffers: EmptyVertexBuffers,
@@ -125,8 +126,9 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 		FrameCount
 	);
 
-	vulkanRenderer.sceneShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0);
-	vulkanRenderer.modelShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0);
+	vulkanRenderer.sceneShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
+	vulkanRenderer.modelShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
+	vulkanRenderer.materialShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT);
 	vulkanRenderer.CreateMaterialDescPool();
 
 	vulkanRenderer.emptyVertexBuffers.Init(vulkanRenderer);

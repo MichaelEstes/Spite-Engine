@@ -50,9 +50,14 @@ colorPass := RegisterRenderPass(
 				renderPass := renderer.CastDriverRenderPass(context.driverRenderpass);
 				allocator := renderer.allocator;
 				frame := renderer.Frame();
+
 				sceneDescSet := renderer.sceneShared.GetDescSet(frame);
+				
 				modelShared := renderer.modelShared;
 				modelDescSet := modelShared.GetDescSet(frame);
+				
+				materialShared := renderer.materialShared;
+				materialDescSet := materialShared.GetDescSet(frame);
 
 				commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 
@@ -103,13 +108,15 @@ colorPass := RegisterRenderPass(
 						modelUBO.model = worldTransform.mat;
 						modelShared.Update(frame, modelUBO);
 
+						materialShared.Update(frame, mat.matData);
+
 						vkCmdBindDescriptorSets(
 							commandBuffer,
 							VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS,
 							pipelineLayout,
 							uint32(1),
-							uint32(2),
-							fixed [modelDescSet, mat.textureDescSet],
+							uint32(3),
+							fixed [modelDescSet, materialDescSet, mat.textureDescSet],
 							uint32(0),
 							null
 						);
@@ -158,10 +165,7 @@ colorPass := RegisterRenderPass(
 								0,
 								geo.indexKind
 							);
-						}
-						
-						if (indexAlloc)
-						{
+
 							vkCmdDrawIndexed(commandBuffer, geo.indexCount, uint32(1), uint32(0), uint32(0), uint32(0));
 						}
 						else

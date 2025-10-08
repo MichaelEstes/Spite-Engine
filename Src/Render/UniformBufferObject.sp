@@ -1,6 +1,8 @@
 package UniformBufferObject
 
 import Matrix
+import Vec
+import Common
 
 state UniformBufferObject
 {
@@ -18,4 +20,16 @@ state SceneUBO
 state ModelUBO
 {
 	model: Matrix4
+}
+
+state MaterialUBO
+{
+	baseColor: Color,
+	emissiveFactor: Vec3,
+
+	normalScale: float32,
+	metallicFactor: float32,
+	roughnessFactor: float32,
+	occlusionStrength: float32,
+	alphaCutoff: float32
 }
