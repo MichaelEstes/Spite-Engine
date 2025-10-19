@@ -73,6 +73,8 @@ _ := SceneRegistry.RegisterScene(
 			gltfEntities
 		);
 
+		log "Loaded Main Scene";
+
 	},
 	"Main Scene"
 )

@@ -48,7 +48,7 @@ state Material
 	vertShader: string,
 	fragShader: string,
 
-	baseColor: Color,
+	baseColor: Color = Color(1.0, 1.0, 1.0, 1.0),
 	emissiveFactor: Vec3,
 
 	normalScale := float32(1.0),

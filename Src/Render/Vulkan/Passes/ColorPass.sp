@@ -52,10 +52,7 @@ colorPass := RegisterRenderPass(
 				frame := renderer.Frame();
 
 				sceneDescSet := renderer.sceneShared.GetDescSet(frame);
-				
-				modelShared := renderer.modelShared;
-				modelDescSet := modelShared.GetDescSet(frame);
-				
+								
 				materialShared := renderer.materialShared;
 				materialDescSet := materialShared.GetDescSet(frame);
 
@@ -101,30 +98,37 @@ colorPass := RegisterRenderPass(
 						geo := mesh.geometry;
 						mat := mesh.material;
 
+						geoAttrFlags := geo.GetAttributesFlags();
+						vertexAlloc := allocator.GetAllocation(geo.vertexHandle);
+						indexAlloc := allocator.GetAllocation(geo.indexHandle);
+
 						worldTransform := scene.GetComponentDirect<WorldTransform>(entity, WorldTransformComponent);
 						if (!worldTransform) continue;
 				
 						modelUBO := ModelUBO();
 						modelUBO.model = worldTransform.mat;
-						modelShared.Update(frame, modelUBO);
 
-						materialShared.Update(frame, mat.matData);
+						vkCmdPushConstants(
+							commandBuffer,
+							pipelineLayout,
+							VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT,
+							0,
+							#sizeof ModelUBO,
+							modelUBO@
+						);
+
+						materialShared.Update(frame, mat.data);
 
 						vkCmdBindDescriptorSets(
 							commandBuffer,
 							VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS,
 							pipelineLayout,
 							uint32(1),
-							uint32(3),
-							fixed [modelDescSet, materialDescSet, mat.textureDescSet],
+							uint32(2),
+							fixed [materialDescSet, mat.textureDescSet],
 							uint32(0),
 							null
 						);
-
-						geoAttrFlags := geo.GetAttributesFlags();
-
-						vertexAlloc := allocator.GetAllocation(geo.vertexHandle);
-						indexAlloc := allocator.GetAllocation(geo.indexHandle);
 
 						vertexBuf := vertexAlloc.data.buffer;
 
@@ -173,7 +177,7 @@ colorPass := RegisterRenderPass(
 						
 						}
 					}
-				}
+				}				
 			},
 			RenderPassStage.Graphics,
 			scene

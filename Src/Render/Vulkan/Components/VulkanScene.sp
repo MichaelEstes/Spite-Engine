@@ -10,6 +10,10 @@ import Common
 MaxMaterialTextures := 8;
 MaxUVs := 4;
 
+SceneSet := 0;
+MaterialSet := 1;
+TexturesSet := 2;
+
 geometryKindToTopologyTable := [
 	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
 	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
@@ -67,7 +71,12 @@ GeometryAttributeFlags VulkanGeometry::GetAttributesFlags()
 
 *VkBuffer_T VulkanGeometry::GetNormalBuffer(renderer: *VulkanRenderer) =>
 {
-	if (this.normals.handle) return renderer.allocator.GetAllocation(this.normals).data.buffer;
+	if (this.normals.handle) 
+	{
+		log "GETTING NORMAL BUFFER INCORRECT";
+		return renderer.emptyVertexBuffers.normals;
+		//return renderer.allocator.GetAllocation(this.normals).data.buffer;
+	}
 	return renderer.emptyVertexBuffers.normals;
 }
 
@@ -104,7 +113,7 @@ state VulkanMaterial
 	textures: [MaxMaterialTextures]VulkanTexture,
 	textureDescSet: *VkDescriptorSet_T,
 
-	matData: MaterialUBO,
+	data: MaterialUBO,
 
 	vertShaderHandle: ResourceHandle,
 	fragShaderHandle: ResourceHandle,
@@ -214,7 +223,7 @@ UploadMesh(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer)
 		}
 
 		meshArr := meshMap.Find(pipelineMeshKey);
-		meshArr.Add(vulkanMesh);
+		index := meshArr.Add(vulkanMesh);
 	}
 }
 
@@ -436,13 +445,13 @@ VulkanMaterial UploadMaterial(mat: Material, renderer: *VulkanRenderer)
 	vulkanMat.vertShaderHandle = UseShader(device, mat.vertShader);
 	vulkanMat.fragShaderHandle = UseShader(device, mat.fragShader);
 
-	vulkanMat.matData.baseColor = mat.baseColor;
-	vulkanMat.matData.emissiveFactor = mat.emissiveFactor;
-	vulkanMat.matData.normalScale = mat.normalScale;
-	vulkanMat.matData.metallicFactor = mat.metallicFactor;
-	vulkanMat.matData.roughnessFactor = mat.roughnessFactor;
-	vulkanMat.matData.occlusionStrength = mat.occlusionStrength;
-	vulkanMat.matData.alphaCutoff = mat.alphaCutoff;
+	vulkanMat.data.baseColor = mat.baseColor;
+	vulkanMat.data.emissiveFactor = mat.emissiveFactor;
+	vulkanMat.data.normalScale = mat.normalScale;
+	vulkanMat.data.metallicFactor = mat.metallicFactor;
+	vulkanMat.data.roughnessFactor = mat.roughnessFactor;
+	vulkanMat.data.occlusionStrength = mat.occlusionStrength;
+	vulkanMat.data.alphaCutoff = mat.alphaCutoff;
 
 	if (!mat.color)
 	{
@@ -468,7 +477,7 @@ CreateMaterialDescSet(mat: VulkanMaterial, renderer: *VulkanRenderer)
 {
 	device := renderer.device;
 	layoutCache := renderer.pipelineLayoutCache~;
-	pool := renderer.materialPool;
+	pool := renderer.texturePool;
 	
 	key := PipelineLayoutKey(mat.vertShaderHandle, mat.fragShaderHandle);
 
@@ -477,7 +486,7 @@ CreateMaterialDescSet(mat: VulkanMaterial, renderer: *VulkanRenderer)
 	setLayouts := layoutCache.descLayoutSetMap.Find(key);
 	assert setLayouts;
 
-	textureDescSetLayout := setLayouts~[3];
+	textureDescSetLayout := setLayouts~[TexturesSet];
 
 	allocInfo := VkDescriptorSetAllocateInfo();
 	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;

@@ -458,7 +458,6 @@ Scene::ClearTagComponent(tagComponent: TagComponent)
 
 Scene::SetSingleton<Type>(value: Type)
 {
-	log "Singleton set";
 	this.singletonComponents.Insert<Type>(value);
 	component := instance.GetComponent<Type>();
 

@@ -1,5 +1,6 @@
 package VulkanRenderer
 
+import Array
 import SparseSet
 import Resource
 
@@ -67,6 +68,35 @@ MergeShaderStage(reflectDescSet: FixedArray<*SpvReflectDescriptorSet>,
 	}
 }
 
+MergePushConstants(module: SpvReflectShaderModule, pushConstantRanges: Array<VkPushConstantRange>)
+{
+	count := module.push_constant_block_count;
+	if (!count) return;
+
+	if (count > pushConstantRanges.capacity)
+	{
+		pushConstantRanges.SizeTo(count);
+	}
+
+	for (i .. count)
+	{
+		if (pushConstantRanges.count > i)
+		{
+			pushConstantRanges[i].stageFlags |= module.shader_stage;
+		}
+		else
+		{
+			block := module.push_constant_blocks[i];
+
+			range := VkPushConstantRange();
+			range.offset = block.offset;
+			range.size = block.size;
+			range.stageFlags = module.shader_stage;
+			pushConstantRanges.Add(range);
+		}
+	}
+}
+
 *VkPipelineLayout_T CreatePipelineLayoutFromKey(device: *VkDevice_T, key: PipelineLayoutKey,
 												cache: VulkanPipelineLayoutCache)
 {
@@ -80,10 +110,10 @@ MergeShaderStage(reflectDescSet: FixedArray<*SpvReflectDescriptorSet>,
 		delete mergedSets;
 	}
 
-	stageFlag := vertShaderRes.reflectModule.shader_stage;
-	MergeShaderStage(vertShaderRes.reflectDescSet, mergedSets, stageFlag);
-	stageFlag = fragShaderRes.reflectModule.shader_stage;
-	MergeShaderStage(fragShaderRes.reflectDescSet, mergedSets, stageFlag);
+	vertStageFlag := vertShaderRes.reflectModule.shader_stage;
+	fragStageFlag := fragShaderRes.reflectModule.shader_stage;
+	MergeShaderStage(vertShaderRes.reflectDescSet, mergedSets, vertStageFlag);
+	MergeShaderStage(fragShaderRes.reflectDescSet, mergedSets, fragStageFlag);
 
 	maxSetIndex := 0;
 
@@ -127,12 +157,17 @@ MergeShaderStage(reflectDescSet: FixedArray<*SpvReflectDescriptorSet>,
 		setLayoutBindingArr.Clear();
 	}
 
+	pushConstantRanges := Array<VkPushConstantRange>();
+	defer delete pushConstantRanges;
+	MergePushConstants(vertShaderRes.reflectModule, pushConstantRanges);
+	MergePushConstants(fragShaderRes.reflectModule, pushConstantRanges);
+
 	pipelineLayoutInfo := VkPipelineLayoutCreateInfo();
 	pipelineLayoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = descSets.count;
 	pipelineLayoutInfo.pSetLayouts = descSets[0]@;
-	pipelineLayoutInfo.pushConstantRangeCount = uint32(0);
-	pipelineLayoutInfo.pPushConstantRanges = null;
+	pipelineLayoutInfo.pushConstantRangeCount = pushConstantRanges.count;
+	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges[0]@;
 
 	pipelineLayout: *VkPipelineLayout_T = null;
 	CheckResult(

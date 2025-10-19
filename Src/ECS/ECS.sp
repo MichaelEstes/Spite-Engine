@@ -277,7 +277,6 @@ ECS::RunSystems(systems: Array<System>)
 		}
 	}
 
-	Fiber.FlushMainThreadJobs();
 	Fiber.WaitForHandle(handle);
 }
 
@@ -297,7 +296,6 @@ ECS::RunFrameSystems(systems: Array<FrameSystem>)
 		}, sceneSystem, handle@, Fiber.JobPriority.High);
 	}
 
-	Fiber.FlushMainThreadJobs();
 	Fiber.WaitForHandle(handle);
 }
 

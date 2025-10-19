@@ -61,41 +61,38 @@ GLTFResourceManagerID := Resource.RegisterResourceManager(GLTFResourceManager@);
 
 ResourceKey GetGLTFKey(param: GLTFLoadParam) => ResourceKey(param.file.Copy());
 
-GLTFManagerLoad(param: *ResourceParam<GLTFResource, GLTFLoadParam>)
+GLTFManagerLoad(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>)
 {
-	Fiber.RunOnMainFiber(::(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>) 
-	{
-		param := resourceParam.param;
-		handle := resourceParam.handle;
-		resourceManager := resourceParam.manager;
-		resource := resourceManager.GetResource(handle).data@;
+	param := resourceParam.param;
+	handle := resourceParam.handle;
+	resourceManager := resourceParam.manager;
+	resource := resourceManager.GetResource(handle).data@;
 	
-		file := param.file;
-		scene := param.scene;
-		outEntities := param.outEntities;
-
-		gltf := LoadGLTF(file);
-
-		gltfData := GLTFLoadData();
-		gltfData.scene = scene;
-		gltfData.resource = resource;
-		gltfData.handle = handle;
-
-		for (gltfScene in gltf.scenes)
+	file := param.file;
+	scene := param.scene;
+	outEntities := param.outEntities;
+	
+	gltf := LoadGLTF(file);
+	
+	gltfData := GLTFLoadData();
+	gltfData.scene = scene;
+	gltfData.resource = resource;
+	gltfData.handle = handle;
+	
+	for (gltfScene in gltf.scenes)
+	{
+		sceneEntity := scene.CreateEntity();
+		scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
+	
+		outEntities.Add(sceneEntity);
+	
+		for (nodeIndex in gltfScene.nodes)
 		{
-			sceneEntity := scene.CreateEntity();
-			scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
-
-			outEntities.Add(sceneEntity);
-
-			for (nodeIndex in gltfScene.nodes)
-			{
-				NodeToECS(gltfData, gltf, scene, nodeIndex, sceneEntity, outEntities);
-			}
+			NodeToECS(gltfData, gltf, scene, nodeIndex, sceneEntity, outEntities);
 		}
-
-		resourceParam.onResourceLoad(resourceParam, ResourceResult.Loaded);
-	}, param);
+	}
+	
+	resourceParam.onResourceLoad(resourceParam, ResourceResult.Loaded);
 }
 
 ResourceHandle LoadGLTFResource(file: string, scene: *Scene, onLoad: ::(ResourceHandle, *GLTFLoadParam), outEntities: *Array<Entity> = null)
@@ -303,7 +300,6 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 	if (gltfMaterial.pbrMetallicRoughness)
 	{
 		pbr := gltfMaterial.pbrMetallicRoughness;
-		material.baseColor = pbr.baseColorFactor;
 		if (pbr.baseColorTexture)
 		{
 			baseColorTextureMap := LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
@@ -316,6 +312,7 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 			material.metallicRoughness = metallicRoughnessTextureMap;
 		}
 
+		material.baseColor = pbr.baseColorFactor;
 		material.metallicFactor = pbr.metallicFactor;
 		material.roughnessFactor = pbr.roughnessFactor;
 	}
@@ -324,12 +321,14 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 	{
 		normalTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.normalTexture.info.index);
 		material.normal = normalTextureMap;
+		material.normalScale = gltfMaterial.normalTexture.scale;
 	}
 
 	if (gltfMaterial.occlusionTexture)
 	{
 		occlusionTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.occlusionTexture.info.index);
 		material.occlusion = occlusionTextureMap;
+		material.occlusionStrength = gltfMaterial.occlusionTexture.strength
 	}
 
 	if (gltfMaterial.emissiveTexture)

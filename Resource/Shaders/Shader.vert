@@ -7,7 +7,7 @@ layout(set = 0, binding = 0) uniform SceneUBO
     mat4 proj;
 } scene;
 
-layout(set = 1, binding = 0) uniform ModelUBO 
+layout(push_constant) uniform Model 
 {
     mat4 model;
 } model;

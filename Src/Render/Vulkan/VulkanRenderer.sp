@@ -56,10 +56,10 @@ state VulkanRenderer
 	transferCommands: VulkanCommands,
 	
 	sceneShared: SharedUBO<SceneUBO>,
-	modelShared: SharedUBO<ModelUBO>,
 	materialShared: SharedUBO<MaterialUBO>,
 	
 	materialPool: *VkDescriptorPool_T,
+	texturePool: *VkDescriptorPool_T,
 
 	emptyVertexBuffers: EmptyVertexBuffers,
 	emptyTextures: EmptyTextures,
@@ -127,8 +127,8 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	);
 
 	vulkanRenderer.sceneShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
-	vulkanRenderer.modelShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
 	vulkanRenderer.materialShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT);
+
 	vulkanRenderer.CreateMaterialDescPool();
 
 	vulkanRenderer.emptyVertexBuffers.Init(vulkanRenderer);
@@ -285,7 +285,7 @@ VulkanRenderer::CreateMaterialDescPool()
 	poolInfo.maxSets = 1000;
 
 	CheckResult(
-		vkCreateDescriptorPool(this.device, poolInfo@, null, this.materialPool@),
+		vkCreateDescriptorPool(this.device, poolInfo@, null, this.texturePool@),
 		"VulkanRenderer::CreateMaterialDescPool Error allocating Vulkan descriptor pool"
 	);
 }
