@@ -4,7 +4,7 @@ import Math
 
 state VulkanStagingBuffer
 {
-	size: uint = 16 * 1024 * 1024,
+	size: uint = 32 * 1024 * 1024,
 	buffer: *VkBuffer_T,
 	mem: *VkDeviceMemory_T
 }

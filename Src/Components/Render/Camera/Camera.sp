@@ -29,8 +29,18 @@ Matrix4 Camera::GetViewMatrix()
 
 Camera::LookAt(target: Vec3, up: Vec3 = Vec3(0.0, 0.0, 1.0))
 {
-	rotMat := Matrix3(Matrix4().LookAt(this.position, target, up));
-	this.rotation.FromRotationMatrix(rotMat).Normalize();
+	pos := this.position;
+	forward := (target - pos).Normalize().vec;
+	right := forward.Cross(up).Normalize().vec;
+	trueUp := right.Cross(forward);
+
+	lookAtMat := Matrix3([
+		float32:[right.x, trueUp.x,	-forward.x],
+		float32:[right.y, trueUp.y,	-forward.y],
+		float32:[right.z, trueUp.z, -forward.z],
+	]);
+
+	this.rotation.FromRotationMatrix(lookAtMat).Normalize();
 }
 
 MainCameraComponent := ECS.RegisterComponent<Camera>(

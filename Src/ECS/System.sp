@@ -1,8 +1,9 @@
 package ECS
 
 import Array
+import SparseSet
 
-enum SystemStep: byte
+enum SystemStep: uint16
 {
 	Fixed,
 	PreFrame,
@@ -15,7 +16,7 @@ enum SystemStep: byte
 	Stop
 }
 
-enum FrameSystemStep: byte
+enum FrameSystemStep: uint16
 {
 	Start,
 	End
@@ -29,6 +30,18 @@ state System
 state FrameSystem
 {
 	run: ::(float)
+}
+
+state SystemID
+{
+	id: uint32,
+	step: SystemStep
+}
+
+state FrameSystemID
+{
+	id: uint32, 
+	step: FrameSystemStep
 }
 
 state Systems
@@ -45,4 +58,24 @@ state Systems
 	
 	onStart: Array<System>,
 	onStop: Array<System>
+}
+
+uint32 Systems::GetSystemCountForStep(step: SystemStep)
+{
+	count: uint32 = 0;
+
+	switch (step)
+	{
+		case (SystemStep.Fixed) count += this.onFixed.count;
+		case (SystemStep.PreFrame) count += this.onPreFrame.count;
+		case (SystemStep.Frame) count += this.onFrame.count;
+		case (SystemStep.PostFrame) count += this.onPostFrame.count;
+		case (SystemStep.PreDraw) count += this.onPreDraw.count;
+		case (SystemStep.Draw) count += this.onDraw.count;
+		case (SystemStep.Start) count += this.onStart.count;
+		case (SystemStep.Stop) count += this.onStop.count;
+		default log "Systems::GetSystemCountForStep Invalid step for system";
+	}
+
+	return count;
 }

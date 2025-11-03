@@ -47,10 +47,10 @@ TagComponent RegisterTagComponent(serializeName: string
 								  onEnter: ::(Entity, Scene) = null)
 			=> instance.RegisterTagComponent(serializeName, componentKind, onRemove, onEnter);
 
-{id: uint32, step: SystemStep} RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
+SystemID RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
 			=> instance.RegisterSystem(run, step);
 
-{id: uint32, step: FrameSystemStep} RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
+FrameSystemID RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
 			=> instance.RegisterFrameSystem(run, step);
 
 *void FrameAlloc<Type>(size: uint32) => instance.frameAllocator.Alloc(size);
@@ -78,7 +78,7 @@ state ECS
 {
 	frameAllocator := FrameAllocator(),
 	scenes := SparseSet<Scene>(),
-	systems: Systems,
+	systems := Systems(),
 
 	componentTypeMap := Map<*_Type, Component>(),
 	componentIDMap := SparseSet<Component>(),
@@ -133,17 +133,17 @@ TagComponent ECS::RegisterTagComponent(serializeName: string
 	return tagComponent;
 }
 
-{id: uint, step: SystemStep} ECS::RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
+SystemID ECS::RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
 {	
 	assert run != null, "Cannot register null systems";
 
 	system := {run} as System;
 	data := this.AddSystem(system, step);
-	this.ExpandSystemBuffer(data.id);
+	this.ExpandSystemBuffer(this.systems.GetSystemCountForStep(step));
 	return data;
 }
 
-{id: uint32, step: FrameSystemStep} ECS::RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
+FrameSystemID ECS::RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
 {	
 	assert run != null, "Cannot register null frame systems";
 
@@ -154,29 +154,31 @@ TagComponent ECS::RegisterTagComponent(serializeName: string
 	{
 		case (FrameSystemStep.Start) id = this.systems.frameStart.Add(system);
 		case (FrameSystemStep.End) id = this.systems.frameEnd.Add(system);
-		default log "Invalid step for frame system";
+		default log "ECS::RegisterFrameSystem Invalid step for frame system";
 	}
 	
 	this.ExpandSystemBuffer(id);
-	return {id, step};
+	return { id, step };
 }
 
-{id: uint32, step: SystemStep} ECS::AddSystem(system: System, step: SystemStep)
+SystemID ECS::AddSystem(system: System, step: SystemStep)
 {
+	id := uint32(0);
+	
 	switch (step)
 	{
-		case (SystemStep.Fixed) return { this.systems.onFixed.Add(system), step };
-		case (SystemStep.PreFrame) return { this.systems.onPreFrame.Add(system), step };
-		case (SystemStep.Frame) return { this.systems.onFrame.Add(system), step };
-		case (SystemStep.PostFrame) return { this.systems.onPostFrame.Add(system), step };
-		case (SystemStep.PreDraw) return { this.systems.onPreDraw.Add(system), step };
-		case (SystemStep.Draw) return { this.systems.onDraw.Add(system), step };
-		case (SystemStep.Start) return { this.systems.onStart.Add(system), step };
-		case (SystemStep.Stop) return { this.systems.onStop.Add(system), step };
-		default log "Invalid step for system";
+		case (SystemStep.Fixed) id = this.systems.onFixed.Add(system);
+		case (SystemStep.PreFrame) id = this.systems.onPreFrame.Add(system);
+		case (SystemStep.Frame) id = this.systems.onFrame.Add(system);
+		case (SystemStep.PostFrame) id = this.systems.onPostFrame.Add(system);
+		case (SystemStep.PreDraw) id = this.systems.onPreDraw.Add(system);
+		case (SystemStep.Draw) id = this.systems.onDraw.Add(system);
+		case (SystemStep.Start) id = this.systems.onStart.Add(system);
+		case (SystemStep.Stop) id = this.systems.onStop.Add(system);
+		default log "ECS::AddSystem Invalid step for system";
 	}
 
-	return { uint32(0), step };
+	return { id, step };
 }
 
 ECS::ExpandSystemBuffer(count: uint32)
@@ -258,7 +260,7 @@ ECS::OnTagComponentEnter(id: uint32, entity: Entity, scene: Scene)
 
 ECS::RunSystems(systems: Array<System>)
 {
-	count := this.scenes.count * systems.count
+	count := this.scenes.count * systems.count;
 	if (!count) return;
 
 	handle: *Fiber.JobHandle = null;
@@ -273,7 +275,7 @@ ECS::RunSystems(systems: Array<System>)
 				dt := instance.dt;
 				
 				system.run(scene~, dt);
-			}, sceneSystem, handle@, Fiber.JobPriority.High);
+			}, sceneSystem, handle@);
 		}
 	}
 
@@ -287,13 +289,12 @@ ECS::RunFrameSystems(systems: Array<FrameSystem>)
 	handle: *Fiber.JobHandle = null;
 	for (system in systems) 
 	{
-		sceneSystem := instance.systemBuffer.Insert({null, system@} as SceneSystem);
-		Fiber.AddJob(::(data: *SceneSystem) {
-			system := data.system;
+		Fiber.AddJob(::(system: *void) {
+			func := system as ::(float);
 			dt := instance.dt;
 			
-			(system~ as FrameSystem).run(dt);
-		}, sceneSystem, handle@, Fiber.JobPriority.High);
+			func(dt);
+		}, system.run as *void, handle@);
 	}
 
 	Fiber.WaitForHandle(handle);

@@ -20,7 +20,7 @@ _ := SceneRegistry.RegisterScene(
 		log "Loading Main Scene";
 		
 		camera := Camera();
-		camera.position = Vec3(2.0, 2.0, 2.0);
+		camera.position = Vec3(0.0, 0.0, 4.0);
 		camera.fov = Math.Deg2Rad(45.0);
 		camera.aspect = 1.0;
 		camera.near = 0.1;
@@ -44,7 +44,8 @@ _ := SceneRegistry.RegisterScene(
 
 		//model := "./Resource/Models/Box/Box.gltf";
 		//model := "./Resource/Models/BoxTextured/BoxTextured.gltf";
-		model := "./Resource/Models/BrainStem/BrainStem.gltf";
+		//model := "./Resource/Models/BrainStem/BrainStem.gltf";
+		model := "./Resource/Models/DamagedHelmet/DamagedHelmet.gltf";
 		log "Loading GLTF: ", model;
 		gltfEntities := AllocThreadParam<Array<Entity>>();
 		boxGLTFHandle := LoadGLTFResource(
@@ -62,13 +63,13 @@ _ := SceneRegistry.RegisterScene(
 				scene := param.scene;
 				log "Loaded gltf: ", outEntities~;
 
-				for (entity in outEntities)
-				{
-					rotate := RotateOverTime();
-					rotate.axis = Vec3(0.0, 0.0, 1.0) as Norm<Vec3>;
-					rotate.speed = 0.25;
-					scene.SetComponent<RotateOverTime>(entity, rotate);
-				}
+				//for (entity in outEntities)
+				//{
+				//	rotate := RotateOverTime();
+				//	rotate.axis = Vec3(0.0, 0.0, 1.0) as Norm<Vec3>;
+				//	rotate.speed = 0.25;
+				//	scene.SetComponent<RotateOverTime>(entity, rotate);
+				//}
 			},
 			gltfEntities
 		);

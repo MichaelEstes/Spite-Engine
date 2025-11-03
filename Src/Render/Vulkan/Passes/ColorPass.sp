@@ -104,18 +104,6 @@ colorPass := RegisterRenderPass(
 
 						worldTransform := scene.GetComponentDirect<WorldTransform>(entity, WorldTransformComponent);
 						if (!worldTransform) continue;
-				
-						modelUBO := ModelUBO();
-						modelUBO.model = worldTransform.mat;
-
-						vkCmdPushConstants(
-							commandBuffer,
-							pipelineLayout,
-							VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT,
-							0,
-							#sizeof ModelUBO,
-							modelUBO@
-						);
 
 						materialShared.Update(frame, mat.data);
 
@@ -158,6 +146,18 @@ colorPass := RegisterRenderPass(
 							uint32(8), 
 							fixed vertexBuffers, 
 							fixed offsets
+						);
+
+						modelUBO := ModelUBO();
+						modelUBO.model = worldTransform.mat;
+
+						vkCmdPushConstants(
+							commandBuffer,
+							pipelineLayout,
+							VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT,
+							0,
+							#sizeof ModelUBO,
+							modelUBO@
 						);
 						
 						if (indexAlloc)
