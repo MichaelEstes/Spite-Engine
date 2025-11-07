@@ -6,6 +6,7 @@ import Window
 import SDL
 import Event
 import SceneRegistry
+import Input
 
 running := false;
 
@@ -16,6 +17,8 @@ Initialize()
 
 	SDL.Init(SDL.InitFlags.VIDEO);
 	SDL.VulkanLoadLibrary(null);
+	
+	InitializeInput();
 
 	SDLEventEmitter.On(SDL.EventType.QUIT, ::(event: SDL.Event) {
 		running = false;

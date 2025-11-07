@@ -2,9 +2,10 @@ package SDL
 
 extern
 {
-	#link windows "./extern/SDL3_image";
-    #link linux "./extern/libSDL3_image";
+	#link windows "./extern/SDL3";
+    #link linux "./extern/libSDL3";
 
+    *bool SDL_GetKeyboardState(numKeys: *int);
 }
 
 enum Scancode: uint32
@@ -38,16 +39,16 @@ enum Scancode: uint32
     Y = 28,
     Z = 29,
 
-    1 = 30,
-    2 = 31,
-    3 = 32,
-    4 = 33,
-    5 = 34,
-    6 = 35,
-    7 = 36,
-    8 = 37,
-    9 = 38,
-    0 = 39,
+    _1 = 30,
+    _2 = 31,
+    _3 = 32,
+    _4 = 33,
+    _5 = 34,
+    _6 = 35,
+    _7 = 36,
+    _8 = 37,
+    _9 = 38,
+    _0 = 39,
 
     RETURN = 40,
     ESCAPE = 41,
@@ -358,3 +359,5 @@ enum Scancode: uint32
 
     COUNT = 512 // not a key, just marks the number of scancodes for array bounds 
 }
+
+*bool GetKeyboardState(numKeys: *int) => SDL_GetKeyboardState(numKeys);

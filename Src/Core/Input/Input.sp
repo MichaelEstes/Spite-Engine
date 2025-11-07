@@ -11,19 +11,28 @@ enum InputValueKind: uint32
 
 state InputKey
 {
-	key: uint32,
-	kind: InputValueKind
+	key: uint32
+}
+
+InputKey::(key: uint32)
+{
+	this.key = key;
 }
 
 state InputDevice
 {
-	buttonStates: Array<bool>,
-	linearStates: Array<float32>,
-	axisStates: Array<Vec2>,
-	
-	inputs: Array<InputKey>,
+	get: ::InputValue(InputKey, *any),
+	data: *void
+}
 
-	id: uint32
+InputDevice::(getter: ::InputValue(InputKey, *any))
+{
+	this.get = getter;
+}
+
+InputValue InputDevice::GetValueForKey(key: InputKey)
+{
+	return this.get(key, this.data);
 }
 
 state InputValue
@@ -36,12 +45,9 @@ state InputValue
 	kind: InputValueKind
 }
 
-state InputEvent
+InputValue::(kind: InputValueKind)
 {
-	value: InputValue,
-	
-	deviceID: uint32,
-	inputKey: uint32
+	this.kind = kind;
 }
 
 

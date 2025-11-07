@@ -7,20 +7,30 @@ inputManager := InputManager();
 
 state InputManager
 {
-	devices: Array<InputDevice>,
-
-	keyboardID: uint32,
-	mouseID: uint32
+	devices: Array<*InputDevice>,
 }
 
-state InputQuery
+InitializeInput()
 {
+	Keyboard.device = InputDevice(
+		::InputValue(key: InputKey, keyboardState: *bool) 
+		{
+			input := InputValue(InputValueKind.Button);
+			input.value.down = keyboardState[key.key]~;
+			return input;
+		}
+	);
+	Keyboard.device.data = SDL.GetKeyboardState(null);
 
+	inputManager.devices.Add(Keyboard.device@);
 }
 
-InputValue QueryInput(deviceID: uint32, inputKey: InputKey)
-{
-	value := InputValue();
+//state InputQuery
+//{
+//
+//}
 
-	return value;
+InputValue QueryInput(device: InputDevice, key: InputKey)
+{
+	return device.GetValueForKey(key);
 }

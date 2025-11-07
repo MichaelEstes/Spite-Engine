@@ -1,5 +1,7 @@
 package RenderComponents
 
+import Input
+
 state CameraOrbit
 {
 	damping: float32
@@ -10,8 +12,10 @@ CameraOrbitComponent := ECS.RegisterComponent<CameraOrbit>(
 );
 
 CameraOrbitSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
-	if (scene.HasSingleton<CameraOrbit>()) return;
+	if (!scene.HasSingleton<CameraOrbit>()) return;
 
 	cameraOrbit := scene.GetSingleton<CameraOrbit>();
 	
+	aButtonDown := QueryInput(Keyboard.device, Keyboard.A).value.down;
+	if (aButtonDown) log "A Button Down";
 });

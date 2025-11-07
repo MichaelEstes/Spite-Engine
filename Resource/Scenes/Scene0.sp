@@ -27,6 +27,7 @@ _ := SceneRegistry.RegisterScene(
 		camera.far = 10.0;
 		camera.LookAt(Vec3(0.0, 0.0, 0.0));
 		scene.SetSingleton<Camera>(camera);
+		scene.SetSingleton<CameraOrbit>(CameraOrbit());
 
 		scene.SetSingleton<SceneDesc>({
 			{
