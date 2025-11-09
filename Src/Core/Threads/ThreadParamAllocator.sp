@@ -55,7 +55,8 @@ int GetSlabIndex<Type>()
 	paramAllocator.indices[index] = bucketIndex;
 
 	slab := paramAllocator.slabs[index];
-	return slab.Alloc(bucketIndex) as *Type;
+	ptr := slab.Alloc(bucketIndex) as *Type;
+	return ptr;
 }
 
 DeallocThreadParam<Type>(value: *Type)

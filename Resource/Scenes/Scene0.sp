@@ -49,6 +49,7 @@ _ := SceneRegistry.RegisterScene(
 		model := "./Resource/Models/DamagedHelmet/DamagedHelmet.gltf";
 		log "Loading GLTF: ", model;
 		gltfEntities := AllocThreadParam<Array<Entity>>();
+		gltfEntities~ = Array<Entity>();
 		boxGLTFHandle := LoadGLTFResource(
 			model,
 			scene,

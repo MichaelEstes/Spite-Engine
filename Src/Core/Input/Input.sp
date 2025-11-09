@@ -11,28 +11,30 @@ enum InputValueKind: uint32
 
 state InputKey
 {
-	key: uint32
+	value: uint32
 }
 
-InputKey::(key: uint32)
+InputKey::(value: uint32)
 {
-	this.key = key;
+	this.value = value;
 }
 
 state InputDevice
 {
-	get: ::InputValue(InputKey, *any),
+	getter: ::InputValue(InputKey, *any),
+	update: ::(*any),
 	data: *void
 }
 
-InputDevice::(getter: ::InputValue(InputKey, *any))
+InputDevice::(getter: ::InputValue(InputKey, *any), update: ::(*any))
 {
-	this.get = getter;
+	this.getter = getter;
+	this.update = update;
 }
 
 InputValue InputDevice::GetValueForKey(key: InputKey)
 {
-	return this.get(key, this.data);
+	return this.getter(key, this.data);
 }
 
 state InputValue

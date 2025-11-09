@@ -46,6 +46,8 @@ MainLoop()
 	{
 		while (SDL.PollEvent(currEvent@)) HandleSDLEvent(currEvent);
 
+		UpdateInput();
+
 		ECS.instance.PreFrame();
 		ECS.instance.Frame();
 		ECS.instance.PreDraw();

@@ -1,6 +1,0 @@
-package Input
-
-//state Pointer
-//{
-//	
-//}
