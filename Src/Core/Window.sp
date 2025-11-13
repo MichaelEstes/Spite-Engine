@@ -2,6 +2,7 @@ package Window
 
 import SDL
 import SparseSet
+import Vec
 
 windowMap := SparseSet<*SDL.Window>();
 
@@ -35,4 +36,11 @@ DestroyWindow(window: *SDL.Window)
 
 	SDL.DestroyWindow(window);
 	windowMap.Remove(window.id);
+}
+
+{ width: uint32, height: uint32 } GetWindowSize(window: *SDL.Window)
+{
+	size := { width := uint32(0), height := uint32(0) };
+	SDL.GetWindowSize(window, size.width@, size.height@);
+	return size;
 }

@@ -236,7 +236,10 @@ ECS::OnComponentRemove(id: uint32, entity: Entity, componentData: *any, scene: S
 
 ECS::OnComponentEnter(id: uint32, entity: Entity, componentData: *any, scene: Scene)
 {
-	if (!this.componentEnterCallbacks.Has(id)) return;
+	if (!this.componentEnterCallbacks.Has(id)) 
+	{
+		return;
+	}
 
 	callback := this.componentEnterCallbacks.Get(id)~;
 	callback(entity, componentData, scene);

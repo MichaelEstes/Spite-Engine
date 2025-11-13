@@ -84,42 +84,42 @@ state VulkanPipelineMeshState
 
 VkPrimitiveTopology VulkanPipelineMeshState::GetTopology() =>
 {
-	return this.data.Range<VkPrimitiveTopology>(0, 4);
+	return this.data.Range<VkPrimitiveTopology>(0, 3);
 }
 
 VulkanPipelineMeshState::SetTopology(topology: VkPrimitiveTopology) =>
 {
-	this.data.SetRange<VkPrimitiveTopology>(0, 4, topology);
+	this.data.SetRange<VkPrimitiveTopology>(0, 3, topology);
 }
 
 VkPolygonMode VulkanPipelineMeshState::GetPolygonMode() =>
 {
-	return this.data.Range<VkPolygonMode>(4, 6);
+	return this.data.Range<VkPolygonMode>(3, 5);
 }
 
 VulkanPipelineMeshState::SetPolygonMode(polygonMode: VkPolygonMode) =>
 {
-	this.data.SetRange<VkPolygonMode>(4, 6, polygonMode);
+	this.data.SetRange<VkPolygonMode>(3, 5, polygonMode);
 }
 
 VulkanAlphaMode VulkanPipelineMeshState::GetAlphaMode() =>
 {
-	return this.data.Range<VulkanAlphaMode>(6, 8);
+	return this.data.Range<VulkanAlphaMode>(5, 7);
 }
 
 VulkanPipelineMeshState::SetAlphaMode(alphaMode: VulkanAlphaMode) =>
 {
-	this.data.SetRange<VulkanAlphaMode>(6, 8, alphaMode);
+	this.data.SetRange<VulkanAlphaMode>(5, 7, alphaMode);
 }
 
 VkPolygonMode VulkanPipelineMeshState::GetCullMode() =>
 {
-	return this.data.Range<VkCullModeFlagBits>(8, 10);
+	return this.data.Range<VkCullModeFlagBits>(7, 9);
 }
 
 VulkanPipelineMeshState::SetCullMode(cullMode: VkCullModeFlagBits) =>
 {
-	this.data.SetRange<VkPolygonMode>(8, 10, cullMode);
+	this.data.SetRange<VkPolygonMode>(7, 9, cullMode);
 }
 
 uint HashPipelineMeshState(key: VulkanPipelineMeshState)

@@ -20,5 +20,5 @@ CameraOrbitSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	if (aButtonDown) log "A Button Down";
 
 	mousePos :=  QueryInput(Mouse.device, Mouse.Position).value.axis;
-	log "Mouse Position: ", mousePos;
+	if (mousePos.x && mousePos.y) log "Mouse Position: ", mousePos;
 });

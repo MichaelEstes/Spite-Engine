@@ -14,6 +14,7 @@ enum MouseButtonBits
 
 state MouseState 
 {
+	window: *SDL.Window,
 	pos: Vec2,
 	buttonMask: uint32
 }

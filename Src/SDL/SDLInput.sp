@@ -7,6 +7,7 @@ extern
 
     *bool SDL_GetKeyboardState(numKeys: *int);
     uint32 SDL_GetMouseState(x: *float32, y: *float32);
+    *Window SDL_GetMouseFocus();
 }
 
 enum Scancode: uint32
@@ -364,3 +365,4 @@ enum Scancode: uint32
 *bool GetKeyboardState(numKeys: *int) => SDL_GetKeyboardState(numKeys);
 
 uint32 GetMouseState(x: *float32, y: *float32) => SDL_GetMouseState(x, y);
+*Window GetMouseFocus() => SDL_GetMouseFocus();

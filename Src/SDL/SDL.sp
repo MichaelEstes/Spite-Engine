@@ -9,6 +9,7 @@ extern
 	void SDL_DestroyWindow(window: *Window);
 	bool SDL_Init(flags: uint32);
 	void SDL_Quit();
+    bool SDL_GetWindowSize(window: *Window, width: *int32, height: *int32);
 	bool SDL_GetWindowSizeInPixels(window: *Window, width: *int32, height: *int32);
 	*byte SDL_GetError();
 
@@ -235,6 +236,7 @@ void Check(error: bool, onError: ::(*byte))
 *Window CreateWindow(title: *byte, w: int32, h: int32, flags: uint) => SDL_CreateWindow(title, w, h, flags);
 void DestroyWindow(window: *Window) => SDL_DestroyWindow(window);
 bool GetWindowSizeInPixels(window: *Window, width: *int32, height: *int32) => SDL_GetWindowSizeInPixels(window, width, height);
+bool GetWindowSize(window: *Window, width: *int32, height: *int32) => SDL_GetWindowSize(window, width, height);
 
 *Surface ConvertSurface(surface: *Surface, format: PixelFormat) => SDL_ConvertSurface(surface, format);
 DestroySurface(surface: *Surface) => SDL_DestroySurface(surface);

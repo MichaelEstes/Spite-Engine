@@ -56,6 +56,7 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 		handle: *JobHandle = null
 		Fiber.RunOnMainThread(::(param: *SceneDescParam)
 		{
+			log "Creating scene description";
 		    defer DeallocThreadParam<SceneDescParam>(param);
 			sceneDesc := param.sceneDesc;
 			scene := param.scene;

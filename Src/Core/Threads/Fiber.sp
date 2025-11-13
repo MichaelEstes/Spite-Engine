@@ -34,6 +34,8 @@ state Job
 	handle: *JobHandle
 }
 
+JobQueueCount := 128;
+
 state Fibers
 {
 	threads: FixedArray<uint>,
@@ -42,7 +44,7 @@ state Fibers
 	jobQueues: FixedArray<SingleConsumerQueue<Job>>,
 	
 	// Jobs to run on the main thread
-	mainThreadJobs := SingleConsumerQueue<Job>(),
+	mainThreadJobs := SingleConsumerQueue<Job>(JobQueueCount),
 	mainThreadID: uint32,
 
 	handleAllocator: BucketAllocator,
@@ -79,7 +81,7 @@ InitalizeFibers()
 	fibers.jobQueues = FixedArray<SingleConsumerQueue<Job>>(totalProcessCount);
 	for (i .. totalProcessCount)
 	{
-		fibers.jobQueues[i]~ = SingleConsumerQueue<Job>();
+		fibers.jobQueues[i]~ = SingleConsumerQueue<Job>(JobQueueCount);
 	}
 
 	for (i .. totalProcessCount)
@@ -225,16 +227,17 @@ RunOnMainThread(func: ::(*any), data: *any, handle: **JobHandle = null)
 
 FlushMainThreadJobs()
 {
-	count := fibers.mainThreadJobs.count.Load();
-	for (i .. count)
+	job := fibers.mainThreadJobs.Dequeue(true);
+	while (job.func)
 	{
-		job := fibers.mainThreadJobs.Dequeue();
 		job.func(job.data);
 		if (job.handle)
 		{
 			job.handle.Decrement();
 		}
 		fibers.jobsFinished.Add(1);
+
+		job = fibers.mainThreadJobs.Dequeue(true);
 	}
 }
 
@@ -243,10 +246,7 @@ Job GetNextJob(index: uint)
 	job := Job();
 
 	jobQueue :=  fibers.jobQueues[index];
-	if (jobQueue.count.Load())
-	{
-		job = jobQueue.Dequeue();
-	}
+	job = jobQueue.Dequeue();
 
 	return job;
 }

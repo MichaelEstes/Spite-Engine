@@ -2,6 +2,7 @@ package Input
 
 import Array
 import SDL
+import Window
 
 inputManager := InputManager();
 
@@ -45,7 +46,20 @@ InitializeInput()
 			else
 			{
 				input.kind = InputValueKind.Axis;
-				input.value.axis = mouseState.pos;
+				if (!mouseState.window)
+				{
+					input.value.axis = Vec2();
+					return input;
+				}
+
+				size := Window.GetWindowSize(mouseState.window);
+				log "Window size: ", size;
+				pos := mouseState.pos;
+				log "Mouse pos: ", pos;
+				x := pos.x / size.width;
+				y := pos.y / size.height;
+				log x, y;
+				input.value.axis = pos;
 			}
 
 			return input;
@@ -53,6 +67,7 @@ InitializeInput()
 		::(mouseState: *MouseState) 
 		{
 			mouseState.buttonMask = SDL.GetMouseState(mouseState.pos.x@, mouseState.pos.y@);
+			mouseState.window = SDL.GetMouseFocus();
 		}
 	);
 	Mouse.device.data = mouseStateGlobal@;
