@@ -172,7 +172,7 @@ WaitForHandle(handle: *JobHandle)
 			while (!handle.Finished())
 			{
 				//log "Waiting Fiber thread", handle;
-				RunNext(i);
+				RunNext(i, true);
 			}
 			return;
 		}
@@ -241,19 +241,19 @@ FlushMainThreadJobs()
 	}
 }
 
-Job GetNextJob(index: uint)
+Job GetNextJob(index: uint, ret: bool)
 {
 	job := Job();
 
 	jobQueue :=  fibers.jobQueues[index];
-	job = jobQueue.Dequeue();
+	job = jobQueue.Dequeue(ret);
 
 	return job;
 }
 
-RunNext(index: uint)
+RunNext(index: uint, ret: bool = false)
 {
-	job := GetNextJob(index);
+	job := GetNextJob(index, ret);
 	if (job.func)
 	{
 		fibers.threadRunningJob[index]~ = true;

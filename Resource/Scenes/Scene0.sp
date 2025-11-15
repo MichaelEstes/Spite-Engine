@@ -63,7 +63,7 @@ _ := SceneRegistry.RegisterScene(
 				}
 
 				scene := param.scene;
-				log "Loaded gltf: ", outEntities~;
+				log "Loaded gltf: ", outEntities.count, outEntities~;
 
 				//for (entity in outEntities)
 				//{

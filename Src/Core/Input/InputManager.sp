@@ -53,13 +53,11 @@ InitializeInput()
 				}
 
 				size := Window.GetWindowSize(mouseState.window);
-				log "Window size: ", size;
 				pos := mouseState.pos;
-				log "Mouse pos: ", pos;
-				x := pos.x / size.width;
-				y := pos.y / size.height;
-				log x, y;
-				input.value.axis = pos;
+
+				x := pos.x / size.width as float32;
+				y := pos.y / size.height as float32;
+				input.value.axis = Vec2(x, y);
 			}
 
 			return input;

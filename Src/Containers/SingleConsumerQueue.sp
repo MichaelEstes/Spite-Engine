@@ -186,6 +186,7 @@ void SingleConsumerQueue::Enqueue(item: Type)
 	}
 
 	this.mem[index]~ = item;
+
 	while (1)
 	{
 		tail := this.back;
@@ -237,6 +238,7 @@ void SingleConsumerQueue::Enqueue(item: Type)
 					MemoryOrder.AcquireRelease,
 					MemoryOrder.Relaxed
 				);
+
 				return;
 			}
 		}
@@ -257,11 +259,14 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 {
 	while (1)
 	{
-		tail := this.back;
-		alloc := this.queue[tail % this.count]~;
 		head := this.front;
+		alloc := this.queue[head % this.count]~;
+		tail := this.back;
 
-		if (head != this.front) continue;
+		if (head != this.front) 
+		{
+			continue;
+		}
 
 		if (head == this.back)
 		{
@@ -309,7 +314,6 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 				);
 
 				item := this.mem[allocBits.arrayIndex]~;
-				// Release index back to free list.
 				this.refAllocator.Free(allocBits.arrayIndex);
 				return item;
 			}
