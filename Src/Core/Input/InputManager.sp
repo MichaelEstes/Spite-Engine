@@ -3,6 +3,7 @@ package Input
 import Array
 import SDL
 import Window
+import Event
 
 inputManager := InputManager();
 
@@ -43,7 +44,7 @@ InitializeInput()
 				bit := 1 << key.value;
 				input.value.down = mouseState.buttonMask & bit;
 			}
-			else
+			else if (key.value == Mouse.Position.value)
 			{
 				input.kind = InputValueKind.Axis;
 				if (!mouseState.window)
@@ -59,16 +60,32 @@ InitializeInput()
 				y := pos.y / size.height as float32;
 				input.value.axis = Vec2(x, y);
 			}
+			else if (key.value == Mouse.Wheel.value)
+			{
+				input.kind = InputValueKind.Axis;
+				input.value.axis = mouseState.wheel;
+			}
 
 			return input;
 		},
 		::(mouseState: *MouseState) 
 		{
+			if ((mouseState.buttonMask & MouseButtonBits.WheelUpdated) == 0)
+			{
+				mouseState.wheel = Vec2();
+			}
 			mouseState.buttonMask = SDL.GetMouseState(mouseState.pos.x@, mouseState.pos.y@);
 			mouseState.window = SDL.GetMouseFocus();
 		}
 	);
 	Mouse.device.data = mouseStateGlobal@;
+	SDLEventEmitter.On(SDL.EventType.MOUSE_WHEEL, ::(event: SDL.Event) 
+		{
+			wheelEvent := event.data.wheel;
+			mouseState := Mouse.device.data as *MouseState;
+			mouseState.buttonMask |= MouseButtonBits.WheelUpdated;
+			mouseState.wheel = Vec2(wheelEvent.x, wheelEvent.y);
+		});
 
 	inputManager.devices.Add(Keyboard.device@);
 	inputManager.devices.Add(Mouse.device@);
