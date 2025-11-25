@@ -4,6 +4,7 @@ import ECS
 import Vec
 import Quaternion
 import Matrix
+import Math
 
 state Camera
 {
@@ -30,8 +31,31 @@ Matrix4 Camera::GetViewMatrix()
 Camera::LookAt(target: Vec3, up: Vec3 = Vec3(0.0, 0.0, 1.0))
 {
 	pos := this.position;
-	forward := (target - pos).Normalize().vec;
-	right := forward.Cross(up).Normalize().vec;
+	forward := (target - pos);
+
+	if (forward.SqrLength() == 0.0)
+	{
+		forward.z = 1.0;
+	}
+	forward.Normalize();
+
+	right := forward.Cross(up);
+	if (right.SqrLength() == 0.0)
+	{
+		if (Math.FAbs(up.z) == 1.0)
+		{
+			forward.x += 0.0001;
+		}
+		else
+		{
+			forward.z += 0.0001;
+		}
+
+		forward.Normalize();
+		right = forward.Cross(up);
+	}
+
+	right.Normalize();
 	trueUp := right.Cross(forward);
 
 	lookAtMat := Matrix3([
@@ -43,12 +67,17 @@ Camera::LookAt(target: Vec3, up: Vec3 = Vec3(0.0, 0.0, 1.0))
 	this.rotation.FromRotationMatrix(lookAtMat).Normalize();
 }
 
+Vec3 Camera::Forward()
+{
+	return this.rotation.Forward();
+}
+
 MainCameraComponent := ECS.RegisterComponent<Camera>(
 	ComponentKind.Singleton,
 	::(entity: Entity, camera: *Camera, scene: Scene) {
 		//log "Removing main camera"
 	}
 	::(entity: Entity, camera: *Camera, scene: Scene) {
-		//log "Setting main camera"
+		//log "Setting main camera", camera;
 	}
 );

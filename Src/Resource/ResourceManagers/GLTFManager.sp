@@ -84,8 +84,9 @@ GLTFManagerLoad(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>)
 		sceneEntity := scene.CreateEntity();
 		scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
 	
-		outEntities.Add(sceneEntity);
-	
+		if (outEntities) outEntities.Add(sceneEntity);
+
+		log "Loading scene with ", gltfScene.nodes.count, "nodes";
 		for (nodeIndex in gltfScene.nodes)
 		{
 			NodeToECS(gltfData, gltf, scene, nodeIndex, sceneEntity, outEntities);
@@ -102,6 +103,7 @@ ResourceHandle LoadGLTFResource(file: string, scene: *Scene, onLoad: ::(Resource
 	gltfParam.scene = scene;
 	gltfParam.outEntities = outEntities;
 	
+	log "GLTF outEntities: ", outEntities;
 	return GLTFResourceManager.LoadResource(gltfParam, onLoad);
 }
 

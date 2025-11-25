@@ -4,7 +4,7 @@ import Input
 
 state CameraOrbit
 {
-	scrollDamping := 0.1
+	scrollDamping: float32 = 0.1
 }
 
 CameraOrbitComponent := ECS.RegisterComponent<CameraOrbit>(
@@ -27,6 +27,10 @@ CameraOrbitSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	wheelDelta := QueryInput(Mouse.device, Mouse.Wheel).value.axis;
 	if (wheelDelta.y)
 	{
-		
+		forward := camera.Forward();
+		amount := wheelDelta.y * cameraOrbit.scrollDamping;
+		delta := forward * amount;
+		log "Moving camera: ", camera, delta, amount, forward;
+		camera.position = camera.position * delta;
 	}
 });

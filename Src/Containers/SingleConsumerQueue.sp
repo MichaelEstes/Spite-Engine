@@ -160,20 +160,27 @@ state SingleConsumerQueue<Type>
 
 	front := uint32(0),
 	back := uint32(0),
-	count := uint32(0)
+	capacity := uint32(0)
 }
 
-SingleConsumerQueue::(count: uint32)
+SingleConsumerQueue::(capacity: uint32)
 {
-	this.refAllocator = RefAllocator(count);
-	this.mem.Alloc(count);
-	this.queue.Alloc(count);
-	this.count = count;
+	this.refAllocator = RefAllocator(capacity);
 
-	for (i .. count)
+	maxSize := capacity + 1;
+	this.mem.Alloc(maxSize);
+	this.queue.Alloc(maxSize);
+	this.capacity = maxSize;
+
+	for (i .. maxSize)
 	{
 		this.queue[i]~ = AllocRef();
 	}
+}
+
+uint32 SingleConsumerQueue::Count()
+{
+	return Math.Abs(this.back - this.front + this.capacity) % this.capacity;
 }
 
 void SingleConsumerQueue::Enqueue(item: Type)
@@ -185,12 +192,16 @@ void SingleConsumerQueue::Enqueue(item: Type)
 		index = this.refAllocator.Alloc();
 	}
 
+	if (index > this.capacity)
+	{
+		log "UHOH", index, this.capacity;
+	}
 	this.mem[index]~ = item;
 
 	while (1)
 	{
 		tail := this.back;
-		alloc := this.queue[tail % this.count]~;
+		alloc := this.queue[tail % this.capacity]~;
 		head := this.front;
 
 		if (tail != this.back) 
@@ -198,9 +209,9 @@ void SingleConsumerQueue::Enqueue(item: Type)
 			continue;
 		}
 
-		if (tail == this.front + this.count)
+		if (tail == this.front + this.capacity)
 		{
-			if (this.queue[head % this.count].Get().arrayIndex != NullIndex)
+			if (this.queue[head % this.capacity].Get().arrayIndex != NullIndex)
 			{
 				if (head == this.front)
 				{
@@ -223,7 +234,7 @@ void SingleConsumerQueue::Enqueue(item: Type)
 		{
 			if (
 				atomic_compare_exchange_strong_u64(
-					this.queue[tail % this.count].val.i@, 
+					this.queue[tail % this.capacity].val.i@, 
 					alloc.val.i@,
 					AllocRef(index, allocBits.version + 1).val.i,
 					MemoryOrder.AcquireRelease,
@@ -242,7 +253,7 @@ void SingleConsumerQueue::Enqueue(item: Type)
 				return;
 			}
 		}
-		else if (this.queue[tail % this.count].Get().arrayIndex != NullIndex)
+		else if (this.queue[tail % this.capacity].Get().arrayIndex != NullIndex)
 		{
 			atomic_compare_exchange_strong_u32(
 				this.back@, 
@@ -257,10 +268,11 @@ void SingleConsumerQueue::Enqueue(item: Type)
 
 Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 {
+	log "Queue Count: ", this.Count();
 	while (1)
 	{
 		head := this.front;
-		alloc := this.queue[head % this.count]~;
+		alloc := this.queue[head % this.capacity]~;
 		tail := this.back;
 
 		if (head != this.front) 
@@ -270,7 +282,7 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 
 		if (head == this.back)
 		{
-			if (this.queue[tail % this.count].Get().arrayIndex == NullIndex)
+			if (this.queue[tail % this.capacity].Get().arrayIndex == NullIndex)
 			{
 				if (tail == this.back) 
 				{
@@ -297,7 +309,7 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 		{
 			if (
 				atomic_compare_exchange_strong_u64(
-					this.queue[head % this.count].val.i@, 
+					this.queue[head % this.capacity].val.i@, 
 					alloc.val.i@,
 					AllocRef(NullIndex, allocBits.version + 1).val.i,
 					MemoryOrder.AcquireRelease,
@@ -318,7 +330,7 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 				return item;
 			}
 		}
-		else if (this.queue[head % this.count].Get().arrayIndex == NullIndex)
+		else if (this.queue[head % this.capacity].Get().arrayIndex == NullIndex)
 		{
 			atomic_compare_exchange_strong_u32(
 				this.front@, 
