@@ -1,5 +1,7 @@
 package BitSet
 
+import Atomic
+
 bitsInByte := 8;
 initialBytes := 8;
 
@@ -65,6 +67,15 @@ BitSet::Set(i: uint)
 	this.alloc[index]~ = this.alloc[index]~ | (1 << offset);
 }
 
+BitSet::AtomicSet(i: uint)
+{
+	this.CheckResize(i);
+	index := i / bitsInByte;
+	offset := i % bitsInByte;
+	atomicValue := this.alloc[index] as *Atomic<byte>;
+	atomicValue.Or(1 << offset);
+}
+
 BitSet::Clear(i: uint)
 {
 	if(!this.Inbounds(i)) return;
@@ -73,12 +84,32 @@ BitSet::Clear(i: uint)
 	this.alloc[index]~ = this.alloc[index]~ &^ (1 << offset);
 }
 
+BitSet::AtomicClear(i: uint)
+{
+	if(!this.Inbounds(i)) return;
+	index := i / bitsInByte;
+	offset := i % bitsInByte;
+	mask := (1 << offset);
+	atomicValue := this.alloc[index] as *Atomic<byte>;
+	atomicValue.And(mask);
+	atomicValue.XOr(mask);
+}
+
 BitSet::Toggle(i: uint)
 {
 	this.CheckResize(i);
 	index := i / bitsInByte;
 	offset := i % bitsInByte;
 	this.alloc[index]~ = this.alloc[index]~ ^ (1 << offset);
+}
+
+BitSet::AtomicToggle(i: uint)
+{
+	this.CheckResize(i);
+	index := i / bitsInByte;
+	offset := i % bitsInByte;
+	atomicValue := this.alloc[index] as *Atomic<byte>;
+	atomicValue.XOr(1 << offset);
 }
 
 BitSet BitSet::Clone()

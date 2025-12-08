@@ -5,13 +5,17 @@ import Mutex
 import Math
 import BitArray
 
-NullIndex := uint32(0x000FFFFF);
+NullIndex := uint16(65535);
 
 state AllocRef
 {
 	val: ?{
 		i: uint64,
-		bits: BitArray<64>
+		bits: {
+			arrayIndex: uint16,
+			stackIndex: uint16,
+			version: uint32
+		}
 	}
 }
 
@@ -25,28 +29,28 @@ AllocRef::(alloc: AllocRef)
 	this.val.i = alloc.val.i;
 }
 
-AllocRef::(arrayIndex: uint32, version: uint32)
+AllocRef::(arrayIndex: uint16, version: uint32)
 {
 	this.Set(arrayIndex, 0, version);
 }
 
-AllocRef::(arrayIndex: uint32, stackIndex: uint32, version: uint32)
+AllocRef::(arrayIndex: uint16, stackIndex: uint16, version: uint32)
 {
 	this.Set(arrayIndex, stackIndex, version);
 }
 
-AllocRef::Set(arrayIndex: uint32, stackIndex: uint32, version: uint32)
+AllocRef::Set(arrayIndex: uint16, stackIndex: uint16, version: uint32)
 {
-	this.val.bits.SetRange<uint32>(0, 19, arrayIndex);
-	this.val.bits.SetRange<uint32>(20, 39, stackIndex);
-	this.val.bits.SetRange<uint32>(40, 63, version);
+	this.val.bits.arrayIndex = arrayIndex;
+	this.val.bits.stackIndex = stackIndex;
+	this.val.bits.version = version;
 }
 
-{ arrayIndex: uint32, stackIndex: uint32, version: uint32 } AllocRef::Get()
+{ arrayIndex: uint16, stackIndex: uint16, version: uint32 } AllocRef::Get()
 {
-	arrayIndex := this.val.bits.Range<uint32>(0, 19);
-	stackIndex := this.val.bits.Range<uint32>(20, 39);
-	version := this.val.bits.Range<uint32>(40, 63);
+	arrayIndex := this.val.bits.arrayIndex;
+	stackIndex := this.val.bits.stackIndex;
+	version := this.val.bits.version;
 
 	return { arrayIndex, stackIndex, version };
 }
@@ -64,7 +68,7 @@ RefAllocator::(size: uint64)
 	this.freeList.Alloc(this.maxSize);
 
 	this.freeList[0].Set(NullIndex, 0, 0);
-	
+
 	for (i := 1 .. this.maxSize)
 	{
 		this.freeList[i].Set(i - 1, i, i);
@@ -93,11 +97,11 @@ uint32 RefAllocator::Alloc()
 			this.freeList[top.stackIndex].val.i@, 
 			AllocRef(stackTop.arrayIndex, stackTop.stackIndex, top.version - 1).val.i@,
 			AllocRef(top.arrayIndex, stackTop.stackIndex, top.version).val.i,
-			MemoryOrder.AcquireRelease,
+			MemoryOrder.Sequential,
 			MemoryOrder.Relaxed
 		);
 
-		if (top.stackIndex == 0) continue; // Stack Empty?
+		if (top.stackIndex == 0) continue;
 
 		belowTop := this.freeList[top.stackIndex - 1].Get();
 
@@ -106,7 +110,7 @@ uint32 RefAllocator::Alloc()
 				this.top.val.i@, 
 				AllocRef(top.arrayIndex, top.stackIndex, top.version).val.i@,
 				AllocRef(belowTop.arrayIndex, top.stackIndex - 1, belowTop.version + 1).val.i,
-				MemoryOrder.AcquireRelease,
+				MemoryOrder.Sequential,
 				MemoryOrder.Relaxed
 			)
 		)
@@ -129,7 +133,7 @@ RefAllocator::Free(arrayIndex: uint32)
 			this.freeList[top.stackIndex].val.i@,
 			AllocRef(stackTop.arrayIndex, stackTop.stackIndex, top.version - 1).val.i@,
 			AllocRef(top.arrayIndex, stackTop.stackIndex,top.version).val.i,
-			MemoryOrder.AcquireRelease,
+			MemoryOrder.Sequential,
 			MemoryOrder.Relaxed
 		);
 
@@ -142,7 +146,7 @@ RefAllocator::Free(arrayIndex: uint32)
 				this.top.val.i@, 
 				AllocRef(top.arrayIndex, top.stackIndex, top.version).val.i@,
 				AllocRef(arrayIndex, top.stackIndex + 1, aboveTopCounter + 1).val.i,
-				MemoryOrder.AcquireRelease,
+				MemoryOrder.Sequential,
 				MemoryOrder.Relaxed
 			)
 		)
@@ -167,12 +171,11 @@ SingleConsumerQueue::(capacity: uint32)
 {
 	this.refAllocator = RefAllocator(capacity);
 
-	maxSize := capacity + 1;
-	this.mem.Alloc(maxSize);
-	this.queue.Alloc(maxSize);
-	this.capacity = maxSize;
+	this.mem.Alloc(capacity);
+	this.queue.Alloc(capacity);
+	this.capacity = capacity;
 
-	for (i .. maxSize)
+	for (i .. capacity)
 	{
 		this.queue[i]~ = AllocRef();
 	}
@@ -183,6 +186,8 @@ uint32 SingleConsumerQueue::Count()
 	return Math.Abs(this.back - this.front + this.capacity) % this.capacity;
 }
 
+bool SingleConsumerQueue::IsEmpty() => this.refAllocator.IsEmpty();
+
 void SingleConsumerQueue::Enqueue(item: Type)
 {
 	index := NullIndex;
@@ -192,10 +197,6 @@ void SingleConsumerQueue::Enqueue(item: Type)
 		index = this.refAllocator.Alloc();
 	}
 
-	if (index > this.capacity)
-	{
-		log "UHOH", index, this.capacity;
-	}
 	this.mem[index]~ = item;
 
 	while (1)
@@ -223,7 +224,7 @@ void SingleConsumerQueue::Enqueue(item: Type)
 				this.front@, 
 				head@,
 				head + 1,
-				MemoryOrder.AcquireRelease,
+				MemoryOrder.Sequential,
 				MemoryOrder.Relaxed
 			);
 			continue;
@@ -237,7 +238,7 @@ void SingleConsumerQueue::Enqueue(item: Type)
 					this.queue[tail % this.capacity].val.i@, 
 					alloc.val.i@,
 					AllocRef(index, allocBits.version + 1).val.i,
-					MemoryOrder.AcquireRelease,
+					MemoryOrder.Sequential,
 					MemoryOrder.Relaxed
 				)
 			)
@@ -246,7 +247,7 @@ void SingleConsumerQueue::Enqueue(item: Type)
 					this.back@, 
 					tail@,
 					tail + 1,
-					MemoryOrder.AcquireRelease,
+					MemoryOrder.Sequential,
 					MemoryOrder.Relaxed
 				);
 
@@ -259,7 +260,7 @@ void SingleConsumerQueue::Enqueue(item: Type)
 				this.back@, 
 				tail@,
 				tail + 1,
-				MemoryOrder.AcquireRelease,
+				MemoryOrder.Sequential,
 				MemoryOrder.Relaxed
 			);
 		}
@@ -268,7 +269,6 @@ void SingleConsumerQueue::Enqueue(item: Type)
 
 Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 {
-	log "Queue Count: ", this.Count();
 	while (1)
 	{
 		head := this.front;
@@ -299,7 +299,7 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 				this.back@, 
 				tail@,
 				tail + 1,
-				MemoryOrder.AcquireRelease,
+				MemoryOrder.Sequential,
 				MemoryOrder.Relaxed
 			);
 		}
@@ -312,7 +312,7 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 					this.queue[head % this.capacity].val.i@, 
 					alloc.val.i@,
 					AllocRef(NullIndex, allocBits.version + 1).val.i,
-					MemoryOrder.AcquireRelease,
+					MemoryOrder.Sequential,
 					MemoryOrder.Relaxed
 				)
 			)
@@ -321,7 +321,7 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 					this.front@, 
 					head@,
 					head + 1,
-					MemoryOrder.AcquireRelease,
+					MemoryOrder.Sequential,
 					MemoryOrder.Relaxed
 				);
 
@@ -336,7 +336,7 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 				this.front@, 
 				head@,
 				head + 1,
-				MemoryOrder.AcquireRelease,
+				MemoryOrder.Sequential,
 				MemoryOrder.Relaxed
 			);
 		}

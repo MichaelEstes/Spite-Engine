@@ -37,7 +37,7 @@ BucketAllocator::delete
 	delete this.itemStatus;
 }
 
-*byte BucketAllocator::Alloc(bucketIndex: int = -1)
+*byte BucketAllocator::Alloc(bucketIndex: int)
 {
 	if (this.bucketStatus[bucketIndex]) 
 	{
@@ -78,6 +78,6 @@ BucketAllocator::Dealloc(ptr: *any)
 	itemIndex := offset / this.itemSize;
 	bucketIndex := itemIndex / this.itemCount;
 	
-	this.itemStatus.Clear(itemIndex);
-	this.bucketStatus.Clear(bucketIndex);
+	this.itemStatus.AtomicClear(itemIndex);
+	this.bucketStatus.AtomicClear(bucketIndex);
 }

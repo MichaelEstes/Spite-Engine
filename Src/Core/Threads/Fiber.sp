@@ -7,140 +7,98 @@ import SingleConsumerQueue
 import Atomic
 import BucketAllocator
 import Mutex
+import BitSet
 
-state JobHandle
+state JobHandle 
 {
 	counter: Atomic<uint32>
 }
 
-JobHandle::(count: uint32)
+JobHandle::()
 {
-	this.counter.Init(count);
+	this.counter.Init(uint32(0));
 }
 
-bool JobHandle::Finished()
-{
-	return this.counter.Load() == uint32(0);
-}
+uint32 JobHandle::Increment(amount: uint32) => this.counter.Add(amount);
+uint32 JobHandle::Decrement(amount: uint32) => this.counter.Sub(amount);
+bool JobHandle::Completed() => this.counter.Load() == 0;
 
-uint32 JobHandle::Add(count: uint32) => this.counter.Add(count, MemoryOrder.Relaxed);
-
-uint32 JobHandle::Decrement() => this.counter.Sub(uint32(1), MemoryOrder.Relaxed);
-
-state Job
+state FiberJob
 {
 	func: ::(*any),
-	data: *any,
+	data: *void,
 	handle: *JobHandle
 }
 
-Job::(func: ::(*any), data: *any, handle: *JobHandle)
+FiberJob::(func: ::(*any), data: *void, handle: *JobHandle)
 {
 	this.func = func;
 	this.data = data;
 	this.handle = handle;
 }
 
-JobQueueCount := 128;
-
 state Fibers
 {
-	threads: FixedArray<uint>,
-	threadIDs: FixedArray<uint32>,
+	mainThreadJobs: SingleConsumerQueue<FiberJob>,
 
-	jobQueues: FixedArray<SingleConsumerQueue<Job>>,
-	
-	// Jobs to run on the main thread
-	mainThreadJobs := SingleConsumerQueue<Job>(JobQueueCount),
-	mainThreadID: uint32,
+	jobQueueArr: FixedArray<SingleConsumerQueue<FiberJob>>,
+	threadIDs: FixedArray<uint32>,
+	threadHandles: FixedArray<uint>,
+	threadEnabled: FixedArray<bool>,
 
 	handleAllocator: BucketAllocator,
-
-	currentProcess: Atomic<uint32>,
-	processCount: uint32,
-
-	jobsAdded: Atomic<uint32>,
-	jobsFinished: Atomic<uint32>,
-	jobsRun: Atomic<uint32>,
-	threadRunningJob: FixedArray<bool>
-
-	running := true
+	currentIndex: Atomic<uint32>,
+	mainThreadID: uint32,
+	fiberCount: uint32
 }
 
-fibers: *Fibers = null;
+fibers := Fibers();
+
+FiberJobCount := 128;
 
 InitalizeFibers()
 {
-	fibers = new Fibers();
-	fibers.currentProcess.Init(0);
-	fibers.mainThreadID = GetCurrentThreadID();
-
 	sysInfo := GetSystemInfo();
 	// - 3 - executable start thread, main (IO) fiber thread, OS scheduling thread
-	//fibers.processCount = Math.Max(sysInfo.processorCount - 3, 1);
-	fibers.processCount = 1;
-	totalProcessCount := fibers.processCount + 1;
-	fibers.handleAllocator = BucketAllocator(#sizeof JobHandle, 32, totalProcessCount);
-
-	fibers.threads = FixedArray<uint>(totalProcessCount);
-	fibers.threadIDs = FixedArray<uint32>(totalProcessCount);
-
-	fibers.threadRunningJob = FixedArray<bool>(totalProcessCount + 1);
+	fibers.fiberCount = Math.Max(sysInfo.processorCount - 3, 1);
 	
-	fibers.jobQueues = FixedArray<SingleConsumerQueue<Job>>(totalProcessCount);
-	for (i .. totalProcessCount)
+	fibers.handleAllocator = BucketAllocator(#sizeof JobHandle, FiberJobCount, fibers.fiberCount + 1);
+
+	fibers.jobQueueArr = FixedArray<SingleConsumerQueue<FiberJob>>(fibers.fiberCount);
+	fibers.threadIDs = FixedArray<uint>(fibers.fiberCount);
+	fibers.threadHandles = FixedArray<uint>(fibers.fiberCount);
+	fibers.threadEnabled = FixedArray<bool>(fibers.fiberCount);
+
+
+	for (i: uint .. fibers.fiberCount)
 	{
-		fibers.jobQueues[i]~ = SingleConsumerQueue<Job>(JobQueueCount);
+		fibers.threadEnabled[i]~ = true;
+		fibers.jobQueueArr[i]~ = SingleConsumerQueue<FiberJob>(FiberJobCount);
+		fibers.threadHandles[i]~ = Thread.Create(RunFiber, i as *void, fibers.threadIDs[i]);
 	}
 
-	for (i .. totalProcessCount)
-	{
-		thread := CreateFiberThread(i);
-		fibers.threads[i]~ = thread;
-	}
+	fibers.mainThreadJobs = SingleConsumerQueue<FiberJob>(FiberJobCount);
+	fibers.mainThreadID = GetCurrentThreadID();
+
+	fibers.currentIndex.Init(0);
 }
 
-int32 GetFiberIndex()
+int32 GetCurrentFiberIndex()
 {
-	currThreadID := GetCurrentThreadID();
-	
-	for (i .. fibers.processCount + 1)
+	id := GetCurrentThreadID();
+	for (i .. fibers.fiberCount)
 	{
-		threadID := fibers.threadIDs[i]~;
-		if (currThreadID == threadID)
-		{
-			return i;
-		}
+		if (id == fibers.threadIDs[i]~) return i;
 	}
 
 	return -1;
 }
 
-*JobHandle CreateJobHandle(count: uint32, index: uint32)
+*JobHandle AllocJobHandle(index: int32)
 {
 	handle := fibers.handleAllocator.Alloc(index) as *JobHandle;
-	assert handle != null, "Failed to allocate job handle";
-	
-	handle~ = JobHandle(count);
+	handle~ = JobHandle();
 	return handle;
-}
-
-*JobHandle GetJobHandle(count: uint32, handleRef: **JobHandle, index: uint32)
-{
-	assert count != 0;
-	if (!handleRef) return null;
-
-	fibers.jobsAdded.Add(count);
-	handle := handleRef~;
-	if (handle)
-	{
-		handle.Add(count);
-		return handle;
-	}
-
-	createdHandle := CreateJobHandle(count, index);
-	if (handleRef) handleRef~ = createdHandle;
-	return createdHandle;
 }
 
 DeallocJobHandle(handle: *JobHandle)
@@ -148,71 +106,94 @@ DeallocJobHandle(handle: *JobHandle)
 	fibers.handleAllocator.Dealloc(handle);
 }
 
-AddJobForIndex(job: Job, index: uint32)
+*JobHandle InitJobHandle(handleRef: **JobHandle, amount: uint32)
 {
-	fibers.jobQueues[index].Enqueue(job);
-}
+	if (!handleRef) return null;
 
-uint32 GetNextFiberIndex() => fibers.currentProcess.Add(1) % fibers.processCount;
-
-AddJob(func: ::(*any), data: *any = null, handle: **JobHandle = null)
-{
-	index := GetNextFiberIndex();
-	jobHandle := GetJobHandle(1, handle, index);
-	job := Job(func, data, jobHandle);
-
-	AddJobForIndex(job, index);
-}
-
-AddJobs(funcs: []::(*any), data: []*any, handle: **JobHandle = null)
-{
-	index := GetNextFiberIndex();
-	count := funcs.count;
-	jobHandle := GetJobHandle(count, handle, index);
-
-	for (i .. count)
+	handle := handleRef~;
+	if (!handle)
 	{
-		func := funcs[i];
-		dataItem := data[i];
-		job := Job(func, dataItem, jobHandle);
+		index := GetCurrentFiberIndex();
+		if (index == int32(-1)) index = fibers.fiberCount;
 
-		AddJobForIndex(job, (index + i) % fibers.processCount);
+		handle = AllocJobHandle(index);
 	}
-}
-
-LogFiberDebug(waitKind: uint32, handle: *JobHandle)
-{
-	msg := "";
-	handleStr := UIntToString(handle.counter.Load());
-	jobsAddedStr := UIntToString(fibers.jobsAdded.Load());
-	jobsFinishedStr := UIntToString(fibers.jobsFinished.Load());
-	jobsRunStr := UIntToString(fibers.jobsRun.Load());
-
-	if (waitKind == 0)
-	{
-		msg = "Waiting Fiber thread, handle count: ";
-	}
-	else if (waitKind == 1)
-	{
-		msg = "Waiting Main thread, handle count: ";
-	}
-	else if (waitKind == 2)
-	{
-		msg = "Waiting Non Fiber thread, handle count: ";
-	}
-	msg = msg.Append(handleStr);
-
-	msg = msg.Append("\nJobs Added: ");
-	msg = msg.Append(jobsAddedStr);
-
-	msg = msg.Append("\nJobs Finished: ");
-	msg = msg.Append(jobsFinishedStr);
-
-	msg = msg.Append("\nJobs Run: ");
-	msg = msg.Append(jobsRunStr);
 	
-	log msg;
-	log "Threads Running Job", fibers.threadRunningJob;
+	handle.Increment(amount);
+	handleRef~ = handle;
+	return handle;
+}
+
+uint32 GetNextFiberIndex()
+{
+	index := fibers.currentIndex.Add(1) % fibers.fiberCount;
+	if (index == GetCurrentFiberIndex()) index += 1;
+	return index;
+}
+
+AddJob(func: ::(*any), data: *any, handle: **JobHandle = null)
+{
+	jobHandle := InitJobHandle(handle, uint32(1));
+	job := FiberJob(func, data, jobHandle);
+
+	index := GetNextFiberIndex();
+	fibers.jobQueueArr[index].Enqueue(job);
+}
+
+bool CurrentThreadIsMainThread() => GetCurrentThreadID() == fibers.mainThreadID;
+
+RunOnMainThread(func: ::(*any), data: *any, handle: **JobHandle = null)
+{
+	jobHandle := InitJobHandle(handle, uint32(1));
+	job := FiberJob(func, data, jobHandle);
+
+	if (CurrentThreadIsMainThread())
+	{
+		RunFiberJob(job);	
+	}
+	else
+	{
+		fibers.mainThreadJobs.Enqueue(job);
+	}
+}
+
+RunFiberJob(job: FiberJob) => 
+{
+	job.func(job.data);
+	if (job.handle)
+	{
+		job.handle.Decrement(1);
+	}
+}
+
+RunNextFiberJob(queue: *SingleConsumerQueue<FiberJob>)
+{
+	job := queue.Dequeue();
+	RunFiberJob(job);
+}
+
+uint32 RunFiber(data: *void)
+{
+	index := data as uint;
+	queue := fibers.jobQueueArr[index];
+
+	while (fibers.threadEnabled[index]~)
+	{
+		RunNextFiberJob(queue);
+	}
+
+	return 0;
+}
+
+FlushMainThreadJobs()
+{
+	queue := fibers.mainThreadJobs;
+	job := queue.Dequeue(true);
+	while (job.func)
+	{
+		RunFiberJob(job);
+		job = queue.Dequeue(true);
+	}
 }
 
 WaitForHandle(handle: *JobHandle)
@@ -220,119 +201,26 @@ WaitForHandle(handle: *JobHandle)
 	assert handle != null, "Cannot wait for a null handle";
 
 	defer DeallocJobHandle(handle);
-	defer log "Wait finished", handle;
 
-	fiberIndex := GetFiberIndex();
-	if (fiberIndex != -1)
+	index := GetCurrentFiberIndex();
+	if (index != -1)
 	{
-		// Waiting for a job on a fiber thread, continue running jobs
-		while (!handle.Finished())
+		queue := fibers.jobQueueArr[index];
+		while (!handle.Completed())
 		{
-			LogFiberDebug(0, handle);
-			RunNext(fiberIndex, true);
+			RunNextFiberJob(queue);
 		}
 		return;
 	}
 
-	currThreadID := GetCurrentThreadID();
-	// Don't stall main thread
-	if (currThreadID == fibers.mainThreadID)
+	if (GetCurrentThreadID() == fibers.mainThreadID)
 	{
-		while (!handle.Finished())
+		while (!handle.Completed())
 		{
-			LogFiberDebug(1, handle);
 			FlushMainThreadJobs();
 		}
 		return;
 	}
 
-	// Waiting on a non fiber thread, spin
-	while (!handle.Finished()) 
-	{
-		LogFiberDebug(2, handle);
-		//Thread.Sleep(1);
-	}
-}
-
-uint CreateFiberThread(index: uint)
-{
-	threadID := fibers.threadIDs[index];
-	thread := Thread.Create(::int32(index: *void) {
-		RunFiber(index as uint);
-		return 0;
-	}, index as *void, threadID);
-
-	return thread;
-}
-
-RunOnMainFiber(func: ::(*any), data: *any, handle: **JobHandle = null)
-{
-	mainIndex := fibers.processCount;
-	jobHandle := GetJobHandle(1, handle, mainIndex);
-	job := Job(func, data, jobHandle);
-
-	AddJobForIndex(job, mainIndex);
-}
-
-RunOnMainThread(func: ::(*any), data: *any, handle: **JobHandle = null)
-{
-	jobHandle := GetJobHandle(1, handle, 0);
-	job := Job(func, data, jobHandle);
-
-	fibers.mainThreadJobs.Enqueue(job);
-}
-
-RunJob(job: Job, index: uint)
-{
-	fibers.threadRunningJob[index]~ = true;
-	job.func(job.data);
-	fibers.jobsRun.Add(1);
-
-	if (job.handle)
-	{
-		job.handle.Decrement();
-		fibers.jobsFinished.Add(1);
-	}
-	
-	fibers.threadRunningJob[index]~ = false;
-}
-
-FlushMainThreadJobs()
-{
-	index := fibers.processCount + 2;
-	job := fibers.mainThreadJobs.Dequeue(true);
-	while (job.func)
-	{
-		RunJob(job, index);
-		job = fibers.mainThreadJobs.Dequeue(true);
-	}
-}
-
-Job GetNextJob(index: uint, ret: bool)
-{
-	job := Job();
-
-	jobQueue :=  fibers.jobQueues[index];
-	job = jobQueue.Dequeue(ret);
-
-	return job;
-}
-
-RunNext(index: uint, ret: bool = false)
-{
-	job := GetNextJob(index, ret);
-	if (job.func)
-	{
-		RunJob(job, index);
-	}
-}
-
-RunFiber(index: uint)
-{
-	//log "Starting fiber thread", index;
-	
-	while (fibers.running)
-	{
-		RunNext(index);
-	}
+	while (!handle.Completed()) {}
 }

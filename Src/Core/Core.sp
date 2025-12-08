@@ -7,12 +7,14 @@ import SDL
 import Event
 import SceneRegistry
 import Input
+import Math
 
 running := false;
 
 Initialize()
 {
 	InitializeTime();
+	Math.SetRandomSeed(Time.StartTime);
 	Fiber.InitalizeFibers();
 
 	SDL.Init(SDL.InitFlags.VIDEO);
