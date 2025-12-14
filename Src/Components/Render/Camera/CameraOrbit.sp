@@ -28,9 +28,8 @@ CameraOrbitSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	if (wheelDelta.y)
 	{
 		forward := camera.Forward();
-		amount := wheelDelta.y * cameraOrbit.scrollDamping;
+		amount := wheelDelta.y * cameraOrbit.scrollDamping * -1.0;
 		delta := forward * amount;
-		log "Moving camera: ", camera, delta, amount, forward;
-		camera.position = camera.position * delta;
+		camera.position = camera.position + delta;
 	}
 });

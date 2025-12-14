@@ -15,12 +15,14 @@ enum HeaderTypeKind
 state HeaderContext
 {
 	typeDefLookup := Map<string, *JSONObject>(),
+	enumLookup := Map<int, *JSONObject>(),
 	unionLookup := Map<string, *JSONObject>()
 }
 
 HeaderContext::delete
 {
 	delete this.typeDefLookup;
+	delete this.enumLookup;
 	delete this.unionLookup;
 }
 
@@ -137,6 +139,12 @@ ParseHeaderJSON(file: string, outFile: string)
 			name := GetName(obj);
 			type := obj.GetMember("type").Object();
 			context.typeDefLookup.Insert(name, type);
+			typeTag := type.GetMember("tag").String();
+			if (typeTag && typeTag.value == ":enum")
+			{
+				enumID := type.GetMember("id").Number().value.i;
+				context.enumLookup.Insert(enumID, obj);
+			}
 		}
 
 		if (tag == "union")
@@ -162,13 +170,13 @@ ParseHeaderJSON(file: string, outFile: string)
 
 		if (tag == "enum")
 		{
-			ParseHeaderEnum(obj, enums);
+			ParseHeaderEnum(obj, enums, context);
 		}
 	}
 
 	str := "";
 
-	str.AppendIn("extern\n{")
+	str.AppendIn("extern\n{\n")
 	str.AppendIn(PrintFunctions(functions));
 	str.AppendIn("}\n");
 	str.AppendIn(PrintEnums(enums));
@@ -240,6 +248,11 @@ ParseHeaderFunction(obj: *JSONObject, functions: []HeaderFunction, context: Head
 		type.kind = HeaderTypeKind.Named;
 		type.type.name = "uint64";
 	}
+	else if (tag == ":unsigned-long-long")
+	{
+		type.kind = HeaderTypeKind.Named;
+		type.type.name = "uint64";
+	}
 	else if (tag == ":signed-char")
 	{
 		type.kind = HeaderTypeKind.Named;
@@ -264,6 +277,11 @@ ParseHeaderFunction(obj: *JSONObject, functions: []HeaderFunction, context: Head
 	{
 		type.kind = HeaderTypeKind.Named;
 		type.type.name = "uint16";
+	}
+	else if (tag == ":bool" || tag == ":_Bool")
+	{
+		type.kind = HeaderTypeKind.Named;
+		type.type.name = "bool";
 	}
 	else if (tag == ":function-pointer")
 	{
@@ -405,7 +423,7 @@ string PrintStruct(struct: HeaderStruct)
 	}
 	if (!struct.members.count)
 	{
-		str = str + "opaque: any";
+		str = str + "\topaque: any";
 	}
 	str = str + "\n}\n\n";
 	return str;
@@ -423,10 +441,20 @@ string PrintStructs(structs: []HeaderStruct)
 	return str;
 }
 
-ParseHeaderEnum(obj: *JSONObject, enums: []HeaderEnum)
+ParseHeaderEnum(obj: *JSONObject, enums: []HeaderEnum, context: HeaderContext)
 {
 	_enum := HeaderEnum();
 	_enum.name = GetName(obj);
+	if (!_enum.name)
+	{
+		enumID := obj.GetMember("id").Number().value.i;
+		if (context.enumLookup.Has(enumID))
+		{
+			typeDefObj := context.enumLookup.Find(enumID)~;
+			_enum.name = GetName(typeDefObj);
+		}
+	}
+
 	fields := obj.GetMember("fields").Array();
 	for (field in fields.values)
 	{

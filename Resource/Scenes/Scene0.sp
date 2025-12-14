@@ -21,10 +21,10 @@ _ := SceneRegistry.RegisterScene(
 		
 		camera := Camera();
 		camera.position = Vec3(0.0, 0.0, 4.0);
-		camera.fov = Math.Deg2Rad(45.0);
+		camera.fov = Math.Deg2Rad(70.0);
 		camera.aspect = 1.0;
 		camera.near = 0.1;
-		camera.far = 10.0;
+		camera.far = 1000.0;
 		camera.LookAt(Vec3(0.0, 0.0, 0.0));
 
 		scene.SetSingleton<Camera>(camera);
@@ -51,7 +51,7 @@ _ := SceneRegistry.RegisterScene(
 		log "Loading GLTF: ", model;
 		gltfEntities := AllocThreadParam<Array<Entity>>();
 		gltfEntities~ = Array<Entity>();
-		boxGLTFHandle := LoadGLTFResource(
+		gltfHandle := LoadGLTFResource(
 			model,
 			scene,
 			::(handle: ResourceHandle, param: *GLTFLoadParam) 

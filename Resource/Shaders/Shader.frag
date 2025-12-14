@@ -22,6 +22,5 @@ layout(location = 0) out vec4 outColor;
 
 void main() 
 {
-	outColor = material.baseColor;
-    //outColor = color * material.baseColor * texture(colorTexture, uv0);
+    outColor = color * material.baseColor * texture(colorTexture, uv0);
 }

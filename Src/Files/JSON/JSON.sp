@@ -255,6 +255,11 @@ string ParseString(view: StringView, json: JSON)
 	strCount := 0;
 	while (view[0]~ != '"') 
 	{
+		if (view[0]~ == '\\')
+		{
+			view.Increment();
+			strCount += 1;
+		}
 		view.Increment();
 		strCount += 1;
 	}
