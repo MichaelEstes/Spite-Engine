@@ -15,6 +15,7 @@ extern
 
     *Surface SDL_ConvertSurface(surface: *Surface, format: PixelFormat);
     void SDL_DestroySurface(surface: *Surface);
+    int32 SDL_GetVersion();
 }
 
 enum InitFlags
@@ -240,3 +241,5 @@ bool GetWindowSize(window: *Window, width: *int32, height: *int32) => SDL_GetWin
 
 *Surface ConvertSurface(surface: *Surface, format: PixelFormat) => SDL_ConvertSurface(surface, format);
 DestroySurface(surface: *Surface) => SDL_DestroySurface(surface);
+
+int32 Version() => SDL_GetVersion();

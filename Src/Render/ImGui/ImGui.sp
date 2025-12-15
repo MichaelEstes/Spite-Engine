@@ -1,5 +1,9 @@
+package ImGui
+
 extern
 {
+	#link windows "./extern/ImGui";
+
 	uint64 ImTextureRef_GetTexID(self: *ImTextureRef_t);
 	*ImGuiContext_t ImGui_CreateContext(shared_font_atlas: *ImFontAtlas_t);
 	void ImGui_DestroyContext(ctx: *ImGuiContext_t);
@@ -18,7 +22,7 @@ extern
 	void ImGui_ShowIDStackToolWindow();
 	void ImGui_ShowIDStackToolWindowEx(p_open: *bool);
 	void ImGui_ShowAboutWindow(p_open: *bool);
-	void ImGui_ShowStyleEditor(ref: *ImGuiStyle_t);
+	void ImGui_ShowStyleEditor(styleRef: *ImGuiStyle_t);
 	bool ImGui_ShowStyleSelector(label: *byte);
 	void ImGui_ShowFontSelector(label: *byte);
 	void ImGui_ShowUserGuide();
@@ -136,22 +140,22 @@ extern
 	void ImGui_TextUnformatted(text: *byte);
 	void ImGui_TextUnformattedEx(text: *byte, text_end: *byte);
 	void ImGui_Text(fmt: *byte);
-	void ImGui_TextV(fmt: *byte, args: __builtin_va_list);
+	void ImGui_TextV(fmt: *byte, args: any);
 	void ImGui_TextColored(col: ImVec4_t, fmt: *byte);
 	void ImGui_TextColoredUnformatted(col: ImVec4_t, text: *byte);
-	void ImGui_TextColoredV(col: ImVec4_t, fmt: *byte, args: __builtin_va_list);
+	void ImGui_TextColoredV(col: ImVec4_t, fmt: *byte, args: any);
 	void ImGui_TextDisabled(fmt: *byte);
 	void ImGui_TextDisabledUnformatted(text: *byte);
-	void ImGui_TextDisabledV(fmt: *byte, args: __builtin_va_list);
+	void ImGui_TextDisabledV(fmt: *byte, args: any);
 	void ImGui_TextWrapped(fmt: *byte);
 	void ImGui_TextWrappedUnformatted(text: *byte);
-	void ImGui_TextWrappedV(fmt: *byte, args: __builtin_va_list);
+	void ImGui_TextWrappedV(fmt: *byte, args: any);
 	void ImGui_LabelText(label: *byte, fmt: *byte);
 	void ImGui_LabelTextUnformatted(label: *byte, text: *byte);
-	void ImGui_LabelTextV(label: *byte, fmt: *byte, args: __builtin_va_list);
+	void ImGui_LabelTextV(label: *byte, fmt: *byte, args: any);
 	void ImGui_BulletText(fmt: *byte);
 	void ImGui_BulletTextUnformatted(text: *byte);
-	void ImGui_BulletTextV(fmt: *byte, args: __builtin_va_list);
+	void ImGui_BulletTextV(fmt: *byte, args: any);
 	void ImGui_SeparatorText(label: *byte);
 	bool ImGui_Button(label: *byte);
 	bool ImGui_ButtonEx(label: *byte, size: ImVec2_t);
@@ -253,8 +257,8 @@ extern
 	bool ImGui_InputInt2(label: *byte, v: [2]int32, flags: int32);
 	bool ImGui_InputInt3(label: *byte, v: [3]int32, flags: int32);
 	bool ImGui_InputInt4(label: *byte, v: [4]int32, flags: int32);
-	bool ImGui_InputDouble(label: *byte, v: *:double);
-	bool ImGui_InputDoubleEx(label: *byte, v: *:double, step: :double, step_fast: :double, format: *byte, flags: int32);
+	bool ImGui_InputDouble(label: *byte, v: *float64);
+	bool ImGui_InputDoubleEx(label: *byte, v: *float64, step: float64, step_fast: float64, format: *byte, flags: int32);
 	bool ImGui_InputScalar(label: *byte, data_type: int32, p_data: *void);
 	bool ImGui_InputScalarEx(label: *byte, data_type: int32, p_data: *void, p_step: *void, p_step_fast: *void, format: *byte, flags: int32);
 	bool ImGui_InputScalarN(label: *byte, data_type: int32, p_data: *void, components: int32);
@@ -271,15 +275,15 @@ extern
 	bool ImGui_TreeNodeStrUnformatted(str_id: *byte, text: *byte);
 	bool ImGui_TreeNodePtr(ptr_id: *void, fmt: *byte);
 	bool ImGui_TreeNodePtrUnformatted(ptr_id: *void, text: *byte);
-	bool ImGui_TreeNodeV(str_id: *byte, fmt: *byte, args: __builtin_va_list);
-	bool ImGui_TreeNodeVPtr(ptr_id: *void, fmt: *byte, args: __builtin_va_list);
+	bool ImGui_TreeNodeV(str_id: *byte, fmt: *byte, args: any);
+	bool ImGui_TreeNodeVPtr(ptr_id: *void, fmt: *byte, args: any);
 	bool ImGui_TreeNodeEx(label: *byte, flags: int32);
 	bool ImGui_TreeNodeExStr(str_id: *byte, flags: int32, fmt: *byte);
 	bool ImGui_TreeNodeExStrUnformatted(str_id: *byte, flags: int32, text: *byte);
 	bool ImGui_TreeNodeExPtr(ptr_id: *void, flags: int32, fmt: *byte);
 	bool ImGui_TreeNodeExPtrUnformatted(ptr_id: *void, flags: int32, text: *byte);
-	bool ImGui_TreeNodeExV(str_id: *byte, flags: int32, fmt: *byte, args: __builtin_va_list);
-	bool ImGui_TreeNodeExVPtr(ptr_id: *void, flags: int32, fmt: *byte, args: __builtin_va_list);
+	bool ImGui_TreeNodeExV(str_id: *byte, flags: int32, fmt: *byte, args: any);
+	bool ImGui_TreeNodeExVPtr(ptr_id: *void, flags: int32, fmt: *byte, args: any);
 	void ImGui_TreePush(str_id: *byte);
 	void ImGui_TreePushPtr(ptr_id: *void);
 	void ImGui_TreePop();
@@ -295,7 +299,7 @@ extern
 	*ImGuiMultiSelectIO_t ImGui_BeginMultiSelect(flags: int32);
 	*ImGuiMultiSelectIO_t ImGui_BeginMultiSelectEx(flags: int32, selection_size: int32, items_count: int32);
 	*ImGuiMultiSelectIO_t ImGui_EndMultiSelect();
-	void ImGui_SetNextItemSelectionUserData(selection_user_data: :long-long);
+	void ImGui_SetNextItemSelectionUserData(selection_user_data: int64);
 	bool ImGui_IsItemToggledSelection();
 	bool ImGui_BeginListBox(label: *byte, size: ImVec2_t);
 	void ImGui_EndListBox();
@@ -324,11 +328,11 @@ extern
 	void ImGui_EndTooltip();
 	void ImGui_SetTooltip(fmt: *byte);
 	void ImGui_SetTooltipUnformatted(text: *byte);
-	void ImGui_SetTooltipV(fmt: *byte, args: __builtin_va_list);
+	void ImGui_SetTooltipV(fmt: *byte, args: any);
 	bool ImGui_BeginItemTooltip();
 	void ImGui_SetItemTooltip(fmt: *byte);
 	void ImGui_SetItemTooltipUnformatted(text: *byte);
-	void ImGui_SetItemTooltipV(fmt: *byte, args: __builtin_va_list);
+	void ImGui_SetItemTooltipV(fmt: *byte, args: any);
 	bool ImGui_BeginPopup(str_id: *byte, flags: int32);
 	bool ImGui_BeginPopupModal(name: *byte, p_open: *bool, flags: int32);
 	void ImGui_EndPopup();
@@ -387,7 +391,7 @@ extern
 	void ImGui_LogButtons();
 	void ImGui_LogText(fmt: *byte);
 	void ImGui_LogTextUnformatted(text: *byte);
-	void ImGui_LogTextV(fmt: *byte, args: __builtin_va_list);
+	void ImGui_LogTextV(fmt: *byte, args: any);
 	bool ImGui_BeginDragDropSource(flags: int32);
 	bool ImGui_SetDragDropPayload(type: *byte, data: *void, sz: uint64, cond: int32);
 	void ImGui_EndDragDropSource();
@@ -427,7 +431,7 @@ extern
 	*ImDrawList_t ImGui_GetForegroundDrawList();
 	bool ImGui_IsRectVisibleBySize(size: ImVec2_t);
 	bool ImGui_IsRectVisible(rect_min: ImVec2_t, rect_max: ImVec2_t);
-	:double ImGui_GetTime();
+	float64 ImGui_GetTime();
 	int32 ImGui_GetFrameCount();
 	*ImDrawListSharedData_t ImGui_GetDrawListSharedData();
 	*byte ImGui_GetStyleColorName(idx: int32);
@@ -435,8 +439,8 @@ extern
 	*ImGuiStorage_t ImGui_GetStateStorage();
 	ImVec2_t ImGui_CalcTextSize(text: *byte);
 	ImVec2_t ImGui_CalcTextSizeEx(text: *byte, text_end: *byte, hide_text_after_double_hash: bool, wrap_width: float32);
-	ImVec4_t ImGui_ColorConvertU32ToFloat4(in: uint32);
-	uint32 ImGui_ColorConvertFloat4ToU32(in: ImVec4_t);
+	ImVec4_t ImGui_ColorConvertU32ToFloat4(val: uint32);
+	uint32 ImGui_ColorConvertFloat4ToU32(val: ImVec4_t);
 	void ImGui_ColorConvertRGBtoHSV(r: float32, g: float32, b: float32, out_h: *float32, out_s: *float32, out_v: *float32);
 	void ImGui_ColorConvertHSVtoRGB(h: float32, s: float32, v: float32, out_r: *float32, out_g: *float32, out_b: *float32);
 	bool ImGui_IsKeyDown(key: int32);
@@ -482,7 +486,7 @@ extern
 	bool ImGui_DebugCheckVersionAndDataLayout(version_str: *byte, sz_io: uint64, sz_style: uint64, sz_vec2: uint64, sz_vec4: uint64, sz_drawvert: uint64, sz_drawidx: uint64);
 	void ImGui_DebugLog(fmt: *byte);
 	void ImGui_DebugLogUnformatted(text: *byte);
-	void ImGui_DebugLogV(fmt: *byte, args: __builtin_va_list);
+	void ImGui_DebugLogV(fmt: *byte, args: any);
 	void ImGui_SetAllocatorFunctions(alloc_func: ::(), free_func: ::(), user_data: *void);
 	void ImGui_GetAllocatorFunctions(p_alloc_func: *::(), p_free_func: *::(), p_user_data: **void);
 	*void ImGui_MemAlloc(size: uint64);
@@ -532,7 +536,7 @@ extern
 	*byte ImGuiTextBuffer_c_str(self: *ImGuiTextBuffer_t);
 	void ImGuiTextBuffer_append(self: *ImGuiTextBuffer_t, str: *byte, str_end: *byte);
 	void ImGuiTextBuffer_appendf(self: *ImGuiTextBuffer_t, fmt: *byte);
-	void ImGuiTextBuffer_appendfv(self: *ImGuiTextBuffer_t, fmt: *byte, args: __builtin_va_list);
+	void ImGuiTextBuffer_appendfv(self: *ImGuiTextBuffer_t, fmt: *byte, args: any);
 	void ImGuiStorage_Clear(self: *ImGuiStorage_t);
 	int32 ImGuiStorage_GetInt(self: *ImGuiStorage_t, key: uint32, default_val: int32);
 	void ImGuiStorage_SetInt(self: *ImGuiStorage_t, key: uint32, val: int32);
@@ -660,7 +664,7 @@ extern
 	void ImDrawData_AddDrawList(self: *ImDrawData_t, draw_list: *ImDrawList_t);
 	void ImDrawData_DeIndexAllBuffers(self: *ImDrawData_t);
 	void ImDrawData_ScaleClipRects(self: *ImDrawData_t, fb_scale: ImVec2_t);
-	void ImTextureData_Create(self: *ImTextureData_t, format: , w: int32, h: int32);
+	void ImTextureData_Create(self: *ImTextureData_t, format: ImTextureFormat, w: int32, h: int32);
 	void ImTextureData_DestroyPixels(self: *ImTextureData_t);
 	*void ImTextureData_GetPixels(self: *ImTextureData_t);
 	*void ImTextureData_GetPixelsAt(self: *ImTextureData_t, x: int32, y: int32);
@@ -669,7 +673,7 @@ extern
 	ImTextureRef_t ImTextureData_GetTexRef(self: *ImTextureData_t);
 	uint64 ImTextureData_GetTexID(self: *ImTextureData_t);
 	void ImTextureData_SetTexID(self: *ImTextureData_t, tex_id: uint64);
-	void ImTextureData_SetStatus(self: *ImTextureData_t, status: );
+	void ImTextureData_SetStatus(self: *ImTextureData_t, status: ImTextureStatus);
 	void ImFontGlyphRangesBuilder_Clear(self: *ImFontGlyphRangesBuilder_t);
 	bool ImFontGlyphRangesBuilder_GetBit(self: *ImFontGlyphRangesBuilder_t, n: uint64);
 	void ImFontGlyphRangesBuilder_SetBit(self: *ImFontGlyphRangesBuilder_t, n: uint64);
@@ -1017,7 +1021,7 @@ enum ImGuiDataType_: uint32
 	ImGuiDataType_COUNT = 12
 }
 
-enum : uint32
+enum ImGuiDir_: uint32
 {
 	ImGuiDir_None = 4294967295,
 	ImGuiDir_Left = 0,
@@ -1027,14 +1031,14 @@ enum : uint32
 	ImGuiDir_COUNT = 4
 }
 
-enum : uint32
+enum ImGuiSortDirection_: uint32
 {
 	ImGuiSortDirection_None = 0,
 	ImGuiSortDirection_Ascending = 1,
 	ImGuiSortDirection_Descending = 2
 }
 
-enum : uint32
+enum ImGuiKey_: uint32
 {
 	ImGuiKey_None = 0,
 	ImGuiKey_NamedKey_BEGIN = 512,
@@ -1442,7 +1446,7 @@ enum ImGuiMouseCursor_: uint32
 	ImGuiMouseCursor_COUNT = 11
 }
 
-enum : uint32
+enum ImGuiMouseSource_: uint32
 {
 	ImGuiMouseSource_Mouse = 0,
 	ImGuiMouseSource_TouchScreen = 1,
@@ -2013,13 +2017,13 @@ state ImGuiIO_t
 	WantCaptureMouseUnlessPopupClose: bool,
 	MousePosPrev: ImVec2_t,
 	MouseClickedPos: [5]ImVec2_t,
-	MouseClickedTime: [5]:double,
+	MouseClickedTime: [5]float64,
 	MouseClicked: [5]bool,
 	MouseDoubleClicked: [5]bool,
 	MouseClickedCount: [5]uint16,
 	MouseClickedLastCount: [5]uint16,
 	MouseReleased: [5]bool,
-	MouseReleasedTime: [5]:double,
+	MouseReleasedTime: [5]float64,
 	MouseDownOwned: [5]bool,
 	MouseDownOwnedUnlessPopupClose: [5]bool,
 	MouseWheelRequestAxisSwap: bool,
@@ -2096,7 +2100,11 @@ state ImGuiTextBuffer_t
 state ImGuiStoragePair_t
 {
 	key: uint32,
-	: union
+	vals: ?{
+		val_i: int32,
+		val_f: float32,
+		val_p: *void
+	}
 }
 
 state ImGuiStorage_t
@@ -2111,8 +2119,8 @@ state ImGuiListClipper_t
 	DisplayEnd: int32,
 	ItemsCount: int32,
 	ItemsHeight: float32,
-	StartPosY: :double,
-	StartSeekOffsetY: :double,
+	StartPosY: float64,
+	StartSeekOffsetY: float64,
 	TempData: *void,
 	Flags: int32
 }
@@ -2125,8 +2133,8 @@ state ImColor_t
 state ImGuiMultiSelectIO_t
 {
 	Requests: ImVector_ImGuiSelectionRequest_t,
-	RangeSrcItem: :long-long,
-	NavIdItem: :long-long,
+	RangeSrcItem: int64,
+	NavIdItem: int64,
 	NavIdSelected: bool,
 	RangeSrcReset: bool,
 	ItemsCount: int32
@@ -2134,11 +2142,11 @@ state ImGuiMultiSelectIO_t
 
 state ImGuiSelectionRequest_t
 {
-	Type: ,
+	Type: ImGuiSelectionRequestType,
 	Selected: bool,
 	RangeDirection: byte,
-	RangeFirstItem: :long-long,
-	RangeLastItem: :long-long
+	RangeFirstItem: int64,
+	RangeLastItem: int64
 }
 
 state ImGuiSelectionBasicStorage_t
@@ -2242,10 +2250,10 @@ state ImTextureRect_t
 state ImTextureData_t
 {
 	UniqueID: int32,
-	Status: ,
+	Status: ImTextureStatus,
 	BackendUserData: *void,
 	TexID: uint64,
-	Format: ,
+	Format: ImTextureFormat,
 	Width: int32,
 	Height: int32,
 	BytesPerPixel: int32,
@@ -2290,10 +2298,11 @@ state ImFontConfig_t
 
 state ImFontGlyph_t
 {
-	Colored: :bitfield,
-	Visible: :bitfield,
-	SourceIdx: :bitfield,
-	Codepoint: :bitfield,
+	//unsigned int Colored : 1;     // Flag to indicate glyph is colored and should generally ignore tinting (make it usable with no shift on little-endian as this is used in loops)
+    //unsigned int Visible : 1;     // Flag to indicate glyph has no visible pixels (e.g. space). Allow early out when rendering.
+    //unsigned int SourceIdx : 4;   // Index of source in parent font
+    //unsigned int Codepoint : 26;  // 0x0000..0x10FFFF
+	Bits: uint32,
 	AdvanceX: float32,
 	X0: float32,
 	Y0: float32,
@@ -2324,14 +2333,14 @@ state ImFontAtlasRect_t
 state ImFontAtlas_t
 {
 	Flags: int32,
-	TexDesiredFormat: ,
+	TexDesiredFormat: ImTextureFormat,
 	TexGlyphPadding: int32,
 	TexMinWidth: int32,
 	TexMinHeight: int32,
 	TexMaxWidth: int32,
 	TexMaxHeight: int32,
 	UserData: *void,
-	: union,
+	TexRef: ImTextureRef_t,
 	TexData: *ImTextureData_t,
 	TexList: ImVector_ImTextureDataPtr_t,
 	Locked: bool,
@@ -2367,10 +2376,11 @@ state ImFontBaked_t
 	FallbackGlyphIndex: int32,
 	Ascent: float32,
 	Descent: float32,
-	MetricsTotalSurface: :bitfield,
-	WantDestroy: :bitfield,
-	LoadNoFallback: :bitfield,
-	LoadNoRenderOnLayout: :bitfield,
+	//unsigned int         MetricsTotalSurface : 26;  // 3  // out // Total surface in pixels to get an idea of the font rasterization/texture cost (not exact, we approximate the cost of padding between glyphs)
+    //unsigned int         WantDestroy : 1;           // 0  //     // Queued for destroy
+    //unsigned int         LoadNoFallback : 1;        // 0  //     // Disable loading fallback in lower-level calls.
+    //unsigned int         LoadNoRenderOnLayout : 1;  // 0  //     // Enable a two-steps mode where CalcTextSize() calls will load AdvanceX *without* rendering/packing glyphs. Only advantagous if you know that the glyph is unlikely to actually be rendered, otherwise it is slower because we'd do one query on the first CalcTextSize and one query on the first Draw.
+	Bits: uint32,
 	LastUsedFrame: int32,
 	BakedId: uint32,
 	OwnerFont: *ImFont_t,

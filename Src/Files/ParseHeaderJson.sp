@@ -228,6 +228,11 @@ ParseHeaderFunction(obj: *JSONObject, functions: []HeaderFunction, context: Head
 		type.kind = HeaderTypeKind.Named;
 		type.type.name = "float32";
 	}
+	else if (tag == ":double")
+	{
+		type.kind = HeaderTypeKind.Named;
+		type.type.name = "float64";
+	}
 	else if (tag == ":int")
 	{
 		type.kind = HeaderTypeKind.Named;
@@ -247,6 +252,11 @@ ParseHeaderFunction(obj: *JSONObject, functions: []HeaderFunction, context: Head
 	{
 		type.kind = HeaderTypeKind.Named;
 		type.type.name = "uint64";
+	}
+	else if (tag == ":long-long")
+	{
+		type.kind = HeaderTypeKind.Named;
+		type.type.name = "int64";
 	}
 	else if (tag == ":unsigned-long-long")
 	{
