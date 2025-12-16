@@ -10,22 +10,22 @@ extern
 	void cImGui_ImplVulkan_Shutdown();
 	void cImGui_ImplVulkan_NewFrame();
 	void cImGui_ImplVulkan_RenderDrawData(draw_data: *ImDrawData_t, command_buffer: *VkCommandBuffer_T);
-	void cImGui_ImplVulkan_RenderDrawDataEx(draw_data: *ImDrawData_t, command_buffer: *VkCommandBuffer_T, pipeline: VkPipeline);
+	void cImGui_ImplVulkan_RenderDrawDataEx(draw_data: *ImDrawData_t, command_buffer: *VkCommandBuffer_T, pipeline: *VkPipeline_T);
 	void cImGui_ImplVulkan_SetMinImageCount(min_image_count: uint32);
 	void cImGui_ImplVulkan_CreateMainPipeline(info: *ImGui_ImplVulkan_PipelineInfo_t);
-	void cImGui_ImplVulkan_UpdateTexture(tex: *ImTextureData);
-	VkDescriptorSet cImGui_ImplVulkan_AddTexture(sampler: VkSampler, image_view: VkImageView, image_layout: VkImageLayout);
-	void cImGui_ImplVulkan_RemoveTexture(descriptor_set: VkDescriptorSet);
+	void cImGui_ImplVulkan_UpdateTexture(tex: *ImTextureData_t);
+	*VkDescriptorSet_T cImGui_ImplVulkan_AddTexture(sampler: *VkSampler_T, image_view: *VkImageView_T, image_layout: VkImageLayout);
+	void cImGui_ImplVulkan_RemoveTexture(descriptor_set: *VkDescriptorSet_T);
 	bool cImGui_ImplVulkan_LoadFunctions(api_version: uint32, loader_func: ::());
 	bool cImGui_ImplVulkan_LoadFunctionsEx(api_version: uint32, loader_func: ::(), user_data: *void);
-	void cImGui_ImplVulkanH_CreateOrResizeWindow(instance: *VkInstance_T, physical_device: *VkPhysicalDevice_T, device: VkDevice, wd: *ImGui_ImplVulkanH_Window_t, queue_family: uint32, allocator: *VkAllocationCallbacks, w: int32, h: int32, min_image_count: uint32, image_usage: VkImageUsageFlags);
+	void cImGui_ImplVulkanH_CreateOrResizeWindow(instance: *VkInstance_T, physical_device: *VkPhysicalDevice_T, device: *VkDevice_T, wd: *ImGui_ImplVulkanH_Window_t, queue_family: uint32, allocator: *VkAllocationCallbacks, w: int32, h: int32, min_image_count: uint32, image_usage: VkImageUsageFlagBits);
 	void cImGui_ImplVulkanH_DestroyWindow(instance: *VkInstance_T, device: *VkDevice_T, wd: *ImGui_ImplVulkanH_Window_t, allocator: *VkAllocationCallbacks);
-	VkSurfaceFormatKHR cImGui_ImplVulkanH_SelectSurfaceFormat(physical_device: *VkPhysicalDevice_T, surface: VkSurfaceKHR, request_formats: *VkFormat, request_formats_count: int32, request_color_space: VkColorSpaceKHR);
-	VkPresentModeKHR cImGui_ImplVulkanH_SelectPresentMode(physical_device: *VkPhysicalDevice_T, surface: VkSurfaceKHR, request_modes: *VkPresentModeKHR, request_modes_count: int32);
+	VkSurfaceFormatKHR cImGui_ImplVulkanH_SelectSurfaceFormat(physical_device: *VkPhysicalDevice_T, surface: *VkSurfaceKHR_T, request_formats: *VkFormat, request_formats_count: int32, request_color_space: VkColorSpaceKHR);
+	VkPresentModeKHR cImGui_ImplVulkanH_SelectPresentMode(physical_device: *VkPhysicalDevice_T, surface: *VkSurfaceKHR_T, request_modes: *VkPresentModeKHR, request_modes_count: int32);
 	*VkPhysicalDevice_T cImGui_ImplVulkanH_SelectPhysicalDevice(instance: *VkInstance_T);
 	uint32 cImGui_ImplVulkanH_SelectQueueFamilyIndex(physical_device: *VkPhysicalDevice_T);
 	int32 cImGui_ImplVulkanH_GetMinImageCountFromPresentMode(present_mode: VkPresentModeKHR);
-	*ImGui_ImplVulkanH_Window_t cImGui_ImplVulkanH_GetWindowDataFromViewport(viewport: *ImGuiViewport);
+	*ImGui_ImplVulkanH_Window_t cImGui_ImplVulkanH_GetWindowDataFromViewport(viewport: *ImGuiViewport_t);
 }
 
 state ImGui_ImplVulkan_PipelineInfo_t
@@ -44,7 +44,7 @@ state ImGui_ImplVulkan_InitInfo_t
 	PhysicalDevice: *VkPhysicalDevice_T,
 	Device: *VkDevice_T,
 	QueueFamily: uint32,
-	Queue: VkQueue,
+	Queue: *VkQueue_T,
 	DescriptorPool: *VkDescriptorPool_T,
 	DescriptorPoolSize: uint32,
 	MinImageCount: uint32,

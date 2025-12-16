@@ -5,17 +5,22 @@ extern
 	#link windows "./extern/SDL3";
     #link linux "./extern/libSDL3";
 
-	*Window SDL_CreateWindow(title: *byte, w: int32, h: int32, flags: uint64);
-	void SDL_DestroyWindow(window: *Window);
 	bool SDL_Init(flags: uint32);
 	void SDL_Quit();
+    
+	*Window SDL_CreateWindow(title: *byte, w: int32, h: int32, flags: uint64);
+	void SDL_DestroyWindow(window: *Window);
     bool SDL_GetWindowSize(window: *Window, width: *int32, height: *int32);
 	bool SDL_GetWindowSizeInPixels(window: *Window, width: *int32, height: *int32);
-	*byte SDL_GetError();
+	uint32 SDL_GetWindowProperties(window: *Window);
+
+    *byte SDL_GetError();
 
     *Surface SDL_ConvertSurface(surface: *Surface, format: PixelFormat);
     void SDL_DestroySurface(surface: *Surface);
+
     int32 SDL_GetVersion();
+    *void SDL_GetPointerProperty(propID: uint32, name: *byte, defaultValue: *void);
 }
 
 enum InitFlags
@@ -238,8 +243,11 @@ void Check(error: bool, onError: ::(*byte))
 void DestroyWindow(window: *Window) => SDL_DestroyWindow(window);
 bool GetWindowSizeInPixels(window: *Window, width: *int32, height: *int32) => SDL_GetWindowSizeInPixels(window, width, height);
 bool GetWindowSize(window: *Window, width: *int32, height: *int32) => SDL_GetWindowSize(window, width, height);
+uint32 GetWindowProperties(window: *Window) => SDL_GetWindowProperties(window);
 
 *Surface ConvertSurface(surface: *Surface, format: PixelFormat) => SDL_ConvertSurface(surface, format);
 DestroySurface(surface: *Surface) => SDL_DestroySurface(surface);
 
 int32 Version() => SDL_GetVersion();
+*void GetPointerProperty(propID: uint32, name: *byte, defaultValue: *void) 
+                         => SDL_GetPointerProperty(propID, name, defaultValue);

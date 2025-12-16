@@ -2,6 +2,8 @@ package VulkanRenderer
 
 import ArrayView
 
+import ImGui
+
 UINT64_MAX := uint64(-1);
 VkFalse := uint32(0);
 VkTrue := uint32(1);
@@ -270,6 +272,23 @@ InitializeVulkanInstance()
 				mesh := scene.GetComponent<Mesh>(entity);
 				
 				UploadMesh(sceneEntity, mesh, renderer);
+			}
+		}
+	);
+
+	ECS.instance.events.On(
+		ImGuiWindowAddedEvent, 
+		::(sceneEntity: SceneEntity)
+		{
+			scene := sceneEntity.scene;
+			entity := sceneEntity.entity;
+
+			if (scene.HasSingleton<VulkanRenderer>())
+			{
+				renderer := scene.GetSingleton<VulkanRenderer>();
+				imGuiWindow := scene.GetComponent<ImGuiWindow>(entity);
+				
+				imGuiWindow.InitVulkan(renderer);
 			}
 		}
 	);
