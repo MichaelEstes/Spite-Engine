@@ -102,6 +102,7 @@ string GetTag(obj: *JSONObject) => obj.GetMember("tag").String().value;
 string GetName(obj: *JSONObject) => obj.GetMember("name").String().value;
 *JSONObject GetType(obj: *JSONObject) => obj.GetMember("type").Object();
 
+//ParseHeaderJSON("./Src/Render/ImGui/extern/dcimgui.h.json", "./Src/Render/ImGui/ImGui.temp");
 ParseHeaderJSON(file: string, outFile: string)
 {
 	json := JSON.ParseJSONFile(file);

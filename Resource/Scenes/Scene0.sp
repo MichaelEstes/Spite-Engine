@@ -14,6 +14,8 @@ import RenderComponents
 
 import ThreadParamAllocator
 
+import ImGui
+
 _ := SceneRegistry.RegisterScene(
 	0,
 	::(scene: *Scene) {
@@ -76,6 +78,16 @@ _ := SceneRegistry.RegisterScene(
 			},
 			gltfEntities
 		);
+
+		imGuiWindowEntity := scene.CreateEntity();
+		scene.SetComponent<ImGuiWindow>(imGuiWindowEntity, ImGuiWindow(
+			::(window: *ImGuiWindow, data: *any) 
+			{
+				log "IMGUI Window Render";
+			},
+			null,
+			1000, 1000
+		));
 
 		log "Loaded Main Scene";
 

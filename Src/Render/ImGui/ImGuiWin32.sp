@@ -2,6 +2,8 @@ package ImGui
 
 extern
 {
+	#link windows "./extern/ImGui";
+
 	bool cImGui_ImplWin32_Init(hwnd: *void);
 	bool cImGui_ImplWin32_InitForOpenGL(hwnd: *void);
 	void cImGui_ImplWin32_Shutdown();

@@ -285,6 +285,7 @@ InitializeVulkanInstance()
 
 			if (scene.HasSingleton<VulkanRenderer>())
 			{
+				log "ImGui Window Init Vulkan";
 				renderer := scene.GetSingleton<VulkanRenderer>();
 				imGuiWindow := scene.GetComponent<ImGuiWindow>(entity);
 				

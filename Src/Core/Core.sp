@@ -4,6 +4,7 @@ import ECS
 import Time
 import Window
 import SDL
+import ImGui
 import Event
 import SceneRegistry
 import Input
@@ -21,6 +22,7 @@ Initialize()
 	SDL.VulkanLoadLibrary(null);
 	
 	InitializeInput();
+	InitializeImGui();
 
 	SDLEventEmitter.On(SDL.EventType.QUIT, ::(event: SDL.Event) {
 		running = false;

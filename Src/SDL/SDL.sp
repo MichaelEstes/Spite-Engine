@@ -251,3 +251,5 @@ DestroySurface(surface: *Surface) => SDL_DestroySurface(surface);
 int32 Version() => SDL_GetVersion();
 *void GetPointerProperty(propID: uint32, name: *byte, defaultValue: *void) 
                          => SDL_GetPointerProperty(propID, name, defaultValue);
+
+Win32WindowHandle := "SDL.window.win32.hwnd"[0];

@@ -1651,6 +1651,26 @@ enum ImGuiViewportFlags_: uint32
 	ImGuiViewportFlags_OwnedByApp = 4
 }
 
+state ImDrawListSharedData_t
+{
+	opaque: any
+}
+
+state ImFontAtlasBuilder_t
+{
+	opaque: any
+}
+
+state ImFontLoader_t
+{
+	opaque: any
+}
+
+state ImGuiContext_t
+{
+	opaque: any
+}
+
 state ImVec2_t
 {
 	x: float32,
