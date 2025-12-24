@@ -2,8 +2,6 @@ package VulkanRenderer
 
 import ArrayView
 
-import ImGui
-
 UINT64_MAX := uint64(-1);
 VkFalse := uint32(0);
 VkTrue := uint32(1);
@@ -39,7 +37,7 @@ state VulkanInstance
 
 	renderPassCaches: Allocator<VulkanRenderPassCache>,
 	frameBufferCaches: Allocator<VulkanFrameBufferCache>,
-	pipelineCaches: Allocator<VulkanPipelineCache>,
+	pipelineCaches: Allocator<VulkanPipelineMap>,
 	pipelineLayoutCaches: Allocator<VulkanPipelineLayoutCache>,
 
 	allocators: Allocator<VulkanAllocator>,
@@ -85,7 +83,7 @@ VulkanInstance::InitializeDevice(deviceIndex: uint32)
 	vulkanInstance.resourceManagers[i]~ = VulkanResourceManager();
 	vulkanInstance.renderPassCaches[i]~ = VulkanRenderPassCache();
 	vulkanInstance.frameBufferCaches[i]~ = VulkanFrameBufferCache();
-	vulkanInstance.pipelineCaches[i]~ = VulkanPipelineCache();
+	vulkanInstance.pipelineCaches[i]~ = VulkanPipelineMap();
 	vulkanInstance.pipelineLayoutCaches[i]~ = VulkanPipelineLayoutCache();
 	vulkanInstance.stagingBuffers[i]~ = VulkanStagingBuffer();
 
@@ -272,24 +270,6 @@ InitializeVulkanInstance()
 				mesh := scene.GetComponent<Mesh>(entity);
 				
 				UploadMesh(sceneEntity, mesh, renderer);
-			}
-		}
-	);
-
-	ECS.instance.events.On(
-		ImGuiWindowAddedEvent, 
-		::(sceneEntity: SceneEntity)
-		{
-			scene := sceneEntity.scene;
-			entity := sceneEntity.entity;
-
-			if (scene.HasSingleton<VulkanRenderer>())
-			{
-				log "ImGui Window Init Vulkan";
-				renderer := scene.GetSingleton<VulkanRenderer>();
-				imGuiWindow := scene.GetComponent<ImGuiWindow>(entity);
-				
-				imGuiWindow.InitVulkan(renderer);
 			}
 		}
 	);

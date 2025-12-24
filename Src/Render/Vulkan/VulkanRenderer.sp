@@ -47,7 +47,7 @@ state VulkanRenderer
 	physicalDevice: *VkPhysicalDevice_T
 	allocator: *VulkanAllocator,
 	stagingBuffer: *VulkanStagingBuffer,
-	pipelineCache: *VulkanPipelineCache,
+	pipelineCache: *VulkanPipelineMap,
 	pipelineLayoutCache: *VulkanPipelineLayoutCache,
 
 	swapchain: VulkanSwapchain,
@@ -70,6 +70,12 @@ state VulkanRenderer
 
 	renderGraph: RenderGraph<VulkanRenderer>,
 
+	userData: ?{
+		ptr: *void,
+		i: uint,
+		entity: Entity
+	},
+
 	deviceIndex: uint32,
 	swapchainHandle: RenderResourceHandle,
 	swapchainImageIndex: uint32,
@@ -81,15 +87,28 @@ VulkanRenderer::Destroy()
 
 }
 
+state VulkanRendererConfig
+{
+	userData: ?{ ptr: *void, i: uint, entity: Entity } = null;
+	textureDescriptorCount: uint32 = 1000
+	maxTextureSets: uint32 = 1000,
+	deviceIndex: uint32 = vulkanInstance.defaultDevice,
+	useUBOs: bool = true;
+	useEmptyStructures: bool = true;
+}
+
 VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>, 
-								    deviceIndex: uint32 = vulkanInstance.defaultDevice)
+								    config: VulkanRendererConfig = VulkanRendererConfig())
 {
 	log "Creating Vulkan renderer";
+
+	deviceIndex := config.deviceIndex;
 
 	vulkanInstance.InitializeDevice(deviceIndex);
 
 	vulkanRenderer := VulkanRenderer();
 	vulkanRenderer.vkInstance = vulkanInstance@;
+	vulkanRenderer.userData = config.userData;
 
 	vulkanRenderer.window = window;
 	vulkanRenderer.CreateSurface();
@@ -126,13 +145,19 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 		FrameCount
 	);
 
-	vulkanRenderer.sceneShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
-	vulkanRenderer.materialShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT);
+	if (config.useUBOs)
+	{
+		vulkanRenderer.sceneShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
+		vulkanRenderer.materialShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT);
+	}
 
-	vulkanRenderer.CreateMaterialDescPool();
+	vulkanRenderer.CreateMaterialDescPool(config.textureDescriptorCount, config.maxTextureSets);
 
-	vulkanRenderer.emptyVertexBuffers.Init(vulkanRenderer);
-	vulkanRenderer.emptyTextures.Init(vulkanRenderer);
+	if (config.useEmptyStructures)
+	{
+		vulkanRenderer.emptyVertexBuffers.Init(vulkanRenderer);
+		vulkanRenderer.emptyTextures.Init(vulkanRenderer);
+	}
 
 	for (passName in passes)
 	{
@@ -149,7 +174,7 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables[deviceIndex]);
 	vulkanRenderer.renderGraph.SetRenderPassFuncs(
 		::*VkRenderPass_T(pass: RenderGraphPass<VulkanRenderer>, renderPass: RenderPass, 
-							 renderer: *VulkanRenderer)
+						  renderer: *VulkanRenderer)
 		{
 			deviceIndex := renderer.deviceIndex;
 			device := renderer.device;
@@ -272,17 +297,17 @@ VulkanRenderer::CreateSurface()
 	}
 }
 
-VulkanRenderer::CreateMaterialDescPool()
+VulkanRenderer::CreateMaterialDescPool(descriptorCount: uint32, maxSet: uint32)
 {
 	poolSizes := [VkDescriptorPoolSize(),];
 	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[0].descriptorCount = 1000;
+	poolSizes[0].descriptorCount = descriptorCount;
 
 	poolInfo := VkDescriptorPoolCreateInfo();
 	poolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = 1;
 	poolInfo.pPoolSizes = fixed poolSizes;
-	poolInfo.maxSets = 1000;
+	poolInfo.maxSets = maxSet;
 
 	CheckResult(
 		vkCreateDescriptorPool(this.device, poolInfo@, null, this.texturePool@),
@@ -428,6 +453,22 @@ VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 	this.sceneShared.Update(frame, sceneUBO);
 }
 
+VulkanRenderer::RenderBegin()
+{
+
+}
+
+VulkanRenderer::RenderSubmit()
+{
+
+}
+
+VulkanRenderer::UpdateScene(scene: *Scene)
+{
+	frame := this.Frame();
+	this.UpdateSceneUBO(scene, frame);
+}
+
 VulkanRenderer::Draw(scene: *Scene)
 {
 	frame := this.Frame();
@@ -435,8 +476,6 @@ VulkanRenderer::Draw(scene: *Scene)
 	renderGraph := this.renderGraph;
 	renderGraph.SetRenderer(this@);
 	resourceTables := renderGraph.handles.resourceTables;
-
-	this.UpdateSceneUBO(scene, frame);
 
 	this.WaitAndAcquireSwapchain(frame);
 
@@ -506,6 +545,7 @@ vulkanDrawSystem := ECS.RegisterSystem(
 		if (scene.HasSingleton<VulkanRenderer>())
 		{
 			renderer := scene.GetSingleton<VulkanRenderer>();
+			renderer.UpdateScene(scene@);
 			renderer.Draw(scene@);
 		}
 	},

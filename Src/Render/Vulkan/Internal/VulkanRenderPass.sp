@@ -8,7 +8,7 @@ state VulkanRenderPassCache
 						 HashRenderPass, RenderPassEquals>()
 }
 
-*VkRenderPass_T CreateVulkanRenderPass(device: *VkDevice_T, createInfo: VkRenderPassCreateInfo)
+*VkRenderPass_T CreateVkRenderPass(device: *VkDevice_T, createInfo: VkRenderPassCreateInfo)
 {
 	renderPass: *VkRenderPass_T = null;
 	CheckResult(
@@ -19,16 +19,8 @@ state VulkanRenderPassCache
 	return renderPass;
 }
 
-*VkRenderPass_T FindOrCreateRenderPass(renderPass: RenderPass, cache: VulkanRenderPassCache, 
-									   device: *VkDevice_T)
+*VkRenderPass_T CreateVulkanRenderPass(renderPass: RenderPass, device: *VkDevice_T)
 {
-	if (cache.renderPassMap.Has(renderPass))
-	{
-		//log "Using cached render pass";
-		return cache.renderPassMap.Find(renderPass)~;
-	}
-
-	//log "Creating render pass";
 	createInfo := VkRenderPassCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	createInfo.attachmentCount = renderPass.attachments.count;
@@ -89,7 +81,21 @@ state VulkanRenderPassCache
 
 	createInfo.pSubpasses = subpassDesc@;
 
-	vkRenderPass := CreateVulkanRenderPass(device, createInfo);
+	return CreateVkRenderPass(device, createInfo);
+}
+
+*VkRenderPass_T FindOrCreateRenderPass(renderPass: RenderPass, cache: VulkanRenderPassCache, 
+									   device: *VkDevice_T)
+{
+	if (cache.renderPassMap.Has(renderPass))
+	{
+		//log "Using cached render pass";
+		return cache.renderPassMap.Find(renderPass)~;
+	}
+
+	//log "Creating render pass";
+	vkRenderPass := CreateVulkanRenderPass(renderPass, device);
+
 	if (vkRenderPass)
 	{
 		cache.renderPassMap.Insert(renderPass, vkRenderPass);

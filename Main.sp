@@ -14,6 +14,12 @@ import GLTFManager
 
 import Scenes
 
+import SingleConsumerQueue
+import FixedArray
+import Math
+
+import ParseHeader
+
 state Test
 {
 	i: int
@@ -101,10 +107,11 @@ testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	//data := 0;
 	//handle: *Fiber.JobHandle = null;
 	//Fiber.AddJob(::(data: *int) {
-	//	for (i .. 10000)
+	//	for (i .. 10)
 	//	{
 	//		data~ = i;
 	//	}	
+	//	log "JOB FINISHED: ", i;
 	//}, data@, handle@);
 	//Fiber.WaitForHandle(handle);
 
@@ -113,11 +120,84 @@ testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	if (scene.HasSingleton<SingletonTest>()) scene.GetSingleton<SingletonTest>().myValue += 1;
 });
 
+queueCount := 8;
+queues := FixedArray<SingleConsumerQueue<uint>>(queueCount);
+
+TestQueue()
+{
+	for (i: uint .. queueCount)
+	{
+		queues[i]~ = SingleConsumerQueue<uint>(128);
+	}
+
+	for (j: uint .. queueCount)
+	{
+		Thread.Create(::int32(data: *void) {
+			index := data as uint;
+			queue := queues[index];
+			indexStr := UIntToString(index);
+			
+			while (true)
+			{
+				val := queue.Dequeue();
+				msg := "Dequeued value ";
+				valStr := UIntToString(val);
+				msg = msg.Append(valStr);
+				msg = msg.Append(" on thread ");
+				msg = msg.Append(indexStr);
+				msg = msg.Append(" top ");
+				msg = msg.Append(ToString<{ arrayIndex: uint32, stackIndex: uint32, version: uint32 }>(
+					queue.refAllocator.top.Get()
+				));
+				log msg;
+				Thread.Sleep(200);
+			}
+
+			return 0;
+		}, j as *void, null);
+	}
+
+	Thread.Create(::int32(data: *void) {
+		val := uint(1);
+		while (true)
+		{
+			index := Math.RandBetween(0, queueCount - 1);
+			indexStr := UIntToString(index);
+			for (i .. Math.RandBetween(64, 128 * 2))
+			{
+				queue := queues[index];
+
+				msg := "Enqueuing value ";
+				valStr := UIntToString(val);
+				msg = msg.Append(valStr);
+				msg = msg.Append(" on thread ");
+				msg = msg.Append(indexStr);
+				msg = msg.Append(" top ");
+				msg = msg.Append(ToString<{ arrayIndex: uint16, stackIndex: uint16, version: uint32 }>(
+					queue.refAllocator.top.Get()
+				));
+				log msg;
+
+				queue.Enqueue(val);
+
+				val += 1;
+			}
+		}
+
+		return 0;
+	}, null, null);
+
+	while (true) {}
+}
+
 Main()
 {
+	//TestQueue();
+
 	scene := ECS.instance.CreateScene();
 	
 	scene.SetSingleton<SingletonTest>({9.0});
+
 	
 	for (i .. 10)
 	{

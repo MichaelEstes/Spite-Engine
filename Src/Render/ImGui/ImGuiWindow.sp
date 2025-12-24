@@ -6,11 +6,15 @@ import ECS
 import Event
 import Window
 
-ImGuiWindowAddedEvent := RegisterEvent<SceneEntity>();
-
 InitializeImGui()
 {
 	ImGui_CreateContext(null);
+}
+
+enum ImGuiBackendKind: uint32 
+{
+	Vulkan,
+	None
 }
 
 state ImGuiWindow
@@ -20,6 +24,16 @@ state ImGuiWindow
 	renderFunc: ::(*ImGuiWindow, *any),
 	data: *any,
 
+	backend: ?{
+		vulkan: {
+			renderer: VulkanRenderer,
+			pipelineCache: *VkPipelineCache_T,
+			initialized: bool
+		},
+		none: *void
+	}
+
+	backendKind: ImGuiBackendKind,
 	width: uint32,
 	height: uint32
 }
@@ -38,7 +52,7 @@ ImGuiWindow::delete
 	delete this.data;
 }
 
-ImGuiWindow::InitVulkan(renderer: *VulkanRenderer)
+ImGuiWindow::InitVulkan(entity: Entity)
 {
 	this.window = CreateWindow(
 		null, this.width, this.height, 
@@ -53,22 +67,19 @@ ImGuiWindow::InitVulkan(renderer: *VulkanRenderer)
 		return;
 	}
 
-	initInfo := ImGui_ImplVulkan_InitInfo_t();
-	initInfo.Instance = renderer.vkInstance.instance;
-    initInfo.PhysicalDevice = renderer.physicalDevice;
-    initInfo.Device = renderer.device;
-    initInfo.QueueFamily = renderer.queues.graphicsQueueIndex;
-    initInfo.Queue = renderer.queues.graphicsQueue;
-    initInfo.PipelineCache = g_PipelineCache;
-    initInfo.DescriptorPool = g_DescriptorPool;
-    initInfo.MinImageCount = g_MinImageCount;
-    initInfo.ImageCount = wd->ImageCount;
-    initInfo.Allocator = g_Allocator;
-    initInfo.PipelineInfoMain.RenderPass = wd->RenderPass;
-    initInfo.PipelineInfoMain.Subpass = 0;
-    initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    initInfo.CheckVkResultFn = check_vk_result;
+	renderConfig := VulkanRendererConfig();
+	renderConfig.deviceIndex = vulkanInstance.defaultDevice;
+	renderConfig.userData.entity = entity;
+	renderConfig.maxTextureSets = 8;
+	renderConfig.textureDescriptorCount = 8;
+	renderConfig.useUBOs = false;
+	renderConfig.useEmptyStructures = false;
+	this.backend.vulkan.renderer = CreateVulkanRenderer(this.window, Array<string>(["ImGuiPass",]), renderConfig);
 
+	renderer := this.backend.vulkan.renderer;
+	device :=  renderer.device;
+	
+	this.backend.vulkan.pipelineCache = null;
 }
 
 ImGuiWindow::Render()
@@ -81,9 +92,21 @@ ImGuiComponent := ECS.RegisterComponent<ImGuiWindow>(
 	::(entity: Entity, imGuiWindow: *ImGuiWindow, scene: Scene) 
 	{
 		delete imGuiWindow~;
-	}
+	},
 	::(entity: Entity, imGuiWindow: *ImGuiWindow, scene: Scene) 
 	{
-		ECS.instance.events.Emit<SceneEntity>(ImGuiWindowAddedEvent, SceneEntity(scene@, entity));
+		imGuiWindow.InitVulkan(entity);
 	}
+);
+
+imGuiDrawSystem := ECS.RegisterSystem(
+	::(scene: Scene, dt: float) 
+	{
+		for (entityComponent in scene.Iterate<ImGuiWindow>())
+		{
+			imGuiWindow := entityComponent.component;
+			imGuiWindow.backend.vulkan.renderer.Draw(scene@);
+		}
+	},
+	SystemStep.Draw
 );

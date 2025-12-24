@@ -69,7 +69,7 @@ EntityComponentArray::Resize(amount: uint32)
 	this.capacity = resizedCapacity;
 }
 
-EntityComponentArray::Insert(entity: Entity, component: Type)
+*Type EntityComponentArray::Insert(entity: Entity, component: Type)
 {
 	assert !!entity, "Cannot insert null entity";
 
@@ -78,6 +78,7 @@ EntityComponentArray::Insert(entity: Entity, component: Type)
 	index := entity.id;
 	this.entitySet.Set(index);
 	this.componentArr[index]~ = component;
+	return this.componentArr[index];
 }
 
 bool EntityComponentArray::Has(entity: Entity)

@@ -93,7 +93,7 @@ EntityComponentMap::ResizeDense()
 	this.capacity = resizedCapacity;
 }
 
-EntityComponentMap::Insert(entity: Entity, component: Type)
+*Type EntityComponentMap::Insert(entity: Entity, component: Type)
 {
 	assert !!entity, "Cannot insert null entity";
 
@@ -105,6 +105,7 @@ EntityComponentMap::Insert(entity: Entity, component: Type)
 
 	this.count += 1;
 	this.sparseArr[entity.id]~ = this.count;
+	return this.componentArr[this.count];
 }
 
 bool EntityComponentMap::Has(entity: Entity)

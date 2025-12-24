@@ -144,13 +144,13 @@ uint HashPipelineKey(key: VulkanPipelineKey)
 	return MHash<VulkanPipelineKey>(key);
 }
 
-state VulkanPipelineCache
+state VulkanPipelineMap
 {
 	pipelineMap := Map<VulkanPipelineKey, VulkanPipeline, HashPipelineKey>()
 }
 
 VulkanPipeline FindOrCreatePipeline(device: *VkDevice_T, key: VulkanPipelineKey,
-									cache: VulkanPipelineCache, layoutCache: VulkanPipelineLayoutCache)
+									cache: VulkanPipelineMap, layoutCache: VulkanPipelineLayoutCache)
 {
 	pipeline := cache.pipelineMap.Find(key);
 	if (pipeline) 
@@ -550,4 +550,11 @@ VkPipelineColorBlendAttachmentState ColorBlendAttachment(colorWriteMask: VkColor
 	colorBlendAttachment.alphaBlendOp = alphaBlendOp;
 
 	return colorBlendAttachment;
+}
+
+*VkPipelineCache_T CreateVkPipelineCache(device: *VkDevice_T, createInfo: VkPipelineCacheCreateInfo)
+{
+	cache: *VkPipelineCache_T = null;
+	vkCreatePipelineCache(device, createInfo@, null, cache@);
+	return cache;
 }

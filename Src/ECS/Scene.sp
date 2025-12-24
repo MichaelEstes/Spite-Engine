@@ -241,12 +241,12 @@ Scene::SetComponentDirect<Type>(entity: Entity, value: Type, component: Componen
 		case (ComponentKind.Common)
 		{
 			componentArrPtr := this.GetOrCreateCommon<Type>(id);
-			componentArrPtr.Insert(entity, value);
+			value = componentArrPtr.Insert(entity, value);
 		}
 		case (ComponentKind.Sparse)
 		{
 			componentMapPtr := this.GetOrCreateSparse<Type>(id);			
-			componentMapPtr.Insert(entity, value);
+			value = componentMapPtr.Insert(entity, value);
 		}
 	}
 
