@@ -4,7 +4,9 @@ import VulkanRenderer
 import SDL
 import ECS
 import Event
-import Window
+import WindowComponent
+import ThreadParamAllocator
+import Fiber
 
 InitializeImGui()
 {
@@ -34,6 +36,7 @@ state ImGuiWindow
 	}
 
 	backendKind: ImGuiBackendKind,
+	entity: Entity,
 	width: uint32,
 	height: uint32
 }
@@ -52,34 +55,59 @@ ImGuiWindow::delete
 	delete this.data;
 }
 
-ImGuiWindow::InitVulkan(entity: Entity)
+ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 {
-	this.window = CreateWindow(
-		null, this.width, this.height, 
-		SDL.WindowFlags.Vulkan | SDL.WindowFlags.Resizable
-	);
-	propsID := SDL.GetWindowProperties(this.window);
-	this.windowHandle = SDL.GetPointerProperty(propsID, SDL.Win32WindowHandle, null);
-	initialized := cImGui_ImplWin32_Init(this.windowHandle);
-	if (!initialized)
+	this.entity = entity;
+
+	param := AllocThreadParam<SceneEntity>();
+	param.entity = entity;
+	param.scene = scene@;
+
+	handle: *JobHandle = null;
+
+	Fiber.RunOnMainThread(::(sceneEntity: *SceneEntity)
 	{
-		log "Failed to initialize ImGui Window";
-		return;
-	}
+		log "Creating ImGui Vulkan Window";
+		defer DeallocThreadParam<SceneEntity>(sceneEntity);
 
-	renderConfig := VulkanRendererConfig();
-	renderConfig.deviceIndex = vulkanInstance.defaultDevice;
-	renderConfig.userData.entity = entity;
-	renderConfig.maxTextureSets = 8;
-	renderConfig.textureDescriptorCount = 8;
-	renderConfig.useUBOs = false;
-	renderConfig.useEmptyStructures = false;
-	this.backend.vulkan.renderer = CreateVulkanRenderer(this.window, Array<string>(["ImGuiPass",]), renderConfig);
+		scene := sceneEntity.scene;
+		entity := sceneEntity.entity;
+		imGuiWindow := scene.GetComponent<ImGuiWindow>(entity);
+	    
+		windowDesc := WindowDesc();
+		windowDesc.title = "";
+		windowDesc.flags = SDL.WindowFlags.Vulkan | SDL.WindowFlags.Resizable;
+		windowDesc.width = imGuiWindow.width;
+		windowDesc.height = imGuiWindow.height;
+		windowData := CreateWindowComponent(windowDesc, scene, entity);
+		window := windowData.window;
 
-	renderer := this.backend.vulkan.renderer;
-	device :=  renderer.device;
-	
-	this.backend.vulkan.pipelineCache = null;
+		propsID := SDL.GetWindowProperties(window);
+		imGuiWindow.windowHandle = SDL.GetPointerProperty(propsID, SDL.Win32WindowHandle, null);
+		initialized := cImGui_ImplWin32_Init(imGuiWindow.windowHandle);
+		if (!initialized)
+		{
+			log "Failed to initialize ImGui Window";
+			return;
+		}
+		
+		imGuiWindow.backend.vulkan.pipelineCache = null;
+
+		renderConfig := VulkanRendererConfig();
+		renderConfig.deviceIndex = vulkanInstance.defaultDevice;
+		renderConfig.userData.entity = entity;
+		renderConfig.maxTextureSets = 8;
+		renderConfig.textureDescriptorCount = 8;
+		renderConfig.useUBOs = false;
+		renderConfig.useEmptyStructures = false;
+		renderConfig.onMeshAdded = ::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {};
+		CreateVulkanRenderer(
+			scene, entity,
+			Array<string>(["ImGuiPass",]),
+			renderConfig
+		);
+	}, param, handle@);
+	WaitForHandle(handle);
 }
 
 ImGuiWindow::Render()
@@ -95,18 +123,6 @@ ImGuiComponent := ECS.RegisterComponent<ImGuiWindow>(
 	},
 	::(entity: Entity, imGuiWindow: *ImGuiWindow, scene: Scene) 
 	{
-		imGuiWindow.InitVulkan(entity);
+		imGuiWindow.InitVulkan(scene, entity);
 	}
-);
-
-imGuiDrawSystem := ECS.RegisterSystem(
-	::(scene: Scene, dt: float) 
-	{
-		for (entityComponent in scene.Iterate<ImGuiWindow>())
-		{
-			imGuiWindow := entityComponent.component;
-			imGuiWindow.backend.vulkan.renderer.Draw(scene@);
-		}
-	},
-	SystemStep.Draw
 );

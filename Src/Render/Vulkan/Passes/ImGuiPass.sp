@@ -15,7 +15,7 @@ ImGuiPass := RegisterRenderPass(
 			::bool(builder: *RenderPassBuilder<VulkanRenderer>, scene: *Scene) 
 			{
 				renderer := builder.Renderer();
-				builder.Read(renderer.swapchainHandle);
+				builder.Read(renderer.swapchainHandle, ResourceUsageFlags.Sampled | ResourceUsageFlags.LoadUndefined);
 				builder.Write(renderer.swapchainHandle);
 
 				return true;
@@ -26,6 +26,8 @@ ImGuiPass := RegisterRenderPass(
 				imGuiWindowEntity := renderer.userData.entity;
 				imGuiWindow := scene.GetComponent<ImGuiWindow>(imGuiWindowEntity);
 				vulkanBackend := imGuiWindow.backend.vulkan;
+				
+				commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 
 				if (!vulkanBackend.initialized)
 				{
@@ -37,7 +39,8 @@ ImGuiPass := RegisterRenderPass(
 					initInfo.Device = renderer.device;
 					initInfo.QueueFamily = renderer.queues.graphicsQueueIndex;
 					initInfo.Queue = renderer.queues.graphicsQueue;
-					initInfo.PipelineCache = vulkanBackend.pipelineCache;
+					//initInfo.PipelineCache = vulkanBackend.pipelineCache;
+					initInfo.PipelineCache = null;
 					initInfo.DescriptorPool = renderer.texturePool;
 					initInfo.MinImageCount = 2;
 					initInfo.ImageCount = VulkanRenderer.FrameCount;
@@ -51,6 +54,19 @@ ImGuiPass := RegisterRenderPass(
 
 					vulkanBackend.initialized = true;
 				}
+
+				cImGui_ImplVulkan_NewFrame();
+				cImGui_ImplWin32_NewFrame();
+				ImGui_NewFrame();
+
+				imGuiWindow.Render();
+
+				ImGui_Render();
+				drawData := ImGui_GetDrawData();
+
+				cImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
+
+				ImGui_EndFrame();
 
 			},
 			RenderPassStage.Graphics,

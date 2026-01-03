@@ -77,8 +77,9 @@ EntityComponentArray::Resize(amount: uint32)
 
 	index := entity.id;
 	this.entitySet.Set(index);
-	this.componentArr[index]~ = component;
-	return this.componentArr[index];
+	componentPtr := this.componentArr[index];
+	componentPtr~ = component;
+	return componentPtr;
 }
 
 bool EntityComponentArray::Has(entity: Entity)

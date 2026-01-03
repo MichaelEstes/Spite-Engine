@@ -83,10 +83,13 @@ _ := SceneRegistry.RegisterScene(
 		scene.SetComponent<ImGuiWindow>(imGuiWindowEntity, ImGuiWindow(
 			::(window: *ImGuiWindow, data: *any) 
 			{
-				log "IMGUI Window Render";
+				ImGui_ShowDemoWindow(true@);
+				ImGui_ShowMetricsWindow(true@);
+				ImGui_ShowDebugLogWindow(true@);
 			},
 			null,
-			1000, 1000
+			uint32(1000),
+			uint32(1000)
 		));
 
 		log "Loaded Main Scene";

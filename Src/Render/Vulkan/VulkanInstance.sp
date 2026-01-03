@@ -263,13 +263,12 @@ InitializeVulkanInstance()
 			log "Mesh Added";
 			scene := sceneEntity.scene;
 			entity := sceneEntity.entity;
+			mesh := scene.GetComponent<Mesh>(entity);
 
-			if (scene.HasSingleton<VulkanRenderer>())
+			for (ec in scene.Iterate<VulkanRenderer>())
 			{
-				renderer := scene.GetSingleton<VulkanRenderer>();
-				mesh := scene.GetComponent<Mesh>(entity);
-				
-				UploadMesh(sceneEntity, mesh, renderer);
+				renderer := ec.component;
+				renderer.onMeshAdded(sceneEntity, mesh, renderer);
 			}
 		}
 	);
@@ -282,9 +281,9 @@ InitializeVulkanInstance()
 
 			for (scene in ECS.Scenes())
 			{
-				if (scene.HasSingleton<VulkanRenderer>())
+				for (ec in scene.Iterate<VulkanRenderer>())
 				{
-					renderer := scene.GetSingleton<VulkanRenderer>();
+					renderer := ec.component;
 					if (renderer.window.id == windowID)
 					{
 						log "Window Resized";

@@ -137,7 +137,10 @@ ResourceTables::SetCurrentTextureLayout(texture: *any, layout: GPUTextureLayout)
 GPUTextureLayout ResourceTables::GetCurrentTextureLayout(texture: *any)
 {
 	layout := this.textureToLayout[texture];
-	if (layout) return layout~;
+	if (layout) 
+	{
+		return layout~;
+	}
 
 	return GPUTextureLayout.Undefined;
 }

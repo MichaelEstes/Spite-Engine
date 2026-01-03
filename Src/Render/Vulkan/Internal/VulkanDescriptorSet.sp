@@ -131,6 +131,11 @@ SharedUBO::Init(device: *VkDevice_T, allocator: *VulkanAllocator, binding: uint3
     }
 }
 
+bool SharedUBO::Valid()
+{
+	return this.pool != null;
+}
+
 SharedUBO::Update(frame: uint32, value: Type)
 {
 	this.UBOs[frame]~ = value;

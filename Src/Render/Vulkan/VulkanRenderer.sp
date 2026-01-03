@@ -8,6 +8,7 @@ import Image
 import SparseSet
 import Event
 import ArrayView
+import WindowComponent
 
 import ECS
 import RenderComponents
@@ -25,9 +26,9 @@ DestroyAll()
 {
 	for (scene in ECS.Scenes())
 	{
-		if (scene.HasSingleton<VulkanRenderer>())
+		for (ec in scene.Iterate<VulkanRenderer>())
 		{
-			renderer := scene.GetSingleton<VulkanRenderer>();
+			renderer := ec.component;
 			renderer.Destroy();
 		}
 	}
@@ -70,6 +71,8 @@ state VulkanRenderer
 
 	renderGraph: RenderGraph<VulkanRenderer>,
 
+	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer),
+
 	userData: ?{
 		ptr: *void,
 		i: uint,
@@ -79,7 +82,8 @@ state VulkanRenderer
 	deviceIndex: uint32,
 	swapchainHandle: RenderResourceHandle,
 	swapchainImageIndex: uint32,
-	currentFrame: uint32
+	currentFrame: uint32,
+	
 }
 
 VulkanRenderer::Destroy()
@@ -89,6 +93,7 @@ VulkanRenderer::Destroy()
 
 state VulkanRendererConfig
 {
+	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer) = UploadMesh;
 	userData: ?{ ptr: *void, i: uint, entity: Entity } = null;
 	textureDescriptorCount: uint32 = 1000
 	maxTextureSets: uint32 = 1000,
@@ -97,20 +102,23 @@ state VulkanRendererConfig
 	useEmptyStructures: bool = true;
 }
 
-VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>, 
-								    config: VulkanRendererConfig = VulkanRendererConfig())
+CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>, 
+					 config: VulkanRendererConfig = VulkanRendererConfig())
 {
 	log "Creating Vulkan renderer";
 
+	windowData := scene.GetComponent<WindowData>(entity);
+	
 	deviceIndex := config.deviceIndex;
 
 	vulkanInstance.InitializeDevice(deviceIndex);
 
 	vulkanRenderer := VulkanRenderer();
 	vulkanRenderer.vkInstance = vulkanInstance@;
+	vulkanRenderer.onMeshAdded = config.onMeshAdded;
 	vulkanRenderer.userData = config.userData;
 
-	vulkanRenderer.window = window;
+	vulkanRenderer.window = windowData.window;
 	vulkanRenderer.CreateSurface();
 
 	vulkanRenderer.deviceIndex = deviceIndex;
@@ -247,7 +255,8 @@ VulkanRenderer CreateVulkanRenderer(window: *SDL.Window, passes: Array<string>,
 		}
 	);
 
-	return vulkanRenderer;
+
+	scene.SetComponent<VulkanRenderer>(entity, vulkanRenderer);
 }
 
 VulkanRenderer::CreateSwapchain()
@@ -436,7 +445,8 @@ VulkanRenderer::TransitionSwapchainPresent(image: *VkImage_T, currentLayout: GPU
 
 VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 {
-	if (!scene.HasSingleton<Camera>()) return;
+	if (!this.sceneShared.Valid() || !scene.HasSingleton<Camera>()) return;
+
 	sceneUBO := SceneUBO();
 	camera := scene.GetSingleton<Camera>();
 	cameraViewMatrix := camera.GetViewMatrix();
@@ -451,16 +461,6 @@ VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 	sceneUBO.projection[1][1] *= -1;
 
 	this.sceneShared.Update(frame, sceneUBO);
-}
-
-VulkanRenderer::RenderBegin()
-{
-
-}
-
-VulkanRenderer::RenderSubmit()
-{
-
 }
 
 VulkanRenderer::UpdateScene(scene: *Scene)
@@ -535,16 +535,16 @@ VulkanRenderer::Draw(scene: *Scene)
 	this.currentFrame += 1;
 }
 
-vulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(
-	ComponentKind.Singleton
+VulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(
+	ComponentKind.Sparse
 );
 
 vulkanDrawSystem := ECS.RegisterSystem(
 	::(scene: Scene, dt: float) 
 	{
-		if (scene.HasSingleton<VulkanRenderer>())
+		for (ec in scene.Iterate<VulkanRenderer>())
 		{
-			renderer := scene.GetSingleton<VulkanRenderer>();
+			renderer := ec.component;
 			renderer.UpdateScene(scene@);
 			renderer.Draw(scene@);
 		}

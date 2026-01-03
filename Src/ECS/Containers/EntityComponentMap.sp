@@ -101,11 +101,12 @@ EntityComponentMap::ResizeDense()
 	if (this.count >= this.capacity) this.ResizeDense();
 
 	this.entityArr[this.count]~ = entity;
-	this.componentArr[this.count]~ = component;
+	componentPtr := this.componentArr[this.count];
+	componentPtr~ = component;
 
 	this.count += 1;
 	this.sparseArr[entity.id]~ = this.count;
-	return this.componentArr[this.count];
+	return componentPtr;
 }
 
 bool EntityComponentMap::Has(entity: Entity)

@@ -1,24 +1,12 @@
 package SceneDescription
 
 import ECS
-import Window
 import SDL
 import SDLRenderer
 import VulkanRenderer
 import ThreadParamAllocator
 import Fiber
-
-windowComponent := ECS.RegisterComponent<*SDL.Window>(
-	ComponentKind.Singleton
-);
-
-state WindowDesc
-{
-	title: string,
-	flags: SDL.WindowFlags,
-	width: uint32,
-	height: uint32
-}
+import WindowComponent
 
 enum RendererFlags: uint
 {
@@ -53,7 +41,7 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 		param.sceneDesc = sceneDesc;
 		param.scene = scene@;
 
-		handle: *JobHandle = null
+		handle: *JobHandle = null;
 		Fiber.RunOnMainThread(::(param: *SceneDescParam)
 		{
 			log "Creating scene description";
@@ -64,25 +52,21 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 		    windowDesc := sceneDesc.window;
 			rendererDesc := sceneDesc.renderer;
 
-			window := CreateWindow(
-				windowDesc.title[0],
-				windowDesc.width,
-				windowDesc.height,
-				windowDesc.flags,
-			);
-			scene.SetSingleton<*SDL.Window>(window);
+			sceneEntity := scene.CreateEntity();
+
+			CreateWindowComponent(windowDesc, scene, sceneEntity);
 
 			if (rendererDesc.flags & RendererFlags.Vulkan)
 			{
 				VulkanRenderer.InitializeVulkanInstance();
-				renderer := VulkanRenderer.CreateVulkanRenderer(window, rendererDesc.passes);
-				scene.SetSingleton<VulkanRenderer>(renderer);
+				VulkanRenderer.CreateVulkanRenderer(scene, sceneEntity, rendererDesc.passes);
 			}
 			else
 			{
+				sceneWindow := scene.GetComponent<WindowData>(sceneEntity);
 				SDLRenderer.InitializeSDLGPUInstance();
 				renderer := SDLRenderer.CreateSDLRenderer(
-					window, 
+					sceneWindow.window,
 					GetSDLInstanceDevice(),
 					rendererDesc.passes
 				);
