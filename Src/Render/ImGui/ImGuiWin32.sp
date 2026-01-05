@@ -12,4 +12,5 @@ extern
 	float32 cImGui_ImplWin32_GetDpiScaleForHwnd(hwnd: *void);
 	float32 cImGui_ImplWin32_GetDpiScaleForMonitor(monitor: *void);
 	void cImGui_ImplWin32_EnableAlphaCompositing(hwnd: *void);
+	int cImGui_ImplWin32_WndProcHandler(hwnd: *void, msg: uint32, wparam: uint, lparam: int);
 }

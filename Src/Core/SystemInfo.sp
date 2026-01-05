@@ -9,6 +9,14 @@ extern
 
 extern
 {
+	#link windows "User32";
+
+	*void SetWindowLongPtrA(hwnd: *void, index: int32, callback: ::int(*void, uint32, uint, int));
+	int CallWindowProcA(prevWndProc: *void, hwnd: *void, msg: uint32, wparam: uint, lparam: int);
+}
+
+extern
+{
     #link linux "libc";
 
     int32 sysconf(name: int32);
@@ -70,4 +78,9 @@ SystemInfo GetSystemInfo()
 	}
 
 	return get();
+}
+
+*void SetWindowEventProc(hwnd: *void, wndProc: ::int(*void, uint32, uint, int))
+{
+	return SetWindowLongPtrA(hwnd, -4, wndProc);
 }

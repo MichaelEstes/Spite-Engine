@@ -7,6 +7,9 @@ import Event
 import WindowComponent
 import ThreadParamAllocator
 import Fiber
+import SystemInfo
+
+prevWndProc := null as *void;
 
 InitializeImGui()
 {
@@ -17,6 +20,12 @@ enum ImGuiBackendKind: uint32
 {
 	Vulkan,
 	None
+}
+
+int ImGuiWndProc(hwnd: *void, msg: uint32, wparam: uint, lparam: int)
+{
+	cImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam);
+	return CallWindowProcA(prevWndProc, hwnd, msg, wparam, lparam);
 }
 
 state ImGuiWindow
@@ -89,6 +98,11 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 		{
 			log "Failed to initialize ImGui Window";
 			return;
+		}
+
+		if (!prevWndProc)
+		{
+			prevWndProc = SetWindowEventProc(imGuiWindow.windowHandle, ImGuiWndProc);
 		}
 		
 		imGuiWindow.backend.vulkan.pipelineCache = null;
