@@ -182,7 +182,7 @@ VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T
 		vkGetDeviceQueue(device, this.transferQueueIndex, 0, this.computeQueue@);
 	}
 
-	tempWindow := CreateWindow(
+	tempWindow := Window.CreateWindow(
 		null,
 		0,
 		0,
@@ -198,7 +198,7 @@ VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T
 	defer 
 	{
 		log "Destroying temp window and surface";
-		DestroyWindow(tempWindow);
+		Window.DestroyWindow(tempWindow);
 		vkDestroySurfaceKHR(instance, surface, null);
 	}
 

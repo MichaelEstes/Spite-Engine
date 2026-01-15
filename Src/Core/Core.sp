@@ -20,15 +20,17 @@ Initialize()
 
 	SDL.Init(SDL.InitFlags.VIDEO);
 	SDL.VulkanLoadLibrary(null);
+	SDLEvents.Insert(0, Event.Emitter());
 	
 	InitializeInput();
 	InitializeImGui();
 
-	SDLEventEmitter.On(SDL.EventType.QUIT, ::(event: SDL.Event) {
+	globalEvents := GetGlobalEventEmitter();
+	globalEvents.On(SDL.EventType.QUIT, ::(event: SDL.Event, data: *void) {
 		running = false;
 	});
 
-	SDLEventEmitter.On(SDL.EventType.WINDOW_CLOSE_REQUESTED, ::(event: SDL.Event) {
+	globalEvents.On(SDL.EventType.WINDOW_CLOSE_REQUESTED, ::(event: SDL.Event, data: *void) {
 		windowID := event.data.window.windowID;
 		Window.DestroyWindow(Window.GetWindowForID(windowID))
 	});
@@ -64,7 +66,12 @@ MainLoop()
 
 HandleSDLEvent(event: SDL.Event)
 {
-	SDLEventEmitter.Emit<SDL.Event>(event.type, event);
+	eventWindowID := event.GetWindowID();
+	if (eventWindowID)
+	{
+		SDLEvents.Get(eventWindowID).Emit<SDL.Event>(event.type, event);
+	}
+	SDLEvents.Get(0).Emit<SDL.Event>(event.type, event);
 	//log event;
 }
 

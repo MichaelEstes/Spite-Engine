@@ -40,11 +40,13 @@ colorPass := RegisterRenderPass(
 			},
 			::(context: *RenderPassContext<VulkanRenderer>, scene: *Scene) 
 			{
-				if (!scene.HasSingleton<Camera>()) return;
-				camera := scene.GetSingleton<Camera>();
+				renderer := context.renderer;
+
+				camera := scene.GetComponent<Camera>(renderer.self);
+				if (!camera) return;
+
 				cameraViewMatrix := camera.GetViewMatrix();
 
-				renderer := context.renderer;
 				device := renderer.device;
 
 				renderPass := renderer.CastDriverRenderPass(context.driverRenderpass);

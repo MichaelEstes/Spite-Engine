@@ -79,7 +79,7 @@ InitializeInput()
 		}
 	);
 	Mouse.device.data = mouseStateGlobal@;
-	SDLEventEmitter.On(SDL.EventType.MOUSE_WHEEL, ::(event: SDL.Event) 
+	GetGlobalEventEmitter().On(SDL.EventType.MOUSE_WHEEL, ::(event: SDL.Event, data: *void) 
 		{
 			wheelEvent := event.data.wheel;
 			mouseState := Mouse.device.data as *MouseState;
@@ -101,7 +101,9 @@ UpdateInput()
 //
 //}
 
-InputValue QueryInput(device: InputDevice, key: InputKey)
+InputValue QueryInput(device: InputDevice, key: InputKey, window: *SDL.Window = null)
 {
+	if (window && window != GetFocusedWindow()) return InputValue();
+
 	return device.GetValueForKey(key);
 }

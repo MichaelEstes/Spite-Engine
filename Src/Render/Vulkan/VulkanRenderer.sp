@@ -79,6 +79,7 @@ state VulkanRenderer
 		entity: Entity
 	},
 
+	self: Entity,
 	deviceIndex: uint32,
 	swapchainHandle: RenderResourceHandle,
 	swapchainImageIndex: uint32,
@@ -121,6 +122,7 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 	vulkanRenderer.window = windowData.window;
 	vulkanRenderer.CreateSurface();
 
+	vulkanRenderer.self = entity;
 	vulkanRenderer.deviceIndex = deviceIndex;
 	vulkanRenderer.device = vulkanInstance.devices[deviceIndex]~;
 	vulkanRenderer.queues = vulkanInstance.queues[deviceIndex];
@@ -445,12 +447,14 @@ VulkanRenderer::TransitionSwapchainPresent(image: *VkImage_T, currentLayout: GPU
 
 VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 {
-	if (!this.sceneShared.Valid() || !scene.HasSingleton<Camera>()) return;
+	if (!this.sceneShared.Valid()) return;
 
-	sceneUBO := SceneUBO();
-	camera := scene.GetSingleton<Camera>();
+	camera := scene.GetComponent<Camera>(this.self);
+	if (!camera) return;
+
 	cameraViewMatrix := camera.GetViewMatrix();
 
+	sceneUBO := SceneUBO();
 	sceneUBO.view = cameraViewMatrix;
 	sceneUBO.projection.Perspective(
 		camera.fov,

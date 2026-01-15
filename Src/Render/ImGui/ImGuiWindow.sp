@@ -9,8 +9,6 @@ import ThreadParamAllocator
 import Fiber
 import SystemInfo
 
-prevWndProc := null as *void;
-
 InitializeImGui()
 {
 	ImGui_CreateContext(null);
@@ -20,12 +18,6 @@ enum ImGuiBackendKind: uint32
 {
 	Vulkan,
 	None
-}
-
-int ImGuiWndProc(hwnd: *void, msg: uint32, wparam: uint, lparam: int)
-{
-	cImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam);
-	return CallWindowProcA(prevWndProc, hwnd, msg, wparam, lparam);
 }
 
 state ImGuiWindow
@@ -60,12 +52,19 @@ ImGuiWindow::(renderFunc: ::(*ImGuiWindow, *any), data: *any, width: uint32, hei
 
 ImGuiWindow::delete
 {
+	events := GetEventEmitterForWindow(this.window);
+	events.Remove(SDL.EventType.MOUSE_MOTION, UpdateMousePos);
+	events.Remove(SDL.EventType.MOUSE_WHEEL, UpdateMouseWheel);
+	events.Remove(SDL.EventType.MOUSE_BUTTON_DOWN, UpdateMouseButton);
+	events.Remove(SDL.EventType.MOUSE_BUTTON_UP, UpdateMouseButton);
+
 	DestroyWindow(this.window);
 	delete this.data;
 }
 
 ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 {
+	log "Init ImGui Vulkan Window";
 	this.entity = entity;
 
 	param := AllocThreadParam<SceneEntity>();
@@ -100,10 +99,11 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 			return;
 		}
 
-		if (!prevWndProc)
-		{
-			prevWndProc = SetWindowEventProc(imGuiWindow.windowHandle, ImGuiWndProc);
-		}
+		events := GetEventEmitterForWindow(window);
+		events.On(SDL.EventType.MOUSE_MOTION, UpdateMousePos);
+		events.On(SDL.EventType.MOUSE_WHEEL, UpdateMouseWheel);
+		events.On(SDL.EventType.MOUSE_BUTTON_DOWN, UpdateMouseButton);
+		events.On(SDL.EventType.MOUSE_BUTTON_UP, UpdateMouseButton);
 		
 		imGuiWindow.backend.vulkan.pipelineCache = null;
 

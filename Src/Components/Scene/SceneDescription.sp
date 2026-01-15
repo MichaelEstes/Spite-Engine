@@ -26,10 +26,10 @@ state SceneDesc
 	renderer: RendererDesc
 }
 
-state SceneDescParam { sceneDesc: *SceneDesc, scene: *Scene }
+state SceneDescParam { sceneDesc: *SceneDesc, scene: *Scene, entity: Entity }
 
 SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
-	ComponentKind.Singleton,
+	ComponentKind.Sparse,
 	::(entity: Entity, sceneDesc: *SceneDesc, scene: Scene) 
 	{
 		log "Scene description removed";
@@ -40,6 +40,7 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 		param := AllocThreadParam<SceneDescParam>();
 		param.sceneDesc = sceneDesc;
 		param.scene = scene@;
+		param.entity = entity;
 
 		handle: *JobHandle = null;
 		Fiber.RunOnMainThread(::(param: *SceneDescParam)
@@ -48,11 +49,10 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 		    defer DeallocThreadParam<SceneDescParam>(param);
 			sceneDesc := param.sceneDesc;
 			scene := param.scene;
+			sceneEntity := param.entity;
 
 		    windowDesc := sceneDesc.window;
 			rendererDesc := sceneDesc.renderer;
-
-			sceneEntity := scene.CreateEntity();
 
 			CreateWindowComponent(windowDesc, scene, sceneEntity);
 

@@ -362,6 +362,16 @@ enum Scancode: uint32
     COUNT = 512 // not a key, just marks the number of scancodes for array bounds 
 }
 
+enum MouseButton: uint32
+{
+    None,
+    Left,
+    Middle,
+    Right,
+    X1,
+    X2
+}
+
 *bool GetKeyboardState(numKeys: *int) => SDL_GetKeyboardState(numKeys);
 
 uint32 GetMouseState(x: *float32, y: *float32) => SDL_GetMouseState(x, y);

@@ -1,5 +1,6 @@
 package Scene0
 
+import ECS
 import Math
 import Array
 import SceneRegistry
@@ -21,6 +22,8 @@ _ := SceneRegistry.RegisterScene(
 	::(scene: *Scene) {
 		log "Loading Main Scene";
 		
+		sceneEntity := scene.CreateEntity();
+
 		camera := Camera();
 		camera.position = Vec3(0.0, 0.0, 4.0);
 		camera.fov = Math.Deg2Rad(70.0);
@@ -28,11 +31,10 @@ _ := SceneRegistry.RegisterScene(
 		camera.near = 0.1;
 		camera.far = 1000.0;
 		camera.LookAt(Vec3(0.0, 0.0, 0.0));
+		scene.SetComponent<Camera>(sceneEntity, camera);
+		scene.SetComponent<CameraOrbit>(sceneEntity, CameraOrbit());
 
-		scene.SetSingleton<Camera>(camera);
-		scene.SetSingleton<CameraOrbit>(CameraOrbit());
-
-		scene.SetSingleton<SceneDesc>({
+		scene.SetComponent<SceneDesc>(sceneEntity, {
 			{
 				"Main Window",
 				SDL.WindowFlags.Vulkan | SDL.WindowFlags.Resizable,

@@ -166,7 +166,7 @@ meshGroupsByScene := SparseSet<Map<VulkanPipelineMeshState, Array<VulkanMesh>, H
 bool AddSceneCallbacks()
 {
 	ECS.OnSceneCreated(
-		::(scene: *Scene) 
+		::(scene: *Scene, data: *void) 
 		{
 			//log "Scene Created";
 			sceneID := scene.id;
@@ -175,7 +175,7 @@ bool AddSceneCallbacks()
 	);
 
 	ECS.OnSceneRemoved(
-		::(scene: *Scene) 
+		::(scene: *Scene, data: *void) 
 		{
 			//log "Scene Removed";
 			sceneID := scene.id;

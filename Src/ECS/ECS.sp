@@ -58,19 +58,21 @@ FrameSystemID RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
 
 ArrayView<Scene> Scenes() => instance.scenes.Values();
 
-OnSceneCreated(callback: ::(*Scene))
+OnSceneCreated(callback: ::(*Scene, *any), data: *any = null)
 {
 	ECS.instance.events.On(
 		SceneCreatedEvent, 
-		callback
+		callback,
+		data
 	);
 }
 
-OnSceneRemoved(callback: ::(*Scene))
+OnSceneRemoved(callback: ::(*Scene, *any), data: *any = null)
 {
 	ECS.instance.events.On(
 		SceneRemovedEvent, 
-		callback
+		callback,
+		data
 	);
 }
 

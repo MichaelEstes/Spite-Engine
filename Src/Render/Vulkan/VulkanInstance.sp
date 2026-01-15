@@ -211,6 +211,8 @@ InitializeVulkanInstance()
 {
 	if (vulkanInstance.initialized) return;
 
+	log "InitializeVulkanInstance";
+
 	vulkanInstance.initialized = true;
 	vulkanInstance.extensionNames = SDL.VulkanGetInstanceExtensions(vulkanInstance.extensionCount@);
     instanceCreateInfo := {
@@ -258,9 +260,9 @@ InitializeVulkanInstance()
 
 	ECS.instance.events.On(
 		MeshAddedEvent, 
-		::(sceneEntity: SceneEntity)
+		::(sceneEntity: SceneEntity, data: *void)
 		{
-			log "Mesh Added";
+			log "Mesh Added Vulkan Instance";
 			scene := sceneEntity.scene;
 			entity := sceneEntity.entity;
 			mesh := scene.GetComponent<Mesh>(entity);
@@ -273,9 +275,9 @@ InitializeVulkanInstance()
 		}
 	);
 
-	SDLEventEmitter.On(
+	GetGlobalEventEmitter().On(
 		SDL.EventType.WINDOW_RESIZED, 
-		::(event: SDL.Event) 
+		::(event: SDL.Event, data: *void) 
 		{
 			windowID := event.data.window.windowID;
 

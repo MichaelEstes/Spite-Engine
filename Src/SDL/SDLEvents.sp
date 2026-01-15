@@ -7,6 +7,8 @@ extern
     
 	bool SDL_PollEvent(event: *Event);
     void SDL_AddEventWatch(filter: ::int(*void, *Event), userdata: *void);
+
+    void SDL_PumpEvents();
 }
 
 OnEvent(callback: ::int(*void, *Event), userdata: *void) => SDL_AddEventWatch(callback, userdata);
@@ -635,7 +637,7 @@ LogEventType(type: EventType)
 
 state Event
 {
-	type: EventType,                                  // Event type, shared with all events, Uint32 to cover user events which are not in the SDL_EventType enumeration 
+	type: EventType,                                  // Event type, shared with all events, uint32 to cover user events which are not in the SDL_EventType enumeration 
     reserved: uint32,
     timestamp: uint64,                                // In nanoseconds, populated using SDL_GetTicksNS() 
     data: ?{
@@ -824,3 +826,76 @@ Event::log()
 }
 
 bool PollEvent(outEvent: *Event) => SDL_PollEvent(outEvent);
+void PumpEvents() => SDL_PumpEvents();
+
+uint32 Event::GetWindowID()
+{
+    switch (this.type)
+    {
+        case (EventType.WINDOW_SHOWN) continue;
+        case (EventType.WINDOW_HIDDEN) continue;
+        case (EventType.WINDOW_EXPOSED) continue;
+        case (EventType.WINDOW_MOVED) continue;
+        case (EventType.WINDOW_RESIZED) continue;
+        case (EventType.WINDOW_PIXEL_SIZE_CHANGED) continue;
+        case (EventType.WINDOW_METAL_VIEW_RESIZED) continue;
+        case (EventType.WINDOW_MINIMIZED) continue;
+        case (EventType.WINDOW_MAXIMIZED) continue;
+        case (EventType.WINDOW_RESTORED) continue;
+        case (EventType.WINDOW_MOUSE_ENTER) continue;
+        case (EventType.WINDOW_MOUSE_LEAVE) continue;
+        case (EventType.WINDOW_FOCUS_GAINED) continue;
+        case (EventType.WINDOW_FOCUS_LOST) continue;
+        case (EventType.WINDOW_CLOSE_REQUESTED) continue;
+        case (EventType.WINDOW_HIT_TEST) continue;
+        case (EventType.WINDOW_ICCPROF_CHANGED) continue;
+        case (EventType.WINDOW_DISPLAY_CHANGED) continue;
+        case (EventType.WINDOW_DISPLAY_SCALE_CHANGED) continue;
+        case (EventType.WINDOW_SAFE_AREA_CHANGED) continue;
+        case (EventType.WINDOW_OCCLUDED) continue;
+        case (EventType.WINDOW_ENTER_FULLSCREEN) continue;
+        case (EventType.WINDOW_LEAVE_FULLSCREEN) continue;
+        case (EventType.WINDOW_DESTROYED) continue;
+        case (EventType.WINDOW_HDR_STATE_CHANGED) return this.data.window.windowID;
+        
+        case (EventType.KEY_DOWN) continue;
+        case (EventType.KEY_UP) return this.data.key.windowID;
+
+        case (EventType.TEXT_EDITING) return this.data.edit.windowID;
+        case (EventType.TEXT_INPUT) return this.data.text.windowID;
+                
+        case (EventType.TEXT_EDITING_CANDIDATES) return this.data.edit_candidates.windowID;
+
+        case (EventType.MOUSE_MOTION) return this.data.motion.windowID;
+
+        case (EventType.MOUSE_BUTTON_DOWN) continue;
+        case (EventType.MOUSE_BUTTON_UP) return this.data.button.windowID;
+
+        case (EventType.MOUSE_WHEEL) return this.data.wheel.windowID;
+        
+        case (EventType.DROP_FILE) continue;
+        case (EventType.DROP_TEXT) continue;
+        case (EventType.DROP_BEGIN) continue;
+        case (EventType.DROP_COMPLETE) continue;
+        case (EventType.DROP_POSITION) return this.data.drop.windowID;
+        
+        case (EventType.PEN_PROXIMITY_IN) continue;
+        case (EventType.PEN_PROXIMITY_OUT) return this.data.pproximity.windowID;
+        case (EventType.PEN_DOWN) continue;
+        case (EventType.PEN_UP) return this.data.ptouch.windowID;
+        case (EventType.PEN_BUTTON_DOWN) continue;
+        case (EventType.PEN_BUTTON_UP) return this.data.pbutton.windowID;
+        case (EventType.PEN_MOTION) return this.data.pmotion.windowID;
+        case (EventType.PEN_AXIS) return this.data.paxis.windowID;
+        
+        case (EventType.RENDER_TARGETS_RESET) continue;
+        case (EventType.RENDER_DEVICE_RESET) continue;
+        case (EventType.RENDER_DEVICE_LOST) return this.data.render.windowID;
+
+        case (EventType.USER) return this.data.user.windowID;
+
+        default break;
+    }
+
+    return 0;
+}

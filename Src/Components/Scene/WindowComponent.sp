@@ -20,7 +20,7 @@ state WindowDesc
 WindowData CreateWindowComponent(desc: WindowDesc, scene: *Scene, entity: Entity)
 {
 	windowData := WindowData();
-	windowData.window = CreateWindow(
+	windowData.window = Window.CreateWindow(
 		desc.title[0],
 		desc.width,
 		desc.height,

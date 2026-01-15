@@ -3,6 +3,7 @@ package Window
 import SDL
 import SparseSet
 import Vec
+import Event
 
 windowMap := SparseSet<*SDL.Window>();
 
@@ -10,6 +11,7 @@ windowMap := SparseSet<*SDL.Window>();
 {
 	window := SDL.CreateWindow(title, width, height, flags);
 	windowMap.Insert(window.id, window);
+	Event.SDLEvents.Insert(window.id, Event.Emitter());
 	return window;
 }
 
@@ -27,6 +29,7 @@ DestroyWindow(window: *SDL.Window)
 
 	SDL.DestroyWindow(window);
 	windowMap.Remove(window.id);
+	Event.SDLEvents.Remove(window.id);
 }
 
 { width: uint32, height: uint32 } GetWindowSize(window: *SDL.Window)
@@ -35,3 +38,5 @@ DestroyWindow(window: *SDL.Window)
 	SDL.GetWindowSize(window, size.width@, size.height@);
 	return size;
 }
+
+*SDL.Window GetFocusedWindow() => SDL.GetMouseFocus();
