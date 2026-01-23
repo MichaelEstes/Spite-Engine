@@ -348,11 +348,10 @@ RenderPass RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOr
 			{
 				subpass.inputAttachments.Add(attachmentRef);
 			}
-			renderPass.subpass = subpass;
-
 		}
 	}
 
+	renderPass.subpass = subpass;
 	return renderPass;
 }
 

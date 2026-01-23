@@ -17,6 +17,7 @@ ImGuiPass := RegisterRenderPass(
 				renderer := builder.Renderer();
 				builder.Read(renderer.swapchainHandle, ResourceUsageFlags.Sampled | ResourceUsageFlags.LoadUndefined);
 				builder.Write(renderer.swapchainHandle);
+				builder.SetClearColor(renderer.swapchainHandle, Color(0.12, 0.12, 0.12, 0.0));
 
 				return true;
 			},
@@ -39,7 +40,6 @@ ImGuiPass := RegisterRenderPass(
 					initInfo.Device = renderer.device;
 					initInfo.QueueFamily = renderer.queues.graphicsQueueIndex;
 					initInfo.Queue = renderer.queues.graphicsQueue;
-					//initInfo.PipelineCache = vulkanBackend.pipelineCache;
 					initInfo.PipelineCache = null;
 					initInfo.DescriptorPool = renderer.texturePool;
 					initInfo.MinImageCount = 2;

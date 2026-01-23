@@ -73,6 +73,12 @@ state DepthStencilClear
     stencil: uint32
 }
 
+DepthStencilClear::(depth: float32, stencil: uint32)
+{
+	this.depth = depth;
+	this.stencil = stencil;
+}
+
 state ClearValue
 {
 	value: ?{

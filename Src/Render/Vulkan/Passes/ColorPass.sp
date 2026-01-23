@@ -31,15 +31,31 @@ colorPass := RegisterRenderPass(
 			colorPassName,
 			::bool(builder: *RenderPassBuilder<VulkanRenderer>, scene: *Scene) 
 			{
-				//log "Vulkan Color pass init";
 				renderer := builder.Renderer();
-				builder.Read(renderer.swapchainHandle);
-				builder.Write(renderer.swapchainHandle);
+				
+				//log "Vulkan Color pass init";
+				builder.Read(renderer.swapchainHandle, ResourceUsageFlags.Sampled | ResourceUsageFlags.LoadUndefined);
+				builder.Write(renderer.swapchainHandle, ResourceUsageFlags.DefaultWrite);
+				
+				depthTexture := TextureDesc();
+				depthTexture.format = renderer.swapchain.depthFormat;
+				depthTexture.usage = GPUTextureUsage.DepthStencil;
+				depthTexture.depth = 1;
+				depthTexture.layerCount = 1;
+				depthTexture.mipLevels = 1;
+				depthTexture.flags = GPUTextureFlags.SizeSwapchainRelative;
+				depthTexture.layout = GPUTextureLayout.Undefined;
+				
+				depthHandle := builder.CreateTexture("depth", depthTexture);
+				builder.Read(depthHandle, ResourceUsageFlags.Sampled | ResourceUsageFlags.LoadUndefined);
+				builder.Write(depthHandle, ResourceUsageFlags.Depth | ResourceUsageFlags.Store);
+				builder.SetDepthStencilColor(depthHandle, DepthStencilClear(1.0, 0));
 
 				return true;
 			},
 			::(context: *RenderPassContext<VulkanRenderer>, scene: *Scene) 
 			{
+				//log "Vulkan Color pass";
 				renderer := context.renderer;
 
 				camera := scene.GetComponent<Camera>(renderer.self);

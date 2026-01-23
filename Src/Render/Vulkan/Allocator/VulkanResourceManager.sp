@@ -9,7 +9,8 @@ state VulkanResourceHandle
 state VulkanRenderTarget
 {
 	image: *VkImage_T,
-	imageView: *VkImageView_T
+	imageView: *VkImageView_T,
+	handle: VulkanAllocHandle
 }
 
 state VulkanResourceManager

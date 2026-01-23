@@ -203,27 +203,27 @@ GPUTextureFormat VkFormatToGPUTextureFormat(format: VkFormat)
     return GPUTextureFormat.INVALID;
 }
 
-VkImageUsageFlagBits GPUTextureUsageToVkUsage(usage: GPUTextureUsageFlags)
+VkImageUsageFlagBits GPUTextureUsageToVkUsage(usage: GPUTextureUsage)
 {
     usageFlags := VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                   VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     
-    if (usage & (GPUTextureUsageFlags.SAMPLER |
-                 GPUTextureUsageFlags.GRAPHICS_STORAGE_READ |
-                 GPUTextureUsageFlags.COMPUTE_STORAGE_READ)) 
+    if (usage & (GPUTextureUsage.Sampler |
+                 GPUTextureUsage.GraphicsRead |
+                 GPUTextureUsage.ComputeRead)) 
     {
         usageFlags |= VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT;
     }
-    if (usage & GPUTextureUsageFlags.COLOR_TARGET) 
+    if (usage & GPUTextureUsage.Color) 
     {
         usageFlags |= VkImageUsageFlagBits.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     }
-    if (usage & GPUTextureUsageFlags.DEPTH_STENCIL_TARGET) 
+    if (usage & GPUTextureUsage.DepthStencil) 
     {
         usageFlags |= VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     }
-    if (usage & (GPUTextureUsageFlags.COMPUTE_STORAGE_WRITE |
-                 GPUTextureUsageFlags.COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE)) 
+    if (usage & (GPUTextureUsage.ComputeWrite |
+                 GPUTextureUsage.ComputeSimultaneousReadWrite)) 
     {
         usageFlags |= VkImageUsageFlagBits.VK_IMAGE_USAGE_STORAGE_BIT;
     }

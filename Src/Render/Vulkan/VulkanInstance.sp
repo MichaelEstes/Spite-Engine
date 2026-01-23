@@ -59,17 +59,21 @@ ArrayView<*VkPhysicalDevice_T> VulkanInstance::PhysicalDevices()
 VulkanInstance::InitializeDevice(deviceIndex: uint32)
 {
 	i := deviceIndex;
+	log deviceIndex;
 	if (vulkanInstance.devicesInitialized[i]~) return;
 	vulkanInstance.resourceTables[i]~ = ResourceTables<VulkanRenderer>(
 		::*VkImage_T(createDesc: TextureDesc, renderer: *VulkanRenderer) {
 			imageCreateInfo := TextureDescToCreateInfo(createDesc, renderer);
 			image := CreateVkImage(renderer.device, imageCreateInfo);
+			imageHandle := renderer.allocator.AllocImage(image, VulkanMemoryFlags.GPU);
+			
 			imageViewInfo := DefaultImageView(image, imageCreateInfo);
 			imageView := CreateVkImageView(renderer.device, imageViewInfo);
 
 			renderTarget := VulkanRenderTarget();
 			renderTarget.image = image;
 			renderTarget.imageView = imageView;
+			renderTarget.handle = imageHandle;
 
 			resourceManager := vulkanInstance.resourceManagers[renderer.deviceIndex];
 			resourceManager.renderTargetMap.Insert(image, renderTarget);

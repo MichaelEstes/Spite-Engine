@@ -47,6 +47,11 @@ state InputValue
 	kind: InputValueKind
 }
 
+InputValue::()
+{
+	this.value = Vec2(0.0, 0.0);
+}
+
 InputValue::(kind: InputValueKind)
 {
 	this.kind = kind;

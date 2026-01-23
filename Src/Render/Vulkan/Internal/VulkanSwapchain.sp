@@ -16,6 +16,7 @@ state VulkanSwapchain
 	extent: VkExtent2D,
 
 	imageFormat: VkFormat,
+	depthFormat: VkFormat,
 	colorSpace: VkColorSpaceKHR,
 
 	imageCount: uint32
@@ -42,6 +43,8 @@ VulkanSwapchain::SelectFormat(renderer: *VulkanRenderer)
 			surfaceFormats[0]
 		);
 	}
+
+	this.depthFormat = FindDepthFormat(renderer.physicalDevice);
 
 	for (i .. surfaceFormatCount)
 	{

@@ -8,6 +8,7 @@ import WindowComponent
 import ThreadParamAllocator
 import Fiber
 import SystemInfo
+import Array
 
 InitializeImGui()
 {
@@ -24,13 +25,12 @@ state ImGuiWindow
 {
 	window: *SDL.Window,
 	windowHandle: *void,
-	renderFunc: ::(*ImGuiWindow, *any),
+	renderFuncs: Array<::(*ImGuiWindow, *any)>,
 	data: *any,
 
 	backend: ?{
 		vulkan: {
 			renderer: VulkanRenderer,
-			pipelineCache: *VkPipelineCache_T,
 			initialized: bool
 		},
 		none: *void
@@ -42,9 +42,9 @@ state ImGuiWindow
 	height: uint32
 }
 
-ImGuiWindow::(renderFunc: ::(*ImGuiWindow, *any), data: *any, width: uint32, height: uint32)
+ImGuiWindow::(renderFuncs: []::(*ImGuiWindow, *any), data: *any, width: uint32, height: uint32)
 {
-	this.renderFunc = renderFunc;
+	this.renderFuncs = Array<::(*ImGuiWindow, *any)>(renderFuncs);
 	this.data = data;
 	this.width = width;
 	this.height = height;
@@ -66,13 +66,13 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 {
 	log "Init ImGui Vulkan Window";
 	this.entity = entity;
+	this.backend.vulkan.initialized = false;
 
 	param := AllocThreadParam<SceneEntity>();
 	param.entity = entity;
 	param.scene = scene@;
 
 	handle: *JobHandle = null;
-
 	Fiber.RunOnMainThread(::(sceneEntity: *SceneEntity)
 	{
 		log "Creating ImGui Vulkan Window";
@@ -90,6 +90,8 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 		windowData := CreateWindowComponent(windowDesc, scene, entity);
 		window := windowData.window;
 
+		imGuiWindow.window = window;
+
 		propsID := SDL.GetWindowProperties(window);
 		imGuiWindow.windowHandle = SDL.GetPointerProperty(propsID, SDL.Win32WindowHandle, null);
 		initialized := cImGui_ImplWin32_Init(imGuiWindow.windowHandle);
@@ -105,8 +107,6 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 		events.On(SDL.EventType.MOUSE_BUTTON_DOWN, UpdateMouseButton);
 		events.On(SDL.EventType.MOUSE_BUTTON_UP, UpdateMouseButton);
 		
-		imGuiWindow.backend.vulkan.pipelineCache = null;
-
 		renderConfig := VulkanRendererConfig();
 		renderConfig.deviceIndex = vulkanInstance.defaultDevice;
 		renderConfig.userData.entity = entity;
@@ -126,7 +126,7 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 
 ImGuiWindow::Render()
 {
-	this.renderFunc(this@, this.data);
+	for (renderFunc in this.renderFuncs) renderFunc(this@, this.data);
 }
 
 ImGuiComponent := ECS.RegisterComponent<ImGuiWindow>(

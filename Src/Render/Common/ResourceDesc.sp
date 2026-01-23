@@ -214,11 +214,22 @@ enum GPUTextureLayout: uint32
     Present
 }
 
+enum GPUTextureUsage: uint32
+{
+    Sampler = (1 << 0),
+    Color = (1 << 1),
+    DepthStencil = (1 << 2),
+    GraphicsRead = (1 << 3),
+    ComputeRead = (1 << 4),			
+    ComputeWrite = (1 << 5),
+    ComputeSimultaneousReadWrite = (1 << 6)
+}
+
 state TextureDesc
 {
 	type: GPUTextureType,
 	format: GPUFormat,
-	usage: GPUTextureUsageFlags,
+	usage: GPUTextureUsage,
 	width: uint32,
 	height: uint32,
 	depth: uint32,

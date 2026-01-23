@@ -61,7 +61,7 @@ InitalizeFibers()
 	sysInfo := GetSystemInfo();
 	// - 3 - executable start thread, main (IO) fiber thread, OS scheduling thread
 	fibers.fiberCount = Math.Max(sysInfo.processorCount - 3, 1);
-	
+
 	fibers.handleAllocator = BucketAllocator(#sizeof JobHandle, FiberJobCount, fibers.fiberCount + 1);
 
 	fibers.jobQueueArr = FixedArray<SingleConsumerQueue<FiberJob>>(fibers.fiberCount);

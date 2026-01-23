@@ -17,6 +17,8 @@ import ThreadParamAllocator
 
 import ImGui
 
+import Utils
+
 _ := SceneRegistry.RegisterScene(
 	0,
 	::(scene: *Scene) {
@@ -83,12 +85,12 @@ _ := SceneRegistry.RegisterScene(
 
 		imGuiWindowEntity := scene.CreateEntity();
 		scene.SetComponent<ImGuiWindow>(imGuiWindowEntity, ImGuiWindow(
-			::(window: *ImGuiWindow, data: *any) 
+			[::(window: *ImGuiWindow, data: *any) 
 			{
 				ImGui_ShowDemoWindow(true@);
 				ImGui_ShowMetricsWindow(true@);
 				ImGui_ShowDebugLogWindow(true@);
-			},
+			},],
 			null,
 			uint32(1000),
 			uint32(1000)
