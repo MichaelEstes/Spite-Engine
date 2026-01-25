@@ -37,8 +37,8 @@ state SharedUBO<Type>
 	pool: *VkDescriptorPool_T,
 	descLayout: *VkDescriptorSetLayout_T,
 	descSets: [FrameCount]*VkDescriptorSet_T,
-	buffers: [FrameCount]VulkanAllocHandle,
-	UBOs: [FrameCount]*Type,
+	buffer: VulkanAllocHandle,
+	UBO: *Type,
 }
 
 SharedUBO::Init(device: *VkDevice_T, allocator: *VulkanAllocator, binding: uint32, stageFlags: VkShaderStageFlagBits)
@@ -58,7 +58,7 @@ SharedUBO::Init(device: *VkDevice_T, allocator: *VulkanAllocator, binding: uint3
 	);
 
 	layoutBinding := VkDescriptorSetLayoutBinding();
-	layoutBinding.binding = 0;
+	layoutBinding.binding = binding;
 	layoutBinding.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	layoutBinding.descriptorCount = 1;
 	layoutBinding.stageFlags = stageFlags;
@@ -74,26 +74,22 @@ SharedUBO::Init(device: *VkDevice_T, allocator: *VulkanAllocator, binding: uint3
 	);
 
 	uboSize := #sizeof Type;
-	for (i .. FrameCount)
-	{
-		createInfo := VkBufferCreateInfo();
-		createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		createInfo.usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		createInfo.size = uboSize;
-		createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+	createInfo := VkBufferCreateInfo();
+	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	createInfo.usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	createInfo.size = uboSize;
+	createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
 
-		buf := CreateVkBuffer(device, createInfo);
-		bufHandle := allocator.AllocBuffer(
-			buf, 
-			VulkanMemoryFlags.Shared | VulkanMemoryFlags.Coherent | VulkanMemoryFlags.Mapped
-		);
-		this.buffers[i] = bufHandle;
+	buf := CreateVkBuffer(device, createInfo);
+	bufHandle := allocator.AllocBuffer(
+		buf, 
+		VulkanMemoryFlags.Shared | VulkanMemoryFlags.Coherent | VulkanMemoryFlags.Mapped
+	);
+	this.buffer = bufHandle;
 
-		alloc := allocator.GetAllocation(bufHandle);
-		block := allocator.GetAllocationBlock(bufHandle);
-		this.UBOs[i] = (block.mappedPtr + alloc.offset) as *Type;
-		this.UBOs[i]~ = Type();
-	}
+	alloc := allocator.GetAllocation(bufHandle);
+	this.UBO = allocator.GetAllocationMappedPtr(bufHandle);
+	this.UBO~ = Type();
 
 	layouts := [FrameCount]*VkDescriptorSetLayout_T;
 	for (i .. FrameCount) layouts[i] = this.descLayout;
@@ -111,10 +107,8 @@ SharedUBO::Init(device: *VkDevice_T, allocator: *VulkanAllocator, binding: uint3
 
 	for (i .. FrameCount) 
 	{
-		buf := allocator.GetAllocation(this.buffers[i]);
-
 		bufferInfo := VkDescriptorBufferInfo();
-		bufferInfo.buffer = buf.data.buffer;
+		bufferInfo.buffer = alloc.data.buffer;
 		bufferInfo.offset = 0;
 		bufferInfo.range = uboSize;
 
@@ -138,7 +132,7 @@ bool SharedUBO::Valid()
 
 SharedUBO::Update(frame: uint32, value: Type)
 {
-	this.UBOs[frame]~ = value;
+	this.UBO~ = value;
 }
 
 *VkDescriptorSet_T SharedUBO::GetDescSet(frame: uint32)

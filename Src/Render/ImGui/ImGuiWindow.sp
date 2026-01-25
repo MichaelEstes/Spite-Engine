@@ -110,9 +110,9 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 		renderConfig := VulkanRendererConfig();
 		renderConfig.deviceIndex = vulkanInstance.defaultDevice;
 		renderConfig.userData.entity = entity;
-		renderConfig.maxTextureSets = 8;
-		renderConfig.textureDescriptorCount = 8;
-		renderConfig.useUBOs = false;
+		renderConfig.maxMaterialSets = 8;
+		renderConfig.materialDescriptorCount = 8;
+		renderConfig.useSceneUBO = false;
 		renderConfig.useEmptyStructures = false;
 		renderConfig.onMeshAdded = ::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {};
 		CreateVulkanRenderer(

@@ -69,6 +69,14 @@ state VulkanAllocator
 	return this.blocks[alloc.blockIndex]@;
 }
 
+*void VulkanAllocator::GetAllocationMappedPtr(allocHandle: VulkanAllocHandle)
+{
+	alloc := this.GetAllocation(allocHandle);
+	block := this.GetAllocationBlock(allocHandle);
+	if (!alloc || !block) return null;
+	return (block.mappedPtr + alloc.offset);
+}
+
 VulkanAllocator::Create(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T)
 {
 	this.device = device;

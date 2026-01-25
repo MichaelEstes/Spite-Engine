@@ -60,7 +60,6 @@ state VulkanRenderer
 	materialShared: SharedUBO<MaterialUBO>,
 	
 	materialPool: *VkDescriptorPool_T,
-	texturePool: *VkDescriptorPool_T,
 
 	emptyVertexBuffers: EmptyVertexBuffers,
 	emptyTextures: EmptyTextures,
@@ -96,10 +95,10 @@ state VulkanRendererConfig
 {
 	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer) = UploadMesh;
 	userData: ?{ ptr: *void, i: uint, entity: Entity } = null;
-	textureDescriptorCount: uint32 = 1000
-	maxTextureSets: uint32 = 1000,
+	materialDescriptorCount: uint32 = 1000
+	maxMaterialSets: uint32 = 1000,
 	deviceIndex: uint32 = vulkanInstance.defaultDevice,
-	useUBOs: bool = true;
+	useSceneUBO: bool = true;
 	useEmptyStructures: bool = true;
 }
 
@@ -155,13 +154,12 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 		FrameCount
 	);
 
-	if (config.useUBOs)
+	if (config.useSceneUBO)
 	{
 		vulkanRenderer.sceneShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
-		vulkanRenderer.materialShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT);
 	}
 
-	vulkanRenderer.CreateMaterialDescPool(config.textureDescriptorCount, config.maxTextureSets);
+	vulkanRenderer.CreateMaterialDescPool(config.materialDescriptorCount, config.maxMaterialSets);
 
 	if (config.useEmptyStructures)
 	{
@@ -310,18 +308,20 @@ VulkanRenderer::CreateSurface()
 
 VulkanRenderer::CreateMaterialDescPool(descriptorCount: uint32, maxSet: uint32)
 {
-	poolSizes := [VkDescriptorPoolSize(),];
+	poolSizes := [VkDescriptorPoolSize(), VkDescriptorPoolSize()];
 	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[0].descriptorCount = descriptorCount;
+	poolSizes[1].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[1].descriptorCount = descriptorCount;
 
 	poolInfo := VkDescriptorPoolCreateInfo();
 	poolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = 1;
+	poolInfo.poolSizeCount = 2;
 	poolInfo.pPoolSizes = fixed poolSizes;
 	poolInfo.maxSets = maxSet;
 
 	CheckResult(
-		vkCreateDescriptorPool(this.device, poolInfo@, null, this.texturePool@),
+		vkCreateDescriptorPool(this.device, poolInfo@, null, this.materialPool@),
 		"VulkanRenderer::CreateMaterialDescPool Error allocating Vulkan descriptor pool"
 	);
 }

@@ -113,7 +113,10 @@ state VulkanMaterial
 	textures: [MaxMaterialTextures]VulkanTexture,
 	textureDescSet: *VkDescriptorSet_T,
 
-	data: MaterialUBO,
+	ubo: *MaterialUBO,
+	uboBufferHandle: VulkanAllocHandle,
+	uboLayout: *VkDescriptorSetLayout_T,
+	uboDescSet: *VkDescriptorSet_T,
 
 	vertShaderHandle: ResourceHandle,
 	fragShaderHandle: ResourceHandle,
@@ -445,13 +448,15 @@ VulkanMaterial UploadMaterial(mat: Material, renderer: *VulkanRenderer)
 	vulkanMat.vertShaderHandle = UseShader(device, mat.vertShader);
 	vulkanMat.fragShaderHandle = UseShader(device, mat.fragShader);
 
-	vulkanMat.data.baseColor = mat.baseColor;
-	vulkanMat.data.emissiveFactor = mat.emissiveFactor;
-	vulkanMat.data.normalScale = mat.normalScale;
-	vulkanMat.data.metallicFactor = mat.metallicFactor;
-	vulkanMat.data.roughnessFactor = mat.roughnessFactor;
-	vulkanMat.data.occlusionStrength = mat.occlusionStrength;
-	vulkanMat.data.alphaCutoff = mat.alphaCutoff;
+	ubo := MaterialUBO();
+	ubo.baseColor = mat.baseColor;
+	ubo.emissiveFactor = mat.emissiveFactor;
+	ubo.normalScale = mat.normalScale;
+	ubo.metallicFactor = mat.metallicFactor;
+	ubo.roughnessFactor = mat.roughnessFactor;
+	ubo.occlusionStrength = mat.occlusionStrength;
+	ubo.alphaCutoff = mat.alphaCutoff;
+	CreateMaterialUBODescSet(vulkanMat, renderer, ubo);
 
 	if (!mat.color)
 	{
@@ -473,11 +478,79 @@ VulkanMaterial UploadMaterial(mat: Material, renderer: *VulkanRenderer)
 	return vulkanMat;
 }
 
+CreateMaterialUBODescSet(mat: VulkanMaterial, renderer: *VulkanRenderer, matUBO: MaterialUBO)
+{
+	device := renderer.device;
+	pool := renderer.materialPool;
+	allocator := renderer.allocator;
+
+	layoutBinding := VkDescriptorSetLayoutBinding();
+	layoutBinding.binding = 0;
+	layoutBinding.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	layoutBinding.descriptorCount = 1;
+	layoutBinding.stageFlags = VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT;
+	
+	layoutInfo := VkDescriptorSetLayoutCreateInfo();
+	layoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = 1;
+	layoutInfo.pBindings = layoutBinding@;
+
+	CheckResult(
+		vkCreateDescriptorSetLayout(device, layoutInfo@, null, mat.uboLayout@),
+		"CreateMaterialUBODescSet Error creating Vulkan descriptor set layout"
+	);
+
+	uboSize := #sizeof MaterialUBO;
+	createInfo := VkBufferCreateInfo();
+	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	createInfo.usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	createInfo.size = uboSize;
+	createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+
+	buf := CreateVkBuffer(device, createInfo);
+	bufHandle := allocator.AllocBuffer(
+		buf, 
+		VulkanMemoryFlags.Shared | VulkanMemoryFlags.Coherent | VulkanMemoryFlags.Mapped
+	);
+	mat.uboBufferHandle = bufHandle;
+
+	alloc := allocator.GetAllocation(bufHandle);
+	mat.ubo = allocator.GetAllocationMappedPtr(bufHandle);
+	mat.ubo~ = matUBO;
+
+	allocInfo := VkDescriptorSetAllocateInfo();
+	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = pool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = mat.uboLayout@;
+
+	CheckResult(
+		vkAllocateDescriptorSets(device, allocInfo@, mat.uboDescSet@),
+		"CreateMaterialUBODescSet Error allocating scene Vulkan descriptor sets"
+	);
+
+	bufferInfo := VkDescriptorBufferInfo();
+	bufferInfo.buffer = alloc.data.buffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = uboSize;
+
+	descriptorWrites := [VkWriteDescriptorSet(),];
+	descriptorWrites[0].sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[0].dstSet = mat.uboDescSet;
+	descriptorWrites[0].dstBinding = 0;
+	descriptorWrites[0].dstArrayElement = 0;
+	descriptorWrites[0].descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrites[0].descriptorCount = 1;
+	descriptorWrites[0].pBufferInfo = bufferInfo@;
+
+	vkUpdateDescriptorSets(device, 1, fixed descriptorWrites, 0, null);
+}
+
 CreateMaterialDescSet(mat: VulkanMaterial, renderer: *VulkanRenderer)
 {
 	device := renderer.device;
 	layoutCache := renderer.pipelineLayoutCache~;
-	pool := renderer.texturePool;
+	pool := renderer.materialPool;
 	
 	key := PipelineLayoutKey(mat.vertShaderHandle, mat.fragShaderHandle);
 

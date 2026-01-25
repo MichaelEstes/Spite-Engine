@@ -71,9 +71,6 @@ colorPass := RegisterRenderPass(
 
 				sceneDescSet := renderer.sceneShared.GetDescSet(frame);
 								
-				materialShared := renderer.materialShared;
-				materialDescSet := materialShared.GetDescSet(frame);
-
 				commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 
 				pipelineMeshMap := meshGroupsByScene.Get(scene.id);
@@ -123,15 +120,13 @@ colorPass := RegisterRenderPass(
 						worldTransform := scene.GetComponentDirect<WorldTransform>(entity, WorldTransformComponent);
 						if (!worldTransform) continue;
 
-						materialShared.Update(frame, mat.data);
-
 						vkCmdBindDescriptorSets(
 							commandBuffer,
 							VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS,
 							pipelineLayout,
 							uint32(1),
 							uint32(2),
-							fixed [materialDescSet, mat.textureDescSet],
+							fixed [mat.uboDescSet, mat.textureDescSet],
 							uint32(0),
 							null
 						);
