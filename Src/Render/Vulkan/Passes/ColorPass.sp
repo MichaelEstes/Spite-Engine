@@ -58,13 +58,7 @@ colorPass := RegisterRenderPass(
 				//log "Vulkan Color pass";
 				renderer := context.renderer;
 
-				camera := scene.GetComponent<Camera>(renderer.self);
-				if (!camera) return;
-
-				cameraViewMatrix := camera.GetViewMatrix();
-
 				device := renderer.device;
-
 				renderPass := renderer.CastDriverRenderPass(context.driverRenderpass);
 				allocator := renderer.allocator;
 				frame := renderer.Frame();

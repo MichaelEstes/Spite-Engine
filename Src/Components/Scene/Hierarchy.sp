@@ -31,3 +31,13 @@ ParentEntity(parent: Entity, child: Entity, scene: *Scene)
 	parentHierarchy.children.Insert(child);
 	childHierarchy.parent = parent;
 }
+
+state HierarchyIterator
+{
+	curr: Entity
+}
+
+HierarchyIterator IterateChildren(parent: Entity)
+{
+
+}

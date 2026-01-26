@@ -27,7 +27,7 @@ _ := SceneRegistry.RegisterScene(
 		sceneEntity := scene.CreateEntity();
 
 		camera := Camera();
-		camera.position = Vec3(0.0, 0.0, 4.0);
+		camera.position = Vec3(2.0, 1.0, 4.0);
 		camera.fov = Math.Deg2Rad(70.0);
 		camera.aspect = 1.0;
 		camera.near = 0.1;
@@ -55,32 +55,21 @@ _ := SceneRegistry.RegisterScene(
 		//model := "./Resource/Models/BrainStem/BrainStem.gltf";
 		model := "./Resource/Models/DamagedHelmet/DamagedHelmet.gltf";
 		log "Loading GLTF: ", model;
-		gltfEntities := AllocThreadParam<Array<Entity>>();
-		gltfEntities~ = Array<Entity>();
 		gltfHandle := LoadGLTFResource(
-			model,
-			scene,
+			model, scene,
 			::(handle: ResourceHandle, param: *GLTFLoadParam) 
 			{
-				outEntities := param.outEntities;
-				defer 
-				{
-					delete outEntities~
-					DeallocThreadParam<Array<Entity>>(outEntities);
-				}
-
 				scene := param.scene;
-				log "Loaded gltf: ", outEntities.count, outEntities~;
+				log "Loaded gltf: ", param.rootEntity;
 
 				//for (entity in outEntities)
 				//{
 				//	rotate := RotateOverTime();
-				//	rotate.axis = Vec3(0.0, 0.0, 1.0) as Norm<Vec3>;
+				//	rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
 				//	rotate.speed = 0.25;
 				//	scene.SetComponent<RotateOverTime>(entity, rotate);
 				//}
 			},
-			gltfEntities
 		);
 
 		imGuiWindowEntity := scene.CreateEntity();

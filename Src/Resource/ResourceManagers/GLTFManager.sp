@@ -25,14 +25,14 @@ state GLTFLoadParam
 {
 	file: string,
 	scene: *Scene,
-	outEntities: *Array<Entity>
+	rootEntity: Entity
 }
 
 state GLTFLoadData
 {
 	scene: *Scene,
 	resource: *GLTFResource,
-	handle: ResourceHandle,
+	handle: ResourceHandle
 }
 
 GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadParam>(
@@ -70,7 +70,6 @@ GLTFManagerLoad(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>)
 	
 	file := param.file;
 	scene := param.scene;
-	outEntities := param.outEntities;
 	
 	gltf := LoadGLTF(file);
 	
@@ -79,31 +78,37 @@ GLTFManagerLoad(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>)
 	gltfData.resource = resource;
 	gltfData.handle = handle;
 	
+	if (!param.rootEntity)
+	{
+		param.rootEntity = scene.CreateEntity();
+		scene.SetComponent<Hierarchy>(param.rootEntity, Hierarchy());
+	}
+	
+	rootEntity := param.rootEntity;
+
 	for (gltfScene in gltf.scenes)
 	{
 		sceneEntity := scene.CreateEntity();
 		scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
-	
-		if (outEntities) outEntities.Add(sceneEntity);
+		ParentEntity(rootEntity, sceneEntity, scene);
 
 		log "Loading scene with ", gltfScene.nodes.count, "nodes";
 		for (nodeIndex in gltfScene.nodes)
 		{
-			NodeToECS(gltfData, gltf, scene, nodeIndex, sceneEntity, outEntities);
+			NodeToECS(gltfData, gltf, scene, nodeIndex, sceneEntity);
 		}
 	}
 	
 	resourceParam.onResourceLoad(resourceParam, ResourceResult.Loaded);
 }
 
-ResourceHandle LoadGLTFResource(file: string, scene: *Scene, onLoad: ::(ResourceHandle, *GLTFLoadParam), outEntities: *Array<Entity> = null)
+ResourceHandle LoadGLTFResource(file: string, scene: *Scene, onLoad: ::(ResourceHandle, *GLTFLoadParam), rootEntity: Entity = NullEntity)
 {
 	gltfParam := GLTFLoadParam();
 	gltfParam.file = file;
 	gltfParam.scene = scene;
-	gltfParam.outEntities = outEntities;
-	
-	log "GLTF outEntities: ", outEntities;
+	gltfParam.rootEntity = rootEntity;
+
 	return GLTFResourceManager.LoadResource(gltfParam, onLoad);
 }
 
@@ -380,15 +385,13 @@ MeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, 
 	scene.SetComponent<Mesh>(entity, mesh);
 }
 
-NodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uint32, parentEntity: Entity, outEntities: *Array<Entity> = null)
+NodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uint32, parentEntity: Entity)
 {
 	gltfNode := gltf.nodes[nodeIndex];
 
 	entity := scene.CreateEntity();
 	scene.SetComponent<Hierarchy>(entity, Hierarchy());
 	ParentEntity(parentEntity, entity, scene);
-
-	if (outEntities) outEntities.Add(entity);
 
 	if (gltfNode.trs)
 	{
@@ -412,6 +415,6 @@ NodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uint32, 
 
 	for (childIndex in gltfNode.children)
 	{
-		NodeToECS(gltfData, gltf, scene, childIndex, entity, outEntities);
+		NodeToECS(gltfData, gltf, scene, childIndex, entity);
 	}
 }

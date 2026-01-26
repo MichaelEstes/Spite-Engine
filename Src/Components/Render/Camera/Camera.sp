@@ -28,7 +28,7 @@ Matrix4 Camera::GetViewMatrix()
 	return view;
 }
 
-Camera::LookAt(target: Vec3, up: Vec3 = Vec3(0.0, 0.0, 1.0))
+Camera::LookAt(target: Vec3, up: Vec3 = Vec3(0.0, 1.0, 0.0))
 {
 	pos := this.position;
 	forward := (target - pos);
