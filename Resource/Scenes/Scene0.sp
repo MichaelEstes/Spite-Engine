@@ -7,16 +7,13 @@ import SceneRegistry
 import SDL
 import SceneDescription
 
-import SDLRenderPass
 import VulkanRenderPass
 
 import GLTFManager
 import RenderComponents
-
-import ThreadParamAllocator
+import SceneComponents
 
 import ImGui
-
 import Utils
 
 _ := SceneRegistry.RegisterScene(
@@ -27,7 +24,7 @@ _ := SceneRegistry.RegisterScene(
 		sceneEntity := scene.CreateEntity();
 
 		camera := Camera();
-		camera.position = Vec3(2.0, 1.0, 4.0);
+		camera.position = Vec3(0, 1.0, 4.0);
 		camera.fov = Math.Deg2Rad(70.0);
 		camera.aspect = 1.0;
 		camera.near = 0.1;
@@ -59,16 +56,20 @@ _ := SceneRegistry.RegisterScene(
 			model, scene,
 			::(handle: ResourceHandle, param: *GLTFLoadParam) 
 			{
+				rootEntity := param.rootEntity;
 				scene := param.scene;
-				log "Loaded gltf: ", param.rootEntity;
+				log "Loaded gltf: ", rootEntity;
 
-				//for (entity in outEntities)
-				//{
-				//	rotate := RotateOverTime();
-				//	rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
-				//	rotate.speed = 0.25;
-				//	scene.SetComponent<RotateOverTime>(entity, rotate);
-				//}
+				//IterateHierarchy(
+				//	rootEntity, scene,
+				//	::(entity: Entity, scene: *Scene) 
+				//	{
+				//		rotate := RotateOverTime();
+				//		rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
+				//		rotate.speed = 0.25;
+				//		scene.SetComponent<RotateOverTime>(entity, rotate);
+				//	}
+				//);
 			},
 		);
 

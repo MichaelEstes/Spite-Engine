@@ -18,6 +18,7 @@ state MouseState
 {
 	window: *SDL.Window,
 	pos: Vec2,
+	delta: Vec2,
 	wheel: Vec2,
 	buttonMask: uint32,
 }
@@ -34,5 +35,6 @@ Mouse := {
 	Side2 := InputKey(4),
 
 	Position := InputKey(5),
-	Wheel := InputKey(6)
+	Delta := InputKey(6),
+	Wheel := InputKey(7)
 }

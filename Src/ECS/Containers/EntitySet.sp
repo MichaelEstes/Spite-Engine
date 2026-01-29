@@ -43,7 +43,7 @@ EntitySet::delete
 	return values;
 }
 
-*Entity EntitySet::operator::[](entity: Entity)
+Entity EntitySet::operator::[](entity: Entity)
 {
 	return this.Find(entity);
 }
@@ -69,12 +69,12 @@ Entity EntitySet::current(it: Iterator)
 	return this.entities[index]~;
 }
 
-*Entity EntitySet::Find(entity: Entity)
+Entity EntitySet::Find(entity: Entity)
 {
 	index := this.FindIndex(entity);
 
-	if(index == InvalidIndex) return null;
-	return this.entities[index];
+	if(index == InvalidIndex) NullEntity;
+	return this.entities[index]~;
 }
 
 bool EntitySet::Empty(index: uint32)

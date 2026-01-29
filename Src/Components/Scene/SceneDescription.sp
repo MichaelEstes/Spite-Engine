@@ -58,7 +58,6 @@ SceneDescComponent := ECS.RegisterComponent<SceneDesc>(
 
 			if (rendererDesc.flags & RendererFlags.Vulkan)
 			{
-				VulkanRenderer.InitializeVulkanInstance();
 				VulkanRenderer.CreateVulkanRenderer(scene, sceneEntity, rendererDesc.passes);
 			}
 			else

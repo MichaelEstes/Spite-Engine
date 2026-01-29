@@ -75,9 +75,9 @@ Vec3 Camera::Forward()
 MainCameraComponent := ECS.RegisterComponent<Camera>(
 	ComponentKind.Sparse,
 	::(entity: Entity, camera: *Camera, scene: Scene) {
-		//log "Removing main camera"
+		//log "Removing camera"
 	}
 	::(entity: Entity, camera: *Camera, scene: Scene) {
-		//log "Setting main camera", camera;
+		//log "Setting camera", entity;
 	}
 );

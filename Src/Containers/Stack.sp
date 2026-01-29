@@ -14,6 +14,11 @@ Stack::()
 	this.capacity = InitialCapacity;
 }
 
+Stack::delete
+{
+	this.mem.Dealloc(this.count);
+}
+
 Stack::Push(value: Type)
 {
 	if(this.count >= this.capacity) this.Expand();	

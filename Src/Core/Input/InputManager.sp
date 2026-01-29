@@ -65,6 +65,11 @@ InitializeInput()
 				input.kind = InputValueKind.Axis;
 				input.value.axis = mouseState.wheel;
 			}
+			else if (key.value == Mouse.Delta.value)
+			{
+				input.kind = InputValueKind.Axis;
+				input.value.axis = mouseState.delta;
+			}
 
 			return input;
 		},
@@ -74,18 +79,23 @@ InitializeInput()
 			{
 				mouseState.wheel = Vec2();
 			}
+			prevPos := Vec2(mouseState.pos.x, mouseState.pos.y);
 			mouseState.buttonMask = SDL.GetMouseState(mouseState.pos.x@, mouseState.pos.y@);
 			mouseState.window = SDL.GetMouseFocus();
+			mouseState.delta = mouseState.pos - prevPos;
 		}
 	);
 	Mouse.device.data = mouseStateGlobal@;
-	GetGlobalEventEmitter().On(SDL.EventType.MOUSE_WHEEL, ::(event: SDL.Event, data: *void) 
+
+	globalEvents := GetGlobalEventEmitter();
+	globalEvents.On(SDL.EventType.MOUSE_WHEEL, ::(event: SDL.Event, data: *void) 
 		{
 			wheelEvent := event.data.wheel;
 			mouseState := Mouse.device.data as *MouseState;
 			mouseState.buttonMask |= MouseButtonBits.WheelUpdated;
 			mouseState.wheel = Vec2(wheelEvent.x, wheelEvent.y);
-		});
+		}
+	);
 
 	inputManager.devices.Add(Keyboard.device@);
 	inputManager.devices.Add(Mouse.device@);
@@ -95,11 +105,6 @@ UpdateInput()
 {
 	inputManager.Update();
 }
-
-//state InputQuery
-//{
-//
-//}
 
 InputValue QueryInput(device: InputDevice, key: InputKey, window: *SDL.Window = null)
 {

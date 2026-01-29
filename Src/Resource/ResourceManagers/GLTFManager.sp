@@ -102,7 +102,7 @@ GLTFManagerLoad(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>)
 	resourceParam.onResourceLoad(resourceParam, ResourceResult.Loaded);
 }
 
-ResourceHandle LoadGLTFResource(file: string, scene: *Scene, onLoad: ::(ResourceHandle, *GLTFLoadParam), rootEntity: Entity = NullEntity)
+ResourceHandle LoadGLTFResource(file: string, scene: *Scene, onLoad: ::(ResourceHandle, *GLTFLoadParam) = null, rootEntity: Entity = NullEntity)
 {
 	gltfParam := GLTFLoadParam();
 	gltfParam.file = file;

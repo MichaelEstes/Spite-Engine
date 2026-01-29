@@ -107,6 +107,8 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 {
 	log "Creating Vulkan renderer";
 
+	InitializeVulkanInstance();
+
 	windowData := scene.GetComponent<WindowData>(entity);
 	
 	deviceIndex := config.deviceIndex;
