@@ -127,7 +127,7 @@ DeallocJobHandle(handle: *JobHandle)
 uint32 GetNextFiberIndex()
 {
 	index := fibers.currentIndex.Add(1) % fibers.fiberCount;
-	if (index == GetCurrentFiberIndex()) index += 1;
+	if (index == GetCurrentFiberIndex()) index = (index + 1) % fibers.fiberCount;
 	return index;
 }
 
