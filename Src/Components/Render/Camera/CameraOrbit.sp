@@ -2,13 +2,11 @@ package RenderComponents
 
 import Input
 import WindowComponent
-import Math
 import Quaternion
 
 state CameraOrbit
 {
 	orbitCenter: Vec3 = Vec3(0.0, 0.0, 0.0),
-	orbitUp: Vec3 = Vec3(0.0, 1.0, 0.0),
 	scrollDamping: float32 = 0.1,
 	panDamping: float32 = 0.0025,
 	rotateDamping: float32 = 0.005
@@ -25,7 +23,9 @@ CameraOrbitSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 		entity := ec.entity;
 		cameraOrbit := ec.component;
 		camera := scene.GetComponent<Camera>(entity);
-		window := scene.GetComponent<WindowData>(entity).window;
+		windowData := scene.GetComponent<WindowData>(entity);
+		if (!windowData) continue;
+		window := windowData.window;
 
 		mouseDelta := QueryInput(Mouse.device, Mouse.Delta, window).value.axis;
 
@@ -56,18 +56,14 @@ CameraOrbitSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 			pitchAngle := mouseDelta.y * cameraOrbit.rotateDamping;
 
 			worldUp := Vec3(0.0, 1.0, 0.0);
-			right := cameraOrbit.orbitUp.Cross(toCamera);
-			if (!right.SqrLength()) right = worldUp.Cross(toCamera);
-			if (!right.SqrLength()) right = Vec3(1.0, 0.0, 0.0).Cross(toCamera);
 
 			if (yawAngle != 0.0)
 			{
-				orbitUpNorm := cameraOrbit.orbitUp.Normalize();
-				yawRot := Quaternion(orbitUpNorm, yawAngle).ToRotationMatrix();
+				yawRot := Quaternion(worldUp as Norm<Vec3>, yawAngle).ToRotationMatrix();
 				toCamera = yawRot * toCamera;
-				cameraOrbit.orbitUp = yawRot * cameraOrbit.orbitUp;
 			}
 
+			right := worldUp.Cross(toCamera);
 			if (right.SqrLength())
 			{
 				rightNorm := right.Normalize();
@@ -75,22 +71,11 @@ CameraOrbitSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 				{
 					pitchRot := Quaternion(rightNorm, pitchAngle).ToRotationMatrix();
 					toCamera = pitchRot * toCamera;
-					cameraOrbit.orbitUp = pitchRot * cameraOrbit.orbitUp;
 				}
 			}
 
-			viewDir := (toCamera * -1.0).Normalize().vec;
-			right = viewDir.Cross(cameraOrbit.orbitUp);
-			if (!right.SqrLength())
-			{
-				auxUp := Vec3(1.0, 0.0, 0.0);
-				if (Math.FAbs(viewDir.x) > 0.99) auxUp = Vec3(0.0, 0.0, 1.0);
-				right = viewDir.Cross(auxUp);
-			}
-			cameraOrbit.orbitUp = right.Cross(viewDir).Normalize().vec;
-
 			camera.position = cameraOrbit.orbitCenter + toCamera;
-			camera.LookAt(cameraOrbit.orbitCenter, cameraOrbit.orbitUp);
+			camera.LookAt(cameraOrbit.orbitCenter, worldUp);
 		}
 	}	
 });

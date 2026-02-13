@@ -51,7 +51,7 @@ int GetSlabIndex<Type>()
 *Type AllocThreadParam<Type>()
 {
 	index := GetSlabIndex<Type>();
-	bucketIndex := paramAllocator.indices[index] + 1;
+	bucketIndex := (paramAllocator.indices[index] + 1) % BucketCount;
 	paramAllocator.indices[index] = bucketIndex;
 
 	slab := paramAllocator.slabs[index];

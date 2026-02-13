@@ -8,25 +8,44 @@ initialBytes := 8;
 state BitSet
 {
 	bitCount: uint,
-	alloc: ZeroedAllocator<byte>
+	mem: ?{
+		alloc: ZeroedAllocator<byte>,
+		bytes: [24]byte
+	}
 }
 
 BitSet::()
 {
-	this.bitCount = initialBytes * bitsInByte;
-	this.alloc.Alloc(initialBytes);
+	this = BitSet(initialBytes);
 }
 
 BitSet::(count: uint)
 {
-	byteCount := (((bitsInByte - count % bitsInByte) + count) / bitsInByte) - 1;
+	byteCount := (count + bitsInByte - 1) / bitsInByte;
+
 	this.bitCount = byteCount * bitsInByte;
-	this.alloc.Alloc(byteCount);
+
+	if (this.IsAllocated())
+	{
+		this.mem.alloc.Alloc(byteCount);
+	}
+	else
+	{
+		byteCount = #sizeof this.mem.bytes;
+		this.bitCount = byteCount * bitsInByte;
+		for (i .. byteCount)
+		{
+			this.mem.bytes[i] = byte(0);
+		}
+	}
 }
 
 BitSet::delete 
 {
-	this.alloc.Dealloc(this.bitCount / bitsInByte);
+	if (this.IsAllocated())
+	{
+		this.mem.alloc.Dealloc(this.bitCount / bitsInByte);
+	}
 }
 
 BitSet::Resize(count: uint)
@@ -34,12 +53,27 @@ BitSet::Resize(count: uint)
 	this.CheckResize(count);
 }
 
+bool BitSet::IsAllocated()
+{
+	return this.bitCount / bitsInByte > #sizeof this.mem.bytes;
+}
+
+*byte BitSet::GetIndex(index: uint)
+{
+	if (this.IsAllocated())
+	{
+		return this.mem.alloc[index];
+	}
+
+	return this.mem.bytes[index]@;
+}
+
 bool BitSet::operator::[](i: uint)  
 { 
 	if(!this.Inbounds(i)) return false;
 	index := i / bitsInByte;
 	offset := i % bitsInByte;
-	return (this.alloc[index]~ >> offset) & 1;
+	return (this.GetIndex(index)~ >> offset) & 1;
 }
 
 bool BitSet::Inbounds(i: uint)
@@ -52,9 +86,15 @@ BitSet::CheckResize(i: uint)
 	if(!this.Inbounds(i))
 	{
 		amount := i / bitsInByte;
-		resizedCapacity := (((amount + (initialBytes - 1)) / initialBytes) * 
-						initialBytes) * 2;
-		this.alloc.Resize(resizedCapacity, this.bitCount / bitsInByte);
+		resizedCapacity := (((amount + (initialBytes - 1)) / initialBytes) * initialBytes) * 2;
+		if (this.IsAllocated())
+		{
+			this.mem.alloc.Resize(resizedCapacity, this.bitCount / bitsInByte);
+		}
+		else
+		{
+			this.mem.alloc.Alloc(resizedCapacity);
+		}
 		this.bitCount = resizedCapacity * bitsInByte;
 	}
 }
@@ -64,7 +104,7 @@ BitSet::Set(i: uint)
 	this.CheckResize(i);
 	index := i / bitsInByte;
 	offset := i % bitsInByte;
-	this.alloc[index]~ = this.alloc[index]~ | (1 << offset);
+	this.GetIndex(index)~ = this.GetIndex(index)~ | (1 << offset);
 }
 
 BitSet::AtomicSet(i: uint)
@@ -72,8 +112,24 @@ BitSet::AtomicSet(i: uint)
 	this.CheckResize(i);
 	index := i / bitsInByte;
 	offset := i % bitsInByte;
-	atomicValue := this.alloc[index] as *Atomic<byte>;
-	atomicValue.Or(1 << offset);
+	mask := byte(1 << offset);
+	atomicValue := this.GetIndex(index) as *Atomic<byte>;
+
+	while (1)
+	{
+		expected := atomicValue.Load(MemoryOrder.Relaxed);
+		value := expected | mask;
+
+		if (expected == value)
+		{
+			return;
+		}
+
+		if (atomicValue.CompareExchange(expected@, value, MemoryOrder.Sequential, MemoryOrder.Relaxed))
+		{
+			return;
+		}
+	}
 }
 
 BitSet::Clear(i: uint)
@@ -81,7 +137,7 @@ BitSet::Clear(i: uint)
 	if(!this.Inbounds(i)) return;
 	index := i / bitsInByte;
 	offset := i % bitsInByte;
-	this.alloc[index]~ = this.alloc[index]~ &^ (1 << offset);
+	this.GetIndex(index)~ = this.GetIndex(index)~ &^ (1 << offset);
 }
 
 BitSet::AtomicClear(i: uint)
@@ -89,10 +145,24 @@ BitSet::AtomicClear(i: uint)
 	if(!this.Inbounds(i)) return;
 	index := i / bitsInByte;
 	offset := i % bitsInByte;
-	mask := (1 << offset);
-	atomicValue := this.alloc[index] as *Atomic<byte>;
-	atomicValue.And(mask);
-	atomicValue.XOr(mask);
+	mask := byte(1 << offset);
+	atomicValue := this.GetIndex(index) as *Atomic<byte>;
+
+	while (1)
+	{
+		expected := atomicValue.Load(MemoryOrder.Relaxed);
+		value := expected &^ mask;
+
+		if (expected == value)
+		{
+			return;
+		}
+
+		if (atomicValue.CompareExchange(expected@, value, MemoryOrder.Sequential, MemoryOrder.Relaxed))
+		{
+			return;
+		}
+	}
 }
 
 BitSet::Toggle(i: uint)
@@ -100,7 +170,7 @@ BitSet::Toggle(i: uint)
 	this.CheckResize(i);
 	index := i / bitsInByte;
 	offset := i % bitsInByte;
-	this.alloc[index]~ = this.alloc[index]~ ^ (1 << offset);
+	this.GetIndex(index)~ = this.GetIndex(index)~ ^ (1 << offset);
 }
 
 BitSet::AtomicToggle(i: uint)
@@ -108,18 +178,15 @@ BitSet::AtomicToggle(i: uint)
 	this.CheckResize(i);
 	index := i / bitsInByte;
 	offset := i % bitsInByte;
-	atomicValue := this.alloc[index] as *Atomic<byte>;
+	atomicValue := this.GetIndex(index) as *Atomic<byte>;
 	atomicValue.XOr(1 << offset);
 }
 
 BitSet BitSet::Clone()
 {
-	cloned := BitSet();
-	cloned.bitCount = this.bitCount;
-
+	cloned := BitSet(this.bitCount);
 	byteCount := this.bitCount / bitsInByte;
-	cloned.alloc.Alloc(byteCount);
-	copy_bytes(cloned.alloc[0], this.alloc[0], byteCount);
+	copy_bytes(cloned.GetIndex(0), this.GetIndex(0), byteCount);
 
 	return cloned;
 }
@@ -127,5 +194,5 @@ BitSet BitSet::Clone()
 BitSet::ClearAll()
 {
 	byteCount := this.bitCount / bitsInByte;
-	zero_out_bytes(this.alloc[0], byteCount);
+	zero_out_bytes(this.GetIndex(0), byteCount);
 }

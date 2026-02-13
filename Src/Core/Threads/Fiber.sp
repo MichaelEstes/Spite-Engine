@@ -44,7 +44,7 @@ state Fibers
 	jobQueueArr: FixedArray<SingleConsumerQueue<FiberJob>>,
 	threadIDs: FixedArray<uint32>,
 	threadHandles: FixedArray<uint>,
-	threadEnabled: FixedArray<bool>,
+	fiberEnabled: FixedArray<bool>,
 
 	handleAllocator: BucketAllocator,
 	currentIndex: Atomic<uint32>,
@@ -65,15 +65,19 @@ InitalizeFibers()
 	fibers.handleAllocator = BucketAllocator(#sizeof JobHandle, FiberJobCount, fibers.fiberCount + 1);
 
 	fibers.jobQueueArr = FixedArray<SingleConsumerQueue<FiberJob>>(fibers.fiberCount);
-	fibers.threadIDs = FixedArray<uint>(fibers.fiberCount);
+	fibers.threadIDs = FixedArray<uint32>(fibers.fiberCount);
 	fibers.threadHandles = FixedArray<uint>(fibers.fiberCount);
-	fibers.threadEnabled = FixedArray<bool>(fibers.fiberCount);
-
+	fibers.fiberEnabled = FixedArray<bool>(fibers.fiberCount);
 
 	for (i: uint .. fibers.fiberCount)
 	{
-		fibers.threadEnabled[i]~ = true;
+		log "Creating Fiber state: " +  UIntToString(i);
+		fibers.fiberEnabled[i]~ = true;
 		fibers.jobQueueArr[i]~ = SingleConsumerQueue<FiberJob>(FiberJobCount);
+	}
+	
+	for (i: uint .. fibers.fiberCount)
+	{
 		fibers.threadHandles[i]~ = Thread.Create(RunFiber, i as *void, fibers.threadIDs[i]);
 	}
 
@@ -175,9 +179,10 @@ RunNextFiberJob(queue: *SingleConsumerQueue<FiberJob>)
 uint32 RunFiber(data: *void)
 {
 	index := data as uint;
+	log "Starting fiber: " +  UIntToString(index);
 	queue := fibers.jobQueueArr[index];
 
-	while (fibers.threadEnabled[index]~)
+	while (fibers.fiberEnabled[index]~)
 	{
 		RunNextFiberJob(queue);
 	}

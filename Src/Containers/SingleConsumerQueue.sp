@@ -7,15 +7,19 @@ import BitArray
 
 NullIndex := uint16(65535);
 
+state AllocRefSegments
+{
+	arrayIndex: uint16,
+	stackIndex: uint16,
+	version: uint32
+}
+
 state AllocRef
 {
+	[value]
 	val: ?{
 		i: uint64,
-		bits: {
-			arrayIndex: uint16,
-			stackIndex: uint16,
-			version: uint32
-		}
+		bits: AllocRefSegments
 	}
 }
 
@@ -46,13 +50,9 @@ AllocRef::Set(arrayIndex: uint16, stackIndex: uint16, version: uint32)
 	this.val.bits.version = version;
 }
 
-{ arrayIndex: uint16, stackIndex: uint16, version: uint32 } AllocRef::Get()
+AllocRefSegments AllocRef::Get()
 {
-	arrayIndex := this.val.bits.arrayIndex;
-	stackIndex := this.val.bits.stackIndex;
-	version := this.val.bits.version;
-
-	return { arrayIndex, stackIndex, version };
+	return atomic_load_u64(this.val.i@, MemoryOrder.Relaxed) as AllocRefSegments;
 }
 
 state RefAllocator

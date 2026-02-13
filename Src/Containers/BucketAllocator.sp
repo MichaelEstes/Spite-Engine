@@ -39,6 +39,12 @@ BucketAllocator::delete
 
 *byte BucketAllocator::Alloc(bucketIndex: int)
 {
+	if (bucketIndex < 0 || bucketIndex >= this.bucketCount)
+	{
+		log "BucketAllocator::Alloc Invalid Bucket Index";
+		return null;
+	}
+
 	if (this.bucketStatus[bucketIndex]) 
 	{
 		log "BucketAllocator: Bucket for index full";
@@ -67,7 +73,10 @@ BucketAllocator::delete
 		}
 	}
 
-	if (full) this.bucketStatus.Set(bucketIndex);
+	if (full) 
+	{
+		this.bucketStatus.Set(bucketIndex);
+	}
 
 	return itemPtr;
 }
