@@ -26,6 +26,7 @@ MeshComponent := ECS.RegisterComponent<Mesh>(
 	}
 	::(entity: Entity, mesh: *Mesh, scene: Scene) 
 	{
+		log "Adding mesh component";
 		ECS.instance.events.Emit<SceneEntity>(MeshAddedEvent, SceneEntity(scene@, entity));
 	}
 );

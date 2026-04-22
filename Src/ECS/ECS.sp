@@ -38,8 +38,10 @@ state SceneSystem { scene: *Scene, system: *System }
 
 Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
 								  onRemove: ::(Entity, *Type, Scene) = null, 
-								  onEnter: ::(Entity, *Type, Scene) = null)
-			=> instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
+								  onEnter: ::(Entity, *Type, Scene) = null) 
+{
+	return instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
+}
 
 TagComponent RegisterTagComponent(serializeName: string
 								  componentKind: ComponentKind = ComponentKind.Sparse,
@@ -110,7 +112,7 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 	type := #typeof Type;
 	assert !this.componentTypeMap.Has(type), "Cannot register a component twice";
 
-	log "Registering Component: ", type.StateName();
+	//log "Registering Component: ", type.StateName();
 
 	component := { this.componentCount, componentKind, uint32(#sizeof Type) } as Component;
 	this.componentTypeMap.Insert(type, component);

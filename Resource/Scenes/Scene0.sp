@@ -86,6 +86,8 @@ _ := SceneRegistry.RegisterScene(
 			uint32(1000)
 		));
 
+		//AddProfilerToWindow(scene, imGuiWindowEntity);
+
 		log "Loaded Main Scene";
 
 	},

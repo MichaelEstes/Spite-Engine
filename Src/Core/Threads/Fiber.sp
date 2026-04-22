@@ -30,6 +30,13 @@ state FiberJob
 	handle: *JobHandle
 }
 
+FiberJob::()
+{
+	this.func = null;
+	this.data = null;
+	this.handle = null;
+}
+
 FiberJob::(func: ::(*any), data: *void, handle: *JobHandle)
 {
 	this.func = func;
@@ -213,7 +220,8 @@ WaitForHandle(handle: *JobHandle)
 		queue := fibers.jobQueueArr[index];
 		while (!handle.Completed())
 		{
-			RunNextFiberJob(queue);
+			job := queue.Dequeue(true);
+			if (job.func) RunFiberJob(job);
 		}
 		return;
 	}
