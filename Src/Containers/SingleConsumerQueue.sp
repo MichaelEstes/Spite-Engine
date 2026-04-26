@@ -267,7 +267,7 @@ void SingleConsumerQueue::Enqueue(item: Type)
 	}
 }
 
-Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
+bool SingleConsumerQueue::TryDequeue(item: *Type)
 {
 	while (1)
 	{
@@ -286,11 +286,80 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 			{
 				if (tail == this.back) 
 				{
-					if (retOnEmpty) 
-					{
-						return Type();
-					}
+					return false;
+				}
+			}
 
+			atomic_compare_exchange_strong_u32(
+				this.back@, 
+				tail@,
+				tail + 1,
+				MemoryOrder.Sequential,
+				MemoryOrder.Relaxed
+			);
+		}
+
+		allocBits := alloc.Get();
+		if (allocBits.arrayIndex != NullIndex)
+		{
+			if (
+				atomic_compare_exchange_strong_u64(
+					this.queue[head % this.capacity].val.i@, 
+					alloc.val.i@,
+					AllocRef(NullIndex, allocBits.version + 1).val.i,
+					MemoryOrder.Sequential,
+					MemoryOrder.Relaxed
+				)
+			)
+			{
+				atomic_compare_exchange_strong_u32(
+					this.front@, 
+					head@,
+					head + 1,
+					MemoryOrder.Sequential,
+					MemoryOrder.Relaxed
+				);
+
+				item~ = this.mem[allocBits.arrayIndex]~;
+				this.refAllocator.Free(allocBits.arrayIndex);
+				return true;
+			}
+		}
+		else if (this.queue[head % this.capacity].Get().arrayIndex == NullIndex)
+		{
+			atomic_compare_exchange_strong_u32(
+				this.front@, 
+				head@,
+				head + 1,
+				MemoryOrder.Sequential,
+				MemoryOrder.Relaxed
+			);
+		}
+	}
+
+	return false;
+}
+
+Type SingleConsumerQueue::Dequeue()
+{
+	while (1)
+	{
+		head := this.front;
+		alloc := this.queue[head % this.capacity]~;
+		tail := this.back;
+		slot := head % this.capacity;
+
+		if (head != this.front) 
+		{
+			continue;
+		}
+
+		if (head == this.back)
+		{
+			if (this.queue[tail % this.capacity].Get().arrayIndex == NullIndex)
+			{
+				if (tail == this.back) 
+				{
 					continue; // Queue is empty.
 				}
 			}
@@ -325,6 +394,8 @@ Type SingleConsumerQueue::Dequeue(retOnEmpty: bool = false)
 					MemoryOrder.Relaxed
 				);
 
+				
+				assert allocBits.arrayIndex < this.capacity, "RefAllocator returned invalid queue index";
 				item := this.mem[allocBits.arrayIndex]~;
 				this.refAllocator.Free(allocBits.arrayIndex);
 				return item;

@@ -23,8 +23,16 @@ uint32 JobHandle::Increment(amount: uint32) => this.counter.Add(amount);
 uint32 JobHandle::Decrement(amount: uint32) => this.counter.Sub(amount);
 bool JobHandle::Completed() => this.counter.Load() == 0;
 
+enum FiberState: ubyte
+{
+	Running = 0,
+	Yielding,
+	Stopped
+}
+
 state FiberJob
 {
+	id: uint64,
 	func: ::(*any),
 	data: *void,
 	handle: *JobHandle
@@ -32,13 +40,15 @@ state FiberJob
 
 FiberJob::()
 {
+	this.id = 0;
 	this.func = null;
 	this.data = null;
 	this.handle = null;
 }
 
-FiberJob::(func: ::(*any), data: *void, handle: *JobHandle)
+FiberJob::(id: uint64, func: ::(*any), data: *void, handle: *JobHandle)
 {
+	this.id = id;
 	this.func = func;
 	this.data = data;
 	this.handle = handle;
@@ -60,6 +70,7 @@ state Fibers
 }
 
 fibers := Fibers();
+jobIDCounter := Atomic<uint64>();
 
 FiberJobCount := 128;
 
@@ -92,6 +103,7 @@ InitalizeFibers()
 	fibers.mainThreadID = GetCurrentThreadID();
 
 	fibers.currentIndex.Init(0);
+	jobIDCounter.Init(0);
 }
 
 int32 GetCurrentFiberIndex()
@@ -128,10 +140,14 @@ DeallocJobHandle(handle: *JobHandle)
 		if (index == int32(-1)) index = fibers.fiberCount;
 
 		handle = AllocJobHandle(index);
+		handle.Increment(amount);
+		handleRef~ = handle;
+	}
+	else
+	{
+		handle.Increment(amount);	
 	}
 	
-	handle.Increment(amount);
-	handleRef~ = handle;
 	return handle;
 }
 
@@ -145,7 +161,8 @@ uint32 GetNextFiberIndex()
 AddJob(func: ::(*any), data: *any, handle: **JobHandle = null)
 {
 	jobHandle := InitJobHandle(handle, uint32(1));
-	job := FiberJob(func, data, jobHandle);
+	jobID := jobIDCounter.Add(1);
+	job := FiberJob(jobID, func, data, jobHandle);
 
 	index := GetNextFiberIndex();
 	fibers.jobQueueArr[index].Enqueue(job);
@@ -156,7 +173,8 @@ bool CurrentThreadIsMainThread() => GetCurrentThreadID() == fibers.mainThreadID;
 RunOnMainThread(func: ::(*any), data: *any, handle: **JobHandle = null)
 {
 	jobHandle := InitJobHandle(handle, uint32(1));
-	job := FiberJob(func, data, jobHandle);
+	jobID := jobIDCounter.Add(1);
+	job := FiberJob(jobID, func, data, jobHandle);
 
 	if (CurrentThreadIsMainThread())
 	{
@@ -177,21 +195,15 @@ RunFiberJob(job: FiberJob) =>
 	}
 }
 
-RunNextFiberJob(queue: *SingleConsumerQueue<FiberJob>)
-{
-	job := queue.Dequeue();
-	RunFiberJob(job);
-}
-
 uint32 RunFiber(data: *void)
 {
 	index := data as uint;
 	log "Starting fiber: " +  UIntToString(index);
-	queue := fibers.jobQueueArr[index];
 
 	while (fibers.fiberEnabled[index]~)
 	{
-		RunNextFiberJob(queue);
+		job := fibers.jobQueueArr[index].Dequeue();
+		RunFiberJob(job);
 	}
 
 	return 0;
@@ -199,12 +211,10 @@ uint32 RunFiber(data: *void)
 
 FlushMainThreadJobs()
 {
-	queue := fibers.mainThreadJobs;
-	job := queue.Dequeue(true);
-	while (job.func)
+	job := FiberJob();
+	while (fibers.mainThreadJobs.TryDequeue(job@))
 	{
 		RunFiberJob(job);
-		job = queue.Dequeue(true);
 	}
 }
 
@@ -217,11 +227,13 @@ WaitForHandle(handle: *JobHandle)
 	index := GetCurrentFiberIndex();
 	if (index != -1)
 	{
-		queue := fibers.jobQueueArr[index];
 		while (!handle.Completed())
 		{
-			job := queue.Dequeue(true);
-			if (job.func) RunFiberJob(job);
+			job := FiberJob();
+			if (fibers.jobQueueArr[index].TryDequeue(job@))
+			{
+				RunFiberJob(job);
+			}
 		}
 		return;
 	}
