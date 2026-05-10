@@ -1,9 +1,10 @@
 package Fiber
 
 import FixedArray
+import Array
 import Thread
 import SystemInfo
-import SingleConsumerQueue
+import MultipleConsumerQueue
 import Atomic
 import BucketAllocator
 import Mutex
@@ -14,21 +15,14 @@ state JobHandle
 	counter: Atomic<uint32>
 }
 
-JobHandle::()
+JobHandle::(initial: uint32)
 {
-	this.counter.Init(uint32(0));
+	this.counter.Init(initial);
 }
 
-uint32 JobHandle::Increment(amount: uint32) => this.counter.Add(amount);
-uint32 JobHandle::Decrement(amount: uint32) => this.counter.Sub(amount);
-bool JobHandle::Completed() => this.counter.Load() == 0;
-
-enum FiberState: ubyte
-{
-	Running = 0,
-	Yielding,
-	Stopped
-}
+uint32 JobHandle::Increment(count: uint32) => this.counter.Add(count);
+uint32 JobHandle::Decrement(count: uint32) => this.counter.Sub(count);
+bool JobHandle::Completed() => this.counter.Load() == uint32(0);
 
 state FiberJob
 {
@@ -54,23 +48,28 @@ FiberJob::(id: uint64, func: ::(*any), data: *void, handle: *JobHandle)
 	this.handle = handle;
 }
 
+string FiberJob::JobName()
+{
+	return (this.func as *_Function)~.name.ToString();
+}
+
 state Fibers
 {
-	mainThreadJobs: SingleConsumerQueue<FiberJob>,
+	mainThreadJobs: MultipleConsumerQueue<FiberJob>,
 
-	jobQueueArr: FixedArray<SingleConsumerQueue<FiberJob>>,
+	jobQueueArr: FixedArray<MultipleConsumerQueue<FiberJob>>,
 	threadIDs: FixedArray<uint32>,
 	threadHandles: FixedArray<uint>,
 	fiberEnabled: FixedArray<bool>,
 
 	handleAllocator: BucketAllocator,
+	nextJobID: Atomic<uint>,
 	currentIndex: Atomic<uint32>,
 	mainThreadID: uint32,
 	fiberCount: uint32
 }
 
 fibers := Fibers();
-jobIDCounter := Atomic<uint64>();
 
 FiberJobCount := 128;
 
@@ -78,11 +77,11 @@ InitalizeFibers()
 {
 	sysInfo := GetSystemInfo();
 	// - 3 - executable start thread, main (IO) fiber thread, OS scheduling thread
-	fibers.fiberCount = Math.Max(sysInfo.processorCount - 3, 1);
+	fibers.fiberCount = Math.Max(sysInfo.processorCount - 3, 2);
 
 	fibers.handleAllocator = BucketAllocator(#sizeof JobHandle, FiberJobCount, fibers.fiberCount + 1);
 
-	fibers.jobQueueArr = FixedArray<SingleConsumerQueue<FiberJob>>(fibers.fiberCount);
+	fibers.jobQueueArr = FixedArray<MultipleConsumerQueue<FiberJob>>(fibers.fiberCount);
 	fibers.threadIDs = FixedArray<uint32>(fibers.fiberCount);
 	fibers.threadHandles = FixedArray<uint>(fibers.fiberCount);
 	fibers.fiberEnabled = FixedArray<bool>(fibers.fiberCount);
@@ -91,7 +90,7 @@ InitalizeFibers()
 	{
 		log "Creating Fiber state: " +  UIntToString(i);
 		fibers.fiberEnabled[i]~ = true;
-		fibers.jobQueueArr[i]~ = SingleConsumerQueue<FiberJob>(FiberJobCount);
+		fibers.jobQueueArr[i]~ = MultipleConsumerQueue<FiberJob>(FiberJobCount);
 	}
 	
 	for (i: uint .. fibers.fiberCount)
@@ -99,11 +98,11 @@ InitalizeFibers()
 		fibers.threadHandles[i]~ = Thread.Create(RunFiber, i as *void, fibers.threadIDs[i]);
 	}
 
-	fibers.mainThreadJobs = SingleConsumerQueue<FiberJob>(FiberJobCount);
+	fibers.mainThreadJobs = MultipleConsumerQueue<FiberJob>(FiberJobCount);
 	fibers.mainThreadID = GetCurrentThreadID();
 
 	fibers.currentIndex.Init(0);
-	jobIDCounter.Init(0);
+	fibers.nextJobID.Init(0);
 }
 
 int32 GetCurrentFiberIndex()
@@ -117,10 +116,10 @@ int32 GetCurrentFiberIndex()
 	return -1;
 }
 
-*JobHandle AllocJobHandle(index: int32)
+*JobHandle AllocJobHandle(index: int32, initialCount: uint32)
 {
 	handle := fibers.handleAllocator.Alloc(index) as *JobHandle;
-	handle~ = JobHandle();
+	handle~ = JobHandle(initialCount);
 	return handle;
 }
 
@@ -129,7 +128,7 @@ DeallocJobHandle(handle: *JobHandle)
 	fibers.handleAllocator.Dealloc(handle);
 }
 
-*JobHandle InitJobHandle(handleRef: **JobHandle, amount: uint32)
+*JobHandle InitJobHandle(handleRef: **JobHandle, count: uint32)
 {
 	if (!handleRef) return null;
 
@@ -139,32 +138,24 @@ DeallocJobHandle(handle: *JobHandle)
 		index := GetCurrentFiberIndex();
 		if (index == int32(-1)) index = fibers.fiberCount;
 
-		handle = AllocJobHandle(index);
-		handle.Increment(amount);
+		handle = AllocJobHandle(index, count);
 		handleRef~ = handle;
 	}
 	else
 	{
-		handle.Increment(amount);	
+		handle.Increment(count);
 	}
-	
-	return handle;
-}
 
-uint32 GetNextFiberIndex()
-{
-	index := fibers.currentIndex.Add(1) % fibers.fiberCount;
-	if (index == GetCurrentFiberIndex()) index = (index + 1) % fibers.fiberCount;
-	return index;
+	return handle;
 }
 
 AddJob(func: ::(*any), data: *any, handle: **JobHandle = null)
 {
 	jobHandle := InitJobHandle(handle, uint32(1));
-	jobID := jobIDCounter.Add(1);
+	jobID := fibers.nextJobID.Add(1);
 	job := FiberJob(jobID, func, data, jobHandle);
 
-	index := GetNextFiberIndex();
+	index := fibers.currentIndex.Add(1) % fibers.fiberCount;
 	fibers.jobQueueArr[index].Enqueue(job);
 }
 
@@ -173,7 +164,7 @@ bool CurrentThreadIsMainThread() => GetCurrentThreadID() == fibers.mainThreadID;
 RunOnMainThread(func: ::(*any), data: *any, handle: **JobHandle = null)
 {
 	jobHandle := InitJobHandle(handle, uint32(1));
-	jobID := jobIDCounter.Add(1);
+	jobID := fibers.nextJobID.Add(1);
 	job := FiberJob(jobID, func, data, jobHandle);
 
 	if (CurrentThreadIsMainThread())

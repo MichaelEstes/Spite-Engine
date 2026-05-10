@@ -104,14 +104,18 @@ testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 		//scene.RemoveTagComponent(commonTagEntity, tagCommonTestComponent);
 	}
 
-	data := 0;
-	handle: *Fiber.JobHandle = null;
-	Fiber.AddJob(::(data: *int) {
-		for (i .. 10)
-		{
-			data~ = i;
-		}	
-	}, data@, handle@);
+	handle := null as *Fiber.JobHandle;
+	for (i .. 20)
+	{
+		Fiber.AddJob(::(data: *int) {
+			val := 0;
+			for (i .. 10)
+			{
+				val += i;
+			}
+			//log UIntToString(data as uint) + " : Run";
+		}, (i as uint) as *uint, handle@);
+	}
 	Fiber.WaitForHandle(handle);
 
 	//log "Data: ", data;

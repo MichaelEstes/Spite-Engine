@@ -26,11 +26,10 @@ ImGuiPass := RegisterRenderPass(
 				renderer := context.renderer;
 				imGuiWindowEntity := renderer.userData.entity;
 				imGuiWindow := scene.GetComponent<ImGuiWindow>(imGuiWindowEntity);
-				vulkanBackend := imGuiWindow.backend.vulkan;
 				
 				commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 
-				if (!vulkanBackend.initialized)
+				if (!imGuiWindow.initialized)
 				{
 					renderPass := renderer.CastDriverRenderPass(context.driverRenderpass);
 
@@ -50,9 +49,8 @@ ImGuiPass := RegisterRenderPass(
 					initInfo.PipelineInfoMain.MSAASamples = 0;
 
 					cImGui_ImplVulkan_Init(initInfo@);
+					imGuiWindow.initialized = true;
 					log "ImGui Vulkan initialized";
-
-					vulkanBackend.initialized = true;
 				}
 
 				cImGui_ImplVulkan_NewFrame();

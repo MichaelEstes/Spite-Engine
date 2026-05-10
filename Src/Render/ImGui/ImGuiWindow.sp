@@ -15,12 +15,6 @@ InitializeImGui()
 	ImGui_CreateContext(null);
 }
 
-enum ImGuiBackendKind: uint32 
-{
-	Vulkan,
-	None
-}
-
 state ImGuiWindow
 {
 	window: *SDL.Window,
@@ -28,18 +22,12 @@ state ImGuiWindow
 	renderFuncs: Array<::(*ImGuiWindow, *any)>,
 	data: *any,
 
-	backend: ?{
-		vulkan: {
-			renderer: VulkanRenderer,
-			initialized: bool
-		},
-		none: *void
-	}
+	renderer: VulkanRenderer,
 
-	backendKind: ImGuiBackendKind,
 	entity: Entity,
 	width: uint32,
-	height: uint32
+	height: uint32,
+	initialized: bool = false
 }
 
 ImGuiWindow::(renderFuncs: []::(*ImGuiWindow, *any), data: *any, width: uint32, height: uint32)
@@ -66,7 +54,6 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 {
 	log "Init ImGui Vulkan Window";
 	this.entity = entity;
-	this.backend.vulkan.initialized = false;
 
 	param := AllocThreadParam<SceneEntity>();
 	param.entity = entity;
