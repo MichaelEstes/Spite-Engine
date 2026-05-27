@@ -37,6 +37,18 @@ bool TextureMap::operator::!()
 	return this.texture.imageHandle.id == 0;
 }
 
+// state Material
+// {
+// 	variables: Array<*void>,
+
+	
+
+// 	alphaMode: AlphaMode = AlphaMode.Opaque,
+// 	cullMode: CullModeFlags = CullModeFlags.Back,
+// 	polygonMode: PolygonMode = PolygonMode.Fill
+// }
+
+
 state Material
 {
 	color: TextureMap,
@@ -64,5 +76,4 @@ state Material
 
 Material::delete
 {
-
 }

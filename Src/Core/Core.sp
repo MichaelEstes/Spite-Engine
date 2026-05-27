@@ -9,6 +9,7 @@ import Event
 import SceneRegistry
 import Input
 import Math
+import RenderAssetDef
 
 running := false;
 

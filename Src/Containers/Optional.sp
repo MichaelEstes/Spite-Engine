@@ -6,11 +6,10 @@ state Optional<Type>
 	has: bool
 }
 
-*Value Optional::Get()
+ref Type Optional::Get()
 {
-	if (this.has) return this.value@;
-
-	return null;
+	if (!this.has) return null;
+	return this.value;
 }
 
 Optional::Set(value: Type)

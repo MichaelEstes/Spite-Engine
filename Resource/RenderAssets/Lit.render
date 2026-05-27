@@ -1,0 +1,57 @@
+{
+    name: Lit,
+    vertex: {
+        attributes: {
+            normal: vec3,
+            tangents: vec4,
+            color: vec4,
+            uv0: vec2
+        },
+        variables: [],
+        nodes: [
+            {
+                name: default,
+                code: `
+                    gl_Position = scene.proj * scene.view * model.model * vec4(position, 1.0);
+                `,
+                after: main
+            }
+        ]
+    },
+    fragment: {
+        variables: [
+            {
+                baseColor: vec4,
+                emissiveFactor: vec3,
+                normalScale: {
+                    type: float,
+                    default: 1.0
+                },
+                metallicFactor: float,
+                roughnessFactor: float,
+                occlusionStrength: float,
+                alphaCutoff: float
+            }
+        ],
+        textures: {
+            colorTexture: sampler2D
+        }
+        using: [color, uv0],
+        out: {
+            outColor: vec4
+        },
+        nodes: [
+            {
+                name: litMain,
+                code: `
+                    outColor = color * material.baseColor * texture(colorTexture, uv0);
+                `,
+                after: main
+            }
+        ],
+
+        alphaMode: opaque,
+	    cullMode: back,
+	    polygonMode: fill
+    }
+}

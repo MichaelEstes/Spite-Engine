@@ -14,10 +14,6 @@ import GLTFManager
 
 import Scenes
 
-import SingleConsumerQueue
-import FixedArray
-import Math
-
 import ParseHeader
 
 state Test

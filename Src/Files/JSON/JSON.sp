@@ -165,10 +165,26 @@ JSON::delete
 	delete this.strs;
 }
 
-JSON ParseJSON(str: string)
+state JSONParseContext
+{
+	view: StringView,
+	file: string,
+	line: uint32,
+	column: uint32,
+	lastChar: byte
+}
+
+JSON ParseJSON(str: string, file: string = "")
 {
 	json := JSON();
-	json.root = ParseJSONValue(StringView(str), json);
+	context := JSONParseContext();
+	context.view = StringView(str);
+	context.file = file;
+	context.line = 0;
+	context.column = 0;
+	context.lastChar = 0;
+	JSONEatWhitespace(context);
+	json.root = ParseJSONValue(context, json);
 	return json;
 }
 
@@ -176,7 +192,7 @@ JSON ParseJSONFile(file: string)
 {
 	contents := OS.ReadFile(file);
 	defer delete contents;
-	return ParseJSON(contents);
+	return ParseJSON(contents, file);
 }
 
 bool IsJSONWhitespace(char: byte)
@@ -188,31 +204,87 @@ bool IsJSONWhitespace(char: byte)
 		   char == byte(0);
 }
 
-JSONEatWhitespace(view: StringView)
+bool JSONIncrement(context: JSONParseContext)
 {
-	while (IsJSONWhitespace(view[0]~)) 
+	char := context.view[0]~;
+	if (!context.view.Increment())
 	{
-		if (!view.Increment()) 
+		return false;
+	}
+
+	if (char == byte(0x0D))
+	{
+		context.line += 1;
+		context.column = 0;
+	}
+	else if (char == byte(0x0A))
+	{
+		if (context.lastChar != byte(0x0D))
+		{
+			context.line += 1;
+			context.column = 0;
+		}
+	}
+	else
+	{
+		context.column += 1;
+	}
+
+	context.lastChar = char;
+	return true;
+}
+
+bool JSONAdvance(context: JSONParseContext, count: uint)
+{
+	i := uint(0);
+	while (i < count)
+	{
+		if (!JSONIncrement(context))
+		{
+			return false;
+		}
+
+		i += 1;
+	}
+
+	return true;
+}
+
+JSONLogParseError(context: JSONParseContext, message: string)
+{
+	log "JSON parse error: ", message;
+	log "File: ", context.file;
+	log "Line: ", context.line, " Column: ", context.column;
+	log "Character: ", context.view[0]~;
+}
+
+JSONEatWhitespace(context: JSONParseContext)
+{
+	while (IsJSONWhitespace(context.view[0]~)) 
+	{
+		if (!JSONIncrement(context)) 
 		{
 			return;
 		}
 	}
 }
 
-*JSONValue ParseJSONValue(view: StringView, json: JSON)
+*JSONValue ParseJSONValue(context: JSONParseContext, json: JSON)
 {
-	JSONEatWhitespace(view);
+	JSONEatWhitespace(context);
 
-	char := view[0]~;
+	char := context.view[0]~;
 
 	switch (char)
 	{
-		case ('{') return ParseJSONObject(view, json);
-		
-		case ('[') return ParseJSONArray(view, json);
+		case ('{') return ParseJSONObject(context, json);
 
-		case ('"') return ParseJSONString(view, json);
-		
+		case ('[') return ParseJSONArray(context, json);
+
+		case ('"') continue;
+		case ('\'') continue;
+		case ('`') return ParseJSONString(context, json);
+
 		case ('-') continue;
 		case ('0') continue;
 		case ('1') continue;
@@ -223,47 +295,52 @@ JSONEatWhitespace(view: StringView)
 		case ('6') continue;
 		case ('7') continue;
 		case ('8') continue;
-		case ('9') return ParseJSONNumber(view, json);
+		case ('9') return ParseJSONNumber(context, json);
 	}
 
-	if (view.StartsWith(trueStr))
+	if (context.view.StartsWith(trueStr))
 	{
-		view.Advance(trueStr.count);
+		JSONAdvance(context, trueStr.count);
 		return CreateJSONBoolean(true, json);
 	}
-	else if (view.StartsWith(falseStr))
+	else if (context.view.StartsWith(falseStr))
 	{
-		view.Advance(falseStr.count);
+		JSONAdvance(context, falseStr.count);
 		return CreateJSONBoolean(false, json);
 	}
-	else if (view.StartsWith(nullStr))
+	else if (context.view.StartsWith(nullStr))
 	{
-		view.Advance(nullStr.count);
+		JSONAdvance(context, nullStr.count);
 		nullValue := json.mem.Emplace<JSONValue>();
 		nullValue.kind = JSONValueKind.Null;
 		return nullValue;
+	}
+	else if (IsIdentifierStart(char))
+	{
+		return ParseJSONBareString(context, json);
 	}
 
 	log "ParseJSONValue Invalid JSON character: ", char;
 	return null;
 }
 
-string ParseString(view: StringView, json: JSON)
+string ParseString(context: JSONParseContext, json: JSON)
 {
-	view.Increment();
-	start := view[0];
+	delim := context.view[0]~;
+	JSONIncrement(context);
+	start := context.view[0];
 	strCount := 0;
-	while (view[0]~ != '"') 
+	while (context.view[0]~ != delim)
 	{
-		if (view[0]~ == '\\')
+		if (delim == '"' && context.view[0]~ == '\\')
 		{
-			view.Increment();
+			JSONIncrement(context);
 			strCount += 1;
 		}
-		view.Increment();
+		JSONIncrement(context);
 		strCount += 1;
 	}
-	view.Increment();
+	JSONIncrement(context);
 
 	str := json.strs.Get(strCount);
 	copy_bytes(str[0], start, strCount);
@@ -280,63 +357,70 @@ string ParseString(view: StringView, json: JSON)
 	return boolValue;
 }
 
-*JSONValue ParseJSONObject(view: StringView, json: JSON)
+*JSONValue ParseJSONObject(context: JSONParseContext, json: JSON)
 {
 	objValue := json.mem.Emplace<JSONValue>();
 	objValue.kind = JSONValueKind.Object;
 	objValue.value.object = json.mem.Emplace<JSONObject>();
-	view.Increment();
-	JSONEatWhitespace(view);
+	JSONIncrement(context);
+	JSONEatWhitespace(context);
 
-	while (view[0]~ != '}')
+	while (context.view[0]~ != '}')
 	{
-		JSONEatWhitespace(view);
-		assert view[0]~ == '"', "Expected JSON object member string";
+		JSONEatWhitespace(context);
 
-		memberName := ParseString(view, json);
+		memberName := "";
+		if (IsStringDelim(context.view[0]~))
+			memberName = ParseString(context, json);
+		else
+			memberName = ParseIdentifier(context, json);
 
-		JSONEatWhitespace(view);
-		assert view[0]~ == ':', "Expected JSON object member name separator ':'";
-		view.Increment();
+		JSONEatWhitespace(context);
+		if (context.view[0]~ != ':')
+		{
+			JSONLogParseError(context, "Expected JSON object member name separator ':'");
+			assert false, "Expected JSON object member name separator ':'";
+		}
+		JSONIncrement(context);
 
-		objValue.value.object.members.Insert(memberName, ParseJSONValue(view, json));
+		objValue.value.object.members.Insert(memberName, ParseJSONValue(context, json));
 		
-		JSONEatWhitespace(view);
-		if (view[0]~ == ',') view.Increment();
+		JSONEatWhitespace(context);
+		if (context.view[0]~ == ',') JSONIncrement(context);
 	}
 
-	view.Increment();
+	JSONIncrement(context);
 	return objValue;
 }
 
-*JSONValue ParseJSONArray(view: StringView, json: JSON)
+*JSONValue ParseJSONArray(context: JSONParseContext, json: JSON)
 {
 	arrValue := json.mem.Emplace<JSONValue>();
 	arrValue.kind = JSONValueKind.Array;
 	arrValue.value.array = json.mem.Emplace<JSONArray>();
-	view.Increment();
-	JSONEatWhitespace(view);
+	JSONIncrement(context);
+	JSONEatWhitespace(context);
 
-	while (view[0]~ != ']')
+	while (context.view[0]~ != ']')
 	{
-		JSONEatWhitespace(view);
+		JSONEatWhitespace(context);
 		
-		arrValue.value.array.values.Add(ParseJSONValue(view, json)@);
+		arrValue.value.array.values.Add(ParseJSONValue(context, json)@);
 
-		JSONEatWhitespace(view);
-		if (view[0]~ == ',') view.Increment();
+		JSONEatWhitespace(context);
+		if (context.view[0]~ == ',') JSONIncrement(context);
 	}
 
-	view.Increment();
+	JSONIncrement(context);
 	return arrValue;
 }
 
-*JSONValue ParseJSONString(view: StringView, json: JSON)
+*JSONValue ParseJSONString(context: JSONParseContext, json: JSON)
 {
 	strValue := json.mem.Emplace<JSONValue>();
 	strValue.kind = JSONValueKind.String;
 	strValue.value.str = json.mem.Emplace<JSONString>();
-	strValue.value.str.value = ParseString(view, json);
+	strValue.value.str.value = ParseString(context, json);
 
 	return strValue;
 }
@@ -346,55 +430,95 @@ bool IsDigit(char: byte)
 	return char >= '0' && char <= '9';
 }
 
-*JSONValue ParseJSONNumber(view: StringView, json: JSON)
+bool IsIdentifierStart(char: byte)
+{
+	return (char >= 'a' && char <= 'z') ||
+	       (char >= 'A' && char <= 'Z') ||
+	       char == '_';
+}
+
+bool IsIdentifierChar(char: byte)
+{
+	return IsIdentifierStart(char) || IsDigit(char);
+}
+
+string ParseIdentifier(context: JSONParseContext, json: JSON)
+{
+	start := context.view[0];
+	count := 0;
+	while (IsIdentifierChar(context.view[0]~))
+	{
+		JSONIncrement(context);
+		count += 1;
+	}
+	str := json.strs.Get(count);
+	copy_bytes(str[0], start, count);
+	return str;
+}
+
+*JSONValue ParseJSONBareString(context: JSONParseContext, json: JSON)
+{
+	strValue := json.mem.Emplace<JSONValue>();
+	strValue.kind = JSONValueKind.String;
+	strValue.value.str = json.mem.Emplace<JSONString>();
+	strValue.value.str.value = ParseIdentifier(context, json);
+	return strValue;
+}
+
+bool IsStringDelim(char: byte)
+{
+	return char == '"' || char == '\'' || char == '`';
+}
+
+*JSONValue ParseJSONNumber(context: JSONParseContext, json: JSON)
 {
 	numValue := json.mem.Emplace<JSONValue>();
 	numValue.kind = JSONValueKind.Number;
 	numValue.value.number = json.mem.Emplace<JSONNumber>();
 	
-	start := view[0];
+	start := context.view[0];
 	count := 0;
 	
 	isFloat := false;
 
-	if (view[0]~ == '-')
+	if (context.view[0]~ == '-')
 	{
-		view.Increment();
+		JSONIncrement(context);
 		count += 1;
 	}
 
-	while (IsDigit(view[0]~))
+	while (IsDigit(context.view[0]~))
 	{
-		view.Increment();
+		JSONIncrement(context);
 		count += 1;
 	}
 
-	if (view[0]~ == '.')
+	if (context.view[0]~ == '.')
 	{
 		isFloat = true;
-		view.Increment();
+		JSONIncrement(context);
 		count += 1;
 
-		while (IsDigit(view[0]~))
+		while (IsDigit(context.view[0]~))
 		{
-			view.Increment();
+			JSONIncrement(context);
 			count += 1;
 		}
 
-		if (view[0]~ == 'E' || view[0]~ == 'e')
+		if (context.view[0]~ == 'E' || context.view[0]~ == 'e')
 		{
-			view.Increment();
+			JSONIncrement(context);
 			count += 1;
 
-			if (view[0]~ == '-' || view[0]~ == '+')
+			if (context.view[0]~ == '-' || context.view[0]~ == '+')
 			{
-				view.Increment();
+				JSONIncrement(context);
 				count += 1;
 			}
 
-			while (IsDigit(view[0]~))
+			while (IsDigit(context.view[0]~))
 			{
-				view.Increment();
+				JSONIncrement(context);
 				count += 1;
 			}
 		}

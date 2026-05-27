@@ -1,0 +1,26 @@
+{
+    name: LitDetailMap,
+    imports: Lit,
+
+    vertex: {
+        attributes: {
+            uv1: vec2
+        }
+    },
+    fragment: {
+        textures: {
+            detailMap: sampler2D
+        },
+        using: [uv1],
+        funcs: [
+            {
+                name: detailMap,
+                code: `
+                    vec4 detailColor = texture(detailMap, uv1);
+                    outColor = outColor * detailColor;
+                `,
+                after: litMain
+            }
+        ]
+    }
+}
