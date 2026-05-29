@@ -129,6 +129,13 @@ Variable::delete
     delete this.name;
 }
 
+Variable Variable::Clone()
+{
+    clone := this;
+    clone.name = this.name.Copy();
+    return clone;
+}
+
 state ShaderNode
 {
     name: string,
@@ -137,16 +144,63 @@ state ShaderNode
     before: string
 }
 
+ShaderNode::delete
+{
+    delete this.name;
+    delete this.code;
+    delete this.after;
+    delete this.before;
+}
+
+ShaderNode ShaderNode::Clone()
+{
+    clone := ShaderNode();
+    clone.name = this.name.Copy();
+    clone.code = this.code.Copy();
+    clone.after = this.after.Copy();
+    clone.before = this.before.Copy();
+    return clone;
+}
+
+TextureDefinition TextureDefinition::Clone()
+{
+    clone := this;
+    clone.name = this.name.Copy();
+    return clone;
+}
+
 state VariableSets
 {
     sets: Array<Array<Variable>>
+}
+
+VariableSets::delete
+{
+    delete this.sets;
+}
+
+VariableSets VariableSets::Clone()
+{
+    clone := VariableSets();
+    clone.sets = this.sets.Copy(
+        ::Array<Variable>(val: Array<Variable>)
+        {
+            return val.Copy(
+                ::Variable(variable: Variable)
+                {
+                    return variable.Clone();
+                }
+            );
+        }
+    )
+    return clone;
 }
 
 state VertexStage
 {
     attributes: Array<Variable>,
     variables: VariableSets,
-    out: Array<Variable>
+    out: Array<Variable>,
     nodes: Array<ShaderNode>
 }
 
@@ -156,6 +210,31 @@ VertexStage::delete
     delete this.variables;
     delete this.out;
     delete this.nodes;
+}
+
+VertexStage VertexStage::Clone()
+{
+    cloned := VertexStage();
+    cloned.attributes = this.attributes.Copy(
+        ::Variable(variable: Variable)
+        {
+            return variable.Clone();
+        }
+    );
+    cloned.variables = this.variables.Clone();
+    cloned.out = this.out.Copy(
+        ::Variable(variable: Variable)
+        {
+            return variable.Clone();
+        }
+    );
+    cloned.nodes = this.nodes.Copy(
+        ::ShaderNode(node: ShaderNode)
+        {
+            return node.Clone();
+        }
+    );
+    return cloned;
 }
 
 state FragmentStage
@@ -180,6 +259,40 @@ FragmentStage::delete
     delete this.nodes;
 }
 
+FragmentStage FragmentStage::Clone()
+{
+    cloned := FragmentStage();
+    cloned.variables = this.variables.Clone();
+    cloned.textures = this.textures.Copy(
+        ::TextureDefinition(texture: TextureDefinition)
+        {
+            return texture.Clone();
+        }
+    );
+    cloned.using = this.using.Copy(
+        ::string(using: string)
+        {
+            return using.Copy();
+        }
+    );
+    cloned.out = this.out.Copy(
+        ::Variable(variable: Variable)
+        {
+            return variable.Clone();
+        }
+    );
+    cloned.nodes = this.nodes.Copy(
+        ::ShaderNode(node: ShaderNode)
+        {
+            return node.Clone();
+        }
+    );
+    cloned.alphaMode = this.alphaMode;
+    cloned.cullMode = this.cullMode;
+    cloned.polygonMode = this.polygonMode;
+    return cloned;
+}
+
 state ComputeStage
 {
     variables: VariableSets,
@@ -194,12 +307,42 @@ ComputeStage::delete
     delete this.nodes;
 }
 
+ComputeStage ComputeStage::Clone()
+{
+    cloned := ComputeStage();
+    cloned.variables = this.variables.Clone();
+    cloned.out = this.out.Copy(
+        ::Variable(variable: Variable)
+        {
+            return variable.Clone();
+        }
+    );
+    cloned.nodes = this.nodes.Copy(
+        ::ShaderNode(node: ShaderNode)
+        {
+            return node.Clone();
+        }
+    );
+    return cloned;
+}
+
 state AssetDef
 {
     name: string,
     vertex: VertexStage,
     fragment: FragmentStage,
     compute: ComputeStage
+}
+
+AssetDef AssetDef::Clone()
+{
+    cloned := AssetDef();
+
+    cloned.vertex = this.vertex.Clone();
+    cloned.fragment = this.fragment.Clone();
+    cloned.compute = this.compute.Clone();
+
+    return cloned;
 }
 
 AssetDef::delete

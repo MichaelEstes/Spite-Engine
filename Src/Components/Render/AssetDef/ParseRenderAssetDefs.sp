@@ -3,8 +3,6 @@ package RenderAssetDef
 import OS
 import JSON
 
-renderAssetPath := "./Resource/RenderAssets";
-
 VariableType ParseVariableType(varName: string)
 {
     if (varName == "bool")                  return VariableType.Bool;
@@ -48,6 +46,28 @@ SamplerFormat ParseSamplerFormat(name: string)
 {
     if (name == "int") return SamplerFormat.Int;
     return SamplerFormat.Float;
+}
+
+AlphaMode ParseAlphaMode(name: string)
+{
+    if (name == "mask")         return AlphaMode.Mask;
+    else if (name == "blend")   return AlphaMode.Blend;
+    return AlphaMode.Opaque;
+}
+
+CullModeFlags ParseCullMode(name: string)
+{
+    if (name == "front")        return CullModeFlags.Front;
+    else if (name == "back")    return CullModeFlags.Back;
+    else if (name == "both")    return CullModeFlags.Both;
+    return CullModeFlags.None;
+}
+
+PolygonMode ParsePolygonMode(name: string)
+{
+    if (name == "line")         return PolygonMode.Line;
+    else if (name == "point")   return PolygonMode.Point;
+    return PolygonMode.Fill;
 }
 
 Value ParseVariableDefault(kind: VariableType, jsonValue: *JSONValue)
@@ -213,7 +233,7 @@ VariableDefinition ParseVariableDefinition(value: *JSONValue)
 TextureDefinition ParseTextureDefinition(name: string, value: *JSONValue)
 {
     textureDef := TextureDefinition();
-    textureDef.name = name;
+    textureDef.name = name.Copy();
     textureDef.precision = VariablePrecision.Default;
 
     str := value.String();
@@ -253,28 +273,23 @@ TextureDefinition ParseTextureDefinition(name: string, value: *JSONValue)
 Variable ParseVariable(name: string, value: *JSONValue)
 {
     var := Variable();
-    var.name = name;
+    var.name = name.Copy();
     var.def = ParseVariableDefinition(value);
     return var;
 }
 
-Array<Variable> ParseVariables(obj: *JSONObject)
+ParseVariables(obj: *JSONObject, vars: Array<Variable>)
 {
-    vars := Array<Variable>();
     for (kv in obj.members)
     {
         name := kv.key~;
         varValue := kv.value~;
         vars.Add(ParseVariable(name, varValue));
     }
-
-    return vars;
 }
 
-VariableSets ParseVariableSets(set: *JSONValue)
+ParseVariableSets(set: *JSONValue, variableSets: VariableSets)
 {
-    variableSets := VariableSets();
-
     arr := set.Array();
     if (arr)
     {
@@ -282,36 +297,82 @@ VariableSets ParseVariableSets(set: *JSONValue)
         {
             varObj := val.Object();
             assert varObj, "Expected object in variable set array";
-            variableSets.sets.Add(ParseVariables(varObj));
+            varSet := Array<Variable>();
+            ParseVariables(varObj, varSet);
+            variableSets.sets.Add(varSet);
         }
     }
     else 
     {
         obj := set.Object();
         assert obj, "Variable sets needs to be an array or an object";
-        variableSets.sets.Add(ParseVariables(obj));
+        varSet := Array<Variable>();
+        ParseVariables(obj, varSet);
+        variableSets.sets.Add(varSet);
     }
-
-    return variableSets;
 }
 
-Array<TextureDefinition> ParseTextures(obj: *JSONObject)
+ParseTextures(obj: *JSONObject, textures: Array<TextureDefinition>)
 {
-    textures := Array<TextureDefinition>();
     for (kv in obj.members)
     {
         name := kv.key~;
         textureValue := kv.value~;
         textures.Add(ParseTextureDefinition(name, textureValue));
     }
-
-    return textures;
 }
 
-AssetDef ParseRenderAssetDef(assetDefObj: *JSONObject)
+ParseShaderNode(obj: *JSONObject, shaderNodes: Array<ShaderNode>)
 {
-    assetDef := AssetDef();
-    name := assetDefObj.GetMember("name").String().value;
+    shaderNode := ShaderNode();
+
+    nameValue := obj.GetMember("name");
+    assert nameValue != null, "Shader node must have a 'name' field";
+    nameStr := nameValue.String();
+    assert nameStr != null, "Shader node 'name' field must be a string";
+    shaderNode.name = nameStr.value.Copy();
+
+    codeValue := obj.GetMember("code");
+    assert codeValue != null, "Shader node must have a 'code' field";
+    codeStr := codeValue.String();
+    assert codeStr != null, "Shader node 'code' field must be a string";
+    shaderNode.code = codeStr.value.Copy();
+
+    afterValue := obj.GetMember("after");
+    if (afterValue)
+    {
+        afterStr := afterValue.String();
+        assert afterStr != null, "Shader node 'after' field must be a string";
+        shaderNode.after = afterStr.value.Copy();
+    }
+
+    beforeValue := obj.GetMember("before");
+    if (beforeValue)
+    {
+        beforeStr := beforeValue.String();
+        assert beforeStr != null, "Shader node 'before' field must be a string";
+        shaderNode.before = beforeStr.value.Copy();
+    }
+
+    shaderNodes.Add(shaderNode);
+}
+
+ParseShaderNodes(value: *JSONValue, shaderNodes: Array<ShaderNode>)
+{
+    nodesArr := value.Array();
+    assert nodesArr, "Shader nodes value must be an array";
+
+    for (nodeValue in nodesArr.values)
+    {
+        nodeObj := nodeValue.Object();
+        assert nodeObj, "Values in shader nodes array must be objects";
+        ParseShaderNode(nodeObj, shaderNodes);
+    }
+}
+
+ParseRenderAssetDef(assetDef: AssetDef, assetDefObj: *JSONObject)
+{
+    name := assetDefObj.GetMember("name").String().value.Copy();
     log "Parsing asset definition: ", name;
 
     assetDef.name = name;
@@ -326,14 +387,20 @@ AssetDef ParseRenderAssetDef(assetDefObj: *JSONObject)
             attributesObj := attributesValue.Object();
             if (attributesObj)
             {
-                assetDef.vertex.attributes = ParseVariables(attributesObj);
+                ParseVariables(attributesObj, assetDef.vertex.attributes);
             }
         }
 
         variablesValue := vertexObj.GetMember("variables");
         if (variablesValue)
         {
-            assetDef.vertex.variables = ParseVariableSets(variablesValue);
+            ParseVariableSets(variablesValue, assetDef.vertex.variables);
+        }
+
+        nodesValue := vertexObj.GetMember("nodes");
+        if (nodesValue)
+        {
+            ParseShaderNodes(nodesValue, assetDef.vertex.nodes);
         }
 
         outValue := vertexObj.GetMember("out");
@@ -342,7 +409,7 @@ AssetDef ParseRenderAssetDef(assetDefObj: *JSONObject)
             outObj := outValue.Object();
             if (outValue)
             {
-                assetDef.vertex.out = ParseVariables(outObj);
+                ParseVariables(outObj, assetDef.vertex.out);
             }
         }
     }
@@ -357,14 +424,14 @@ AssetDef ParseRenderAssetDef(assetDefObj: *JSONObject)
             texturesObj := texturesValue.Object();
             if (texturesObj)
             {
-                assetDef.fragment.textures = ParseTextures(texturesObj);
+                ParseTextures(texturesObj, assetDef.fragment.textures);
             }
         }
 
         variablesValue := fragmentObj.GetMember("variables");
         if (variablesValue)
         {
-            assetDef.fragment.variables = ParseVariableSets(variablesValue);
+            ParseVariableSets(variablesValue, assetDef.fragment.variables);
         }
 
         usingValue := fragmentObj.GetMember("using");
@@ -376,7 +443,7 @@ AssetDef ParseRenderAssetDef(assetDefObj: *JSONObject)
             {
                 usingStr := val.String();
                 assert usingStr, "Values in using array must be strings";
-                assetDef.fragment.using.Add(usingStr.value);
+                assetDef.fragment.using.Add(usingStr.value.Copy());
             }
         }
 
@@ -386,47 +453,140 @@ AssetDef ParseRenderAssetDef(assetDefObj: *JSONObject)
             outObj := outValue.Object();
             if (outValue)
             {
-                assetDef.fragment.out = ParseVariables(outObj);
+                ParseVariables(outObj, assetDef.fragment.out);
             }
         }
-    }
 
-    return assetDef;
+        nodesValue := fragmentObj.GetMember("nodes");
+        if (nodesValue)
+        {
+            ParseShaderNodes(nodesValue, assetDef.fragment.nodes);
+        }
+
+        alphaModeValue := fragmentObj.GetMember("alphaMode");
+        if (alphaModeValue)
+        {
+            alphaModeStr := alphaModeValue.String();
+            assert alphaModeStr, "fragment alphaMode must be a string";
+            alphaMode := alphaModeStr.value;
+            assetDef.fragment.alphaMode = ParseAlphaMode(alphaMode);
+        }
+
+        cullModeValue := fragmentObj.GetMember("cullMode");
+        if (cullModeValue)
+        {
+            cullModeStr := cullModeValue.String();
+            assert cullModeStr, "fragment cullMode must be a string";
+            cullMode := cullModeStr.value;
+            assetDef.fragment.cullMode = ParseCullMode(cullMode);
+        }
+
+        polygonModeValue := fragmentObj.GetMember("polygonMode");
+        if (polygonModeValue)
+        {
+            polygonModeStr := polygonModeValue.String();
+            assert polygonModeStr, "fragment polygonMode must be a string";
+            polygonMode := polygonModeStr.value;
+            assetDef.fragment.polygonMode = ParsePolygonMode(polygonMode);
+        }
+    }
 }
 
-AssetDef ParseRenderAssetDefFile(file: string)
+ParseRenderAssetDefFile(
+    assetDefJSON: JSON, 
+    assetDefs: Map<string, AssetDef>,
+    assetDefsJSON: Map<string, JSON>
+)
 {
-    assetFilePath := OS.JoinPaths([renderAssetPath, file]);
-    defer delete assetFilePath;
-
-    log "Parsing render asset file: ", assetFilePath;
-    assetDefJSON := ParseJSONFile(assetFilePath);
+    assetDef := AssetDef();
 
     assetDefRoot := assetDefJSON.root;
-    assert assetDefRoot != null, "Failed to parse asset definition file" + assetFilePath;
-
     assetDefObj := assetDefRoot.Object();
-    assert assetDefRoot != null, "Asset definition file wasn't an object" + assetFilePath;
 
-    return ParseRenderAssetDef(assetDefObj);
+    importVal := assetDefObj.GetMember("imports");
+    if (importVal)
+    {
+        importStr := importVal.String();
+        assert importStr, "Value of imports must be a string";
+        importName := importStr.value;
+
+        log "Importing asset def: ", importName;
+
+        if (assetDefs.Has(importName))
+        {
+            importFrom := assetDefs.Find(importName);
+            assetDef = importFrom.Clone();
+        }
+        else
+        {
+            toImportJSON := assetDefsJSON.Find(importName)~;
+            ParseRenderAssetDefFile(toImportJSON, assetDefs, assetDefsJSON);
+            importFrom := assetDefs.Find(importName);
+            assetDef = importFrom.Clone();
+        }
+    }
+    
+    ParseRenderAssetDef(assetDef, assetDefObj);
+    assetDefs.Insert(assetDef.name, assetDef);
 }
 
 Map<string, AssetDef> ParseRenderAssetDefs()
 {
     log "Parsing Asset Defs";
 
+    renderAssetPath := "./Resource/RenderAssets";
+
     assetDefs := Map<string, AssetDef>();
+    assetDefsJSON := Map<string, JSON>();
+    defer {
+        for (kv in assetDefsJSON)
+        {
+            json := kv.value~;
+            delete json;
+        }
+
+        delete assetDefsJSON;
+    }
+
     files := OS.GetFilesInDirectory(renderAssetPath);
-    log "Asset Def Files: ", files;
     defer {
         for (file in files) delete file
         delete files;
     }
+    log "Asset Def Files: ", files;
 
     for (file in files)
     {
-        assetDef := ParseRenderAssetDefFile(file);
-        assetDefs.Insert(assetDef.name, assetDef);
+        assetFilePath := OS.JoinPaths([renderAssetPath, file]);
+        defer delete assetFilePath;
+
+        log "Parsing render asset file: ", assetFilePath;
+        assetDefJSON := ParseJSONFile(assetFilePath);
+
+        assetDefRoot := assetDefJSON.root;
+        assert assetDefRoot != null, "Failed to parse asset definition file" + assetFilePath;
+
+        assetDefObj := assetDefRoot.Object();
+        assert assetDefRoot != null, "Asset definition file wasn't an object" + assetFilePath;
+
+        nameVal := assetDefObj.GetMember("name");
+        assert nameVal != null, "Asset definitions must declare a name" + assetFilePath;
+
+        nameStr := nameVal.String();
+        assert nameStr != null, "Asset definition name must be a string" + assetFilePath;
+
+        name := nameStr.value;
+        assert !assetDefsJSON.Has(name), "Each asset definition must have a unique name";
+        assetDefsJSON.Insert(name, assetDefJSON);
+    }
+
+    for (kv in assetDefsJSON)
+    {
+        name := kv.key~;
+        json := kv.value~;
+
+        if (assetDefs.Has(name)) continue;
+        ParseRenderAssetDefFile(json, assetDefs, assetDefsJSON);
     }
 
     return assetDefs;
@@ -434,5 +594,11 @@ Map<string, AssetDef> ParseRenderAssetDefs()
 
 _ := #compile void 
 {
-    ParseRenderAssetDefs();
+    assetDefs := ParseRenderAssetDefs();
+
+    for (kv in assetDefs)
+    {
+        assetDef := kv.value~;
+
+    }
 }

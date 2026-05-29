@@ -184,3 +184,14 @@ Array::Clear()
 {
 	this.count = 0;
 }
+
+Array<Type> Array::Copy(valCopy: ::Type(Type) = ::Type(val: Type) => val)
+{
+	arr := Array<Type>();
+	arr.SizeTo(this.count);
+	for (val in this)
+	{
+		arr.Add(valCopy(val));
+	}
+	return arr;
+}
