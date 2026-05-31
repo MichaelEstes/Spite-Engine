@@ -599,6 +599,6 @@ _ := #compile void
     for (kv in assetDefs)
     {
         assetDef := kv.value~;
-
+        WriteShaderForAssetDef(assetDef);
     }
 }
