@@ -1,7 +1,7 @@
 package RenderAssetDef
 
-import Optional
 import Array
+import ShaderTools
 
 enum RenderStage: uint32
 {
@@ -201,7 +201,9 @@ state VertexStage
     attributes: Array<Variable>,
     variables: VariableSets,
     out: Array<Variable>,
-    nodes: Array<ShaderNode>
+    nodes: Array<ShaderNode>,
+
+    compiled: string
 }
 
 VertexStage::delete
@@ -210,6 +212,7 @@ VertexStage::delete
     delete this.variables;
     delete this.out;
     delete this.nodes;
+    delete this.compiled;
 }
 
 VertexStage VertexStage::Clone()
@@ -245,6 +248,8 @@ state FragmentStage
     out: Array<Variable>,
     nodes: Array<ShaderNode>,
 
+    compiled: string,
+
     alphaMode: AlphaMode,
 	cullMode: CullModeFlags,
 	polygonMode: PolygonMode
@@ -257,6 +262,7 @@ FragmentStage::delete
     delete this.using;
     delete this.out;
     delete this.nodes;
+    delete this.compiled;
 }
 
 FragmentStage FragmentStage::Clone()
@@ -298,6 +304,8 @@ state ComputeStage
     variables: VariableSets,
     out: Array<Variable>,
     nodes: Array<ShaderNode>,
+
+    compiled: string
 }
 
 ComputeStage::delete
@@ -305,6 +313,7 @@ ComputeStage::delete
     delete this.variables;
     delete this.out;
     delete this.nodes;
+    delete this.compiled;
 }
 
 ComputeStage ComputeStage::Clone()
@@ -331,18 +340,12 @@ state AssetDef
     name: string,
     vertex: VertexStage,
     fragment: FragmentStage,
-    compute: ComputeStage
-}
+    compute: Array<ComputeStage>,
 
-AssetDef AssetDef::Clone()
-{
-    cloned := AssetDef();
-
-    cloned.vertex = this.vertex.Clone();
-    cloned.fragment = this.fragment.Clone();
-    cloned.compute = this.compute.Clone();
-
-    return cloned;
+    compiled: {
+        vertex: *byte,
+        fragment: *byte
+    }
 }
 
 AssetDef::delete
@@ -351,4 +354,34 @@ AssetDef::delete
     delete this.vertex;
     delete this.fragment;
     delete this.compute;
+}
+
+AssetDef AssetDef::Clone()
+{
+    cloned := AssetDef();
+
+    cloned.vertex = this.vertex.Clone();
+    cloned.fragment = this.fragment.Clone();
+    for (compute in this.compute)
+    {
+        cloned.compute.Add(compute.Clone());
+    }
+
+    return cloned;
+}
+
+
+AssetDef::Compile(compiler: ShaderCompiler)
+{
+    CompileShadersForAssetDef(this, compiler);
+}
+
+*Variable FindVariableByName(vars: Array<Variable>, name: string)
+{
+    for (var in vars)
+    {
+        if (var.name == name) return var@;
+    }
+
+    return null;
 }

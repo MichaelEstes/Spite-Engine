@@ -3,6 +3,7 @@ package JSON
 import Arena
 import StrArena
 import OS
+import Array
 
 extern
 {
@@ -97,6 +98,7 @@ JSONValue::log()
 state JSONObject
 {
 	members := Map<string, *JSONValue>(),
+	order: Array<string>
 }
 
 JSONObject::delete
@@ -113,6 +115,28 @@ JSONObject::delete
 	}
 
 	return null;
+}
+
+*JSONValue JSONObject::operator::[](name: string)
+{
+	return this.GetMember(name);
+}
+
+Iterator JSONObject::operator::in()
+{
+	return {null, -1};
+}
+
+bool JSONObject::next(it: Iterator)
+{
+	it.index += 1;
+	return it.index < this.order.count;
+}
+
+{key: string, value: *JSONValue} JSONObject::current(it: Iterator)
+{
+	name := this.order[it.index];
+	return { name, this.GetMember(name) };	
 }
 
 state JSONArray
@@ -384,7 +408,8 @@ string ParseString(context: JSONParseContext, json: JSON)
 		JSONIncrement(context);
 
 		objValue.value.object.members.Insert(memberName, ParseJSONValue(context, json));
-		
+		objValue.value.object.order.Add(memberName);
+
 		JSONEatWhitespace(context);
 		if (context.view[0]~ == ',') JSONIncrement(context);
 	}

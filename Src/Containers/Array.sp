@@ -29,6 +29,11 @@ Array::delete
 	this.mem.Dealloc(this.count);
 }
 
+Array::Free()
+{
+	this.mem.Dealloc(this.count);
+}
+
 []Type Array::log()
 {
 	return this.AsBuiltin();

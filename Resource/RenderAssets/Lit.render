@@ -2,6 +2,7 @@
     name: Lit,
     vertex: {
         attributes: {
+            position: vec3,
             normal: vec3,
             tangents: vec4,
             color: vec4,
@@ -44,7 +45,7 @@
             {
                 name: litMain,
                 code: `
-                    outColor = color * material.baseColor * texture(colorTexture, uv0);
+                    outColor = color * baseColor * texture(colorTexture, uv0);
                 `,
                 after: main
             }

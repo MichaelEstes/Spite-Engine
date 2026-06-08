@@ -2,6 +2,7 @@ package RenderAssetDef
 
 import OS
 import JSON
+import ShaderTools
 
 VariableType ParseVariableType(varName: string)
 {
@@ -36,7 +37,7 @@ TextureType ParseTextureType(textureName: string)
 
 VariablePrecision ParseVariablePrecision(name: string)
 {
-    if (name == "low")      return VariablePrecision.Low;
+    if (name == "low")          return VariablePrecision.Low;
     else if (name == "medium")  return VariablePrecision.Medium;
     else if (name == "high")    return VariablePrecision.High;
     return VariablePrecision.Default;
@@ -280,10 +281,10 @@ Variable ParseVariable(name: string, value: *JSONValue)
 
 ParseVariables(obj: *JSONObject, vars: Array<Variable>)
 {
-    for (kv in obj.members)
+    for (kv in obj)
     {
-        name := kv.key~;
-        varValue := kv.value~;
+        name := kv.key;
+        varValue := kv.value;
         vars.Add(ParseVariable(name, varValue));
     }
 }
@@ -314,10 +315,10 @@ ParseVariableSets(set: *JSONValue, variableSets: VariableSets)
 
 ParseTextures(obj: *JSONObject, textures: Array<TextureDefinition>)
 {
-    for (kv in obj.members)
+    for (kv in obj)
     {
-        name := kv.key~;
-        textureValue := kv.value~;
+        name := kv.key;
+        textureValue := kv.value;
         textures.Add(ParseTextureDefinition(name, textureValue));
     }
 }
@@ -510,7 +511,7 @@ ParseRenderAssetDefFile(
         assert importStr, "Value of imports must be a string";
         importName := importStr.value;
 
-        log "Importing asset def: ", importName;
+        // log "Importing asset def: ", importName;
 
         if (assetDefs.Has(importName))
         {
@@ -532,7 +533,7 @@ ParseRenderAssetDefFile(
 
 Map<string, AssetDef> ParseRenderAssetDefs()
 {
-    log "Parsing Asset Defs";
+    // log "Parsing Asset Defs";
 
     renderAssetPath := "./Resource/RenderAssets";
 
@@ -553,14 +554,14 @@ Map<string, AssetDef> ParseRenderAssetDefs()
         for (file in files) delete file
         delete files;
     }
-    log "Asset Def Files: ", files;
+    // log "Asset Def Files: ", files;
 
     for (file in files)
     {
         assetFilePath := OS.JoinPaths([renderAssetPath, file]);
         defer delete assetFilePath;
 
-        log "Parsing render asset file: ", assetFilePath;
+        // log "Parsing render asset file: ", assetFilePath;
         assetDefJSON := ParseJSONFile(assetFilePath);
 
         assetDefRoot := assetDefJSON.root;
@@ -592,13 +593,15 @@ Map<string, AssetDef> ParseRenderAssetDefs()
     return assetDefs;
 }
 
-_ := #compile void 
-{
-    assetDefs := ParseRenderAssetDefs();
+// _ := #compile void 
+// {
+//     assetDefs := ParseRenderAssetDefs();
 
-    for (kv in assetDefs)
-    {
-        assetDef := kv.value~;
-        WriteShaderForAssetDef(assetDef);
-    }
-}
+//     compiler := InitShaderCompiler();
+//     defer delete compiler;
+
+//     for (assetDef in assetDefs.Values())
+//     {
+//         assetDef.Compile(compiler);
+//     }
+// }

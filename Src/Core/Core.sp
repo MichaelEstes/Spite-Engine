@@ -25,6 +25,7 @@ Initialize()
 	
 	InitializeInput();
 	InitializeImGui();
+	InitializeRenderAssetDefs();
 
 	globalEvents := GetGlobalEventEmitter();
 	globalEvents.On(SDL.EventType.QUIT, ::(event: SDL.Event, data: *void) {
