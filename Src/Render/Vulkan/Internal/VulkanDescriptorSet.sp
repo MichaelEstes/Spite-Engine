@@ -41,7 +41,7 @@ state SharedUBO<Type>
 	UBO: *Type,
 }
 
-SharedUBO::Init(device: *VkDevice_T, allocator: *VulkanAllocator, binding: uint32, stageFlags: VkShaderStageFlagBits)
+SharedUBO::Init(device: *VkDevice_T, allocator: VulkanAllocator, binding: uint32, stageFlags: VkShaderStageFlagBits)
 {
 	poolSizes := [VkDescriptorPoolSize(),];
 	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;

@@ -9,7 +9,7 @@ MeshRemovedEvent := RegisterEvent<SceneEntity>();
 
 state Mesh
 {
-    primitives: Array<Primitive>
+    primitives: Array<Primitive>,
 }
 
 Mesh::delete

@@ -36,20 +36,16 @@ DestroyAll()
 
 FrameCount := 2;
 
-state VulkanRenderer
+state VulkanMeshCallbacks
 {
-	vkInstance: *VulkanInstance,
-	
+	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer),
+
+}
+
+state VulkanRenderer
+{	
 	window: *SDL.Window,
 	surface: *VkSurfaceKHR_T,
-
-	device: *VkDevice_T,
-	queues: *VulkanQueues,
-	physicalDevice: *VkPhysicalDevice_T
-	allocator: *VulkanAllocator,
-	stagingBuffer: *VulkanStagingBuffer,
-	pipelineCache: *VulkanPipelineMap,
-	pipelineLayoutCache: *VulkanPipelineLayoutCache,
 
 	swapchain: VulkanSwapchain,
 	graphicsCommands: VulkanCommands,
@@ -57,12 +53,8 @@ state VulkanRenderer
 	transferCommands: VulkanCommands,
 	
 	sceneShared: SharedUBO<SceneUBO>,
-	materialShared: SharedUBO<MaterialUBO>,
 	
 	materialPool: *VkDescriptorPool_T,
-
-	emptyVertexBuffers: EmptyVertexBuffers,
-	emptyTextures: EmptyTextures,
 
 	frameFences: [FrameCount]*VkFence_T,
 
@@ -70,7 +62,7 @@ state VulkanRenderer
 
 	renderGraph: RenderGraph<VulkanRenderer>,
 
-	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer),
+	meshCallbacks: VulkanMeshCallbacks,
 
 	userData: ?{
 		ptr: *void,
@@ -79,11 +71,9 @@ state VulkanRenderer
 	},
 
 	self: Entity,
-	deviceIndex: uint32,
 	swapchainHandle: RenderResourceHandle,
 	swapchainImageIndex: uint32,
-	currentFrame: uint32,
-	
+	currentFrame: uint32,	
 }
 
 VulkanRenderer::Destroy()
@@ -93,13 +83,11 @@ VulkanRenderer::Destroy()
 
 state VulkanRendererConfig
 {
-	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer) = UploadMesh;
-	userData: ?{ ptr: *void, i: uint, entity: Entity } = null;
-	materialDescriptorCount: uint32 = 1000
+	meshCallbacks := VulkanMeshCallbacks(),
+	userData: ?{ ptr: *void, i: uint, entity: Entity } = null,
+	materialDescriptorCount: uint32 = 1000,
 	maxMaterialSets: uint32 = 1000,
-	deviceIndex: uint32 = vulkanInstance.defaultDevice,
-	useSceneUBO: bool = true;
-	useEmptyStructures: bool = true;
+	useSceneUBO: bool = true,
 }
 
 CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>, 
@@ -110,64 +98,51 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 	InitializeVulkanInstance();
 
 	windowData := scene.GetComponent<WindowData>(entity);
-	
-	deviceIndex := config.deviceIndex;
-
-	vulkanInstance.InitializeDevice(deviceIndex);
 
 	vulkanRenderer := VulkanRenderer();
-	vulkanRenderer.vkInstance = vulkanInstance@;
-	vulkanRenderer.onMeshAdded = config.onMeshAdded;
+	vulkanRenderer.meshCallbacks = config.meshCallbacks;
 	vulkanRenderer.userData = config.userData;
 
 	vulkanRenderer.window = windowData.window;
 	vulkanRenderer.CreateSurface();
 
 	vulkanRenderer.self = entity;
-	vulkanRenderer.deviceIndex = deviceIndex;
-	vulkanRenderer.device = vulkanInstance.devices[deviceIndex]~;
-	vulkanRenderer.queues = vulkanInstance.queues[deviceIndex];
-	vulkanRenderer.physicalDevice = vulkanInstance.physicalDevices[deviceIndex]~;
-	vulkanRenderer.allocator = vulkanInstance.allocators[deviceIndex];
-	vulkanRenderer.stagingBuffer = vulkanInstance.GetStagingBuffer(deviceIndex);
-	vulkanRenderer.pipelineCache = vulkanInstance.pipelineCaches[deviceIndex];
-	vulkanRenderer.pipelineLayoutCache = vulkanInstance.pipelineLayoutCaches[deviceIndex];
 
 	vulkanRenderer.CreateSwapchain();
 
+	log "Created swapchain image views";
+
+	device := vulkanInstance.device;
+	queues := vulkanInstance.queues;
+	allocator := vulkanInstance.allocator;
+
 	for (i := 0 .. FrameCount)
 	{
-		vulkanRenderer.frameFences[i] = CreateFence(vulkanRenderer.device);
+		vulkanRenderer.frameFences[i] = CreateFence(device);
 	}
 
 	vulkanRenderer.graphicsCommands.Create(
-		vulkanRenderer.device, 
-		vulkanRenderer.queues.graphicsQueueIndex,
+		device, 
+		queues.graphicsQueueIndex,
 		FrameCount
 	);
 	vulkanRenderer.computeCommands.Create(
-		vulkanRenderer.device, 
-		vulkanRenderer.queues.computeQueueIndex,
+		device, 
+		queues.computeQueueIndex,
 		FrameCount
 	);
 	vulkanRenderer.transferCommands.Create(
-		vulkanRenderer.device, 
-		vulkanRenderer.queues.transferQueueIndex,
+		device, 
+		queues.transferQueueIndex,
 		FrameCount
 	);
 
 	if (config.useSceneUBO)
 	{
-		vulkanRenderer.sceneShared.Init(vulkanRenderer.device, vulkanRenderer.allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
+		vulkanRenderer.sceneShared.Init(device, allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
 	}
 
 	vulkanRenderer.CreateMaterialDescPool(config.materialDescriptorCount, config.maxMaterialSets);
-
-	if (config.useEmptyStructures)
-	{
-		vulkanRenderer.emptyVertexBuffers.Init(vulkanRenderer);
-		vulkanRenderer.emptyTextures.Init(vulkanRenderer);
-	}
 
 	for (passName in passes)
 	{
@@ -181,16 +156,15 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 		vulkanRenderer.passes.Add(renderPass~);
 	}
 
-	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables[deviceIndex]);
+	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables@);
 	vulkanRenderer.renderGraph.SetRenderPassFuncs(
 		::*VkRenderPass_T(pass: RenderGraphPass<VulkanRenderer>, renderPass: RenderPass, 
 						  renderer: *VulkanRenderer)
 		{
-			deviceIndex := renderer.deviceIndex;
-			device := renderer.device;
-			renderPassCache := vulkanInstance.renderPassCaches[deviceIndex]~;
-			frameBufferCache := vulkanInstance.frameBufferCaches[deviceIndex]~;
-			resourceManager := vulkanInstance.resourceManagers[deviceIndex]~;
+			device := vulkanInstance.device;
+			renderPassCache := vulkanInstance.renderPassCache;
+			frameBufferCache := vulkanInstance.frameBufferCache;
+			resourceManager := vulkanInstance.resourceManager;
 			renderGraph := renderer.renderGraph;
 
 			vkRenderPass := FindOrCreateRenderPass(renderPass, renderPassCache, device);
@@ -257,14 +231,13 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 		}
 	);
 
-
 	scene.SetComponent<VulkanRenderer>(entity, vulkanRenderer);
 }
 
 VulkanRenderer::CreateSwapchain()
 {
 	this.swapchain.Create(this@);
-	resourceManager := vulkanInstance.resourceManagers[this.deviceIndex];
+	resourceManager := vulkanInstance.resourceManager;
 	for (i .. this.swapchain.imageCount)
 	{
 		image := this.swapchain.images[i]~;
@@ -278,30 +251,31 @@ VulkanRenderer::CreateSwapchain()
 
 VulkanRenderer::RecreateSwapchain()
 {
-	vkDeviceWaitIdle(this.device);
+	device := vulkanInstance.device;
+	vkDeviceWaitIdle(device);
 
-	resourceManager := vulkanInstance.resourceManagers[this.deviceIndex];
+	resourceManager := vulkanInstance.resourceManager;
 	for (i .. this.swapchain.imageCount)
 	{
 		image := this.swapchain.images[i]~;
 		resourceManager.renderTargetMap.Remove(image);
 	}
 
-	frameBufferCache := vulkanInstance.frameBufferCaches[this.deviceIndex]~;
+	frameBufferCache := vulkanInstance.frameBufferCache;
 	for (kv in frameBufferCache.frameBufferMap)
 	{
-		vkDestroyFramebuffer(this.device, kv.value~, null);
+		vkDestroyFramebuffer(device, kv.value~, null);
 	}
 	frameBufferCache.frameBufferMap.Clear();
 
-	this.swapchain.Destroy(this.device);
+	this.swapchain.Destroy(device);
 
 	this.CreateSwapchain();
 }
 
 VulkanRenderer::CreateSurface()
 {
-	if (!SDL.VulkanCreateSurface(this.window, this.vkInstance.instance, null, this.surface@))
+	if (!SDL.VulkanCreateSurface(this.window, vulkanInstance.instance, null, this.surface@))
 	{
 		puts(SDL.GetError());
 		log "Error creating Vulkan surface";
@@ -310,6 +284,8 @@ VulkanRenderer::CreateSurface()
 
 VulkanRenderer::CreateMaterialDescPool(descriptorCount: uint32, maxSet: uint32)
 {
+	device := vulkanInstance.device;
+
 	poolSizes := [VkDescriptorPoolSize(), VkDescriptorPoolSize()];
 	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[0].descriptorCount = descriptorCount;
@@ -323,7 +299,7 @@ VulkanRenderer::CreateMaterialDescPool(descriptorCount: uint32, maxSet: uint32)
 	poolInfo.maxSets = maxSet;
 
 	CheckResult(
-		vkCreateDescriptorPool(this.device, poolInfo@, null, this.materialPool@),
+		vkCreateDescriptorPool(device, poolInfo@, null, this.materialPool@),
 		"VulkanRenderer::CreateMaterialDescPool Error allocating Vulkan descriptor pool"
 	);
 }
@@ -380,10 +356,12 @@ enum CommandBufferKind: uint32
 
 VkResult VulkanRenderer::WaitAndAcquireSwapchain(frame: uint32)
 {
+	device := vulkanInstance.device;
+
 	fence := this.frameFences[frame]@;
-	vkWaitForFences(this.device, 1, fence, VkTrue, UINT64_MAX);
-	result := this.swapchain.AcquireNext(this.device, frame);
-	vkResetFences(this.device, 1, fence);
+	vkWaitForFences(device, 1, fence, VkTrue, UINT64_MAX);
+	result := this.swapchain.AcquireNext(device, frame);
+	vkResetFences(device, 1, fence);
 
 	return result;
 }
@@ -411,9 +389,9 @@ VulkanRenderer::End(commandBuffer: *VkCommandBuffer_T)
 VulkanRenderer::TransitionSwapchainPresent(image: *VkImage_T, currentLayout: GPUTextureLayout, 
 										   format: GPUFormat)
 {
+	device := vulkanInstance.device;
 	oldLayout := GPUTextureLayoutToVkLayout(currentLayout);
 	vkFormat := format;
-	device := this.device;
 	
 	barrier := VkImageMemoryBarrier();
 	barrier.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -477,8 +455,8 @@ VulkanRenderer::UpdateScene(scene: *Scene)
 
 VulkanRenderer::Draw(scene: *Scene)
 {
+	device := vulkanInstance.device;
 	frame := this.Frame();
-	device := this.device;
 	renderGraph := this.renderGraph;
 	renderGraph.SetRenderer(this@);
 	resourceTables := renderGraph.handles.resourceTables;
@@ -533,11 +511,11 @@ VulkanRenderer::Draw(scene: *Scene)
 	submitInfo.pSignalSemaphores = fixed signalSemaphores;
 
 	CheckResult(
-		vkQueueSubmit(this.queues.graphicsQueue, 1, submitInfo@, fence),
+		vkQueueSubmit(vulkanInstance.queues.graphicsQueue, 1, submitInfo@, fence),
 		"Error submitting Vulkan draw command buffer"
 	);
 
-	this.swapchain.Present(this.queues.presentQueue, frame);
+	this.swapchain.Present(vulkanInstance.queues.presentQueue, frame);
 	this.currentFrame += 1;
 }
 
@@ -561,10 +539,7 @@ vulkanDrawSystem := ECS.RegisterSystem(
 vulkanDrawCleanupSystem := ECS.RegisterFrameSystem(
 	::(dt: float) 
 	{
-		for (i .. vulkanInstance.physicalDeviceCount)
-		{
-			vulkanInstance.resourceTables[i].ReleaseTrackedResources();
-		}
+		vulkanInstance.resourceTables.ReleaseTrackedResources();
 	},
 	FrameSystemStep.End
 );

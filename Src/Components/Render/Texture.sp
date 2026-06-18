@@ -30,3 +30,8 @@ state Texture
 	wrapU: TextureWrap,
 	wrapV: TextureWrap
 }
+
+Texture::delete
+{
+	ReleaseResourceRef(this.imageHandle);
+}

@@ -11,7 +11,7 @@ ImGuiPass := RegisterRenderPass(
 	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene) 
 	{
 		graph.AddPass(
-			colorPassName,
+			ImGuiPassName,
 			::bool(builder: *RenderPassBuilder<VulkanRenderer>, scene: *Scene) 
 			{
 				renderer := builder.Renderer();
@@ -34,11 +34,11 @@ ImGuiPass := RegisterRenderPass(
 					renderPass := renderer.CastDriverRenderPass(context.driverRenderpass);
 
 					initInfo := ImGui_ImplVulkan_InitInfo_t();
-					initInfo.Instance = renderer.vkInstance.instance;
-					initInfo.PhysicalDevice = renderer.physicalDevice;
-					initInfo.Device = renderer.device;
-					initInfo.QueueFamily = renderer.queues.graphicsQueueIndex;
-					initInfo.Queue = renderer.queues.graphicsQueue;
+					initInfo.Instance = vulkanInstance.instance;
+					initInfo.PhysicalDevice = vulkanInstance.GetPhysicalDevice();
+					initInfo.Device = vulkanInstance.device;
+					initInfo.QueueFamily = vulkanInstance.queues.graphicsQueueIndex;
+					initInfo.Queue = vulkanInstance.queues.graphicsQueue;
 					initInfo.PipelineCache = null;
 					initInfo.DescriptorPool = renderer.materialPool;
 					initInfo.MinImageCount = 2;

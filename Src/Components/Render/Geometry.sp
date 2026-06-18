@@ -1,9 +1,25 @@
 package RenderComponents
 
+import RenderAssetDef
 import Vec
 import Common
 import ArrayView
 import Array
+
+state GeometryVariableUpdate
+{
+    geometry: *Geometry,
+    index: VariableSetIndex
+}
+
+state GeometryAttributeUpdate
+{
+    geometry: *Geometry,
+    index: uint32
+}
+
+GeometryVariableUpdateEvent := RegisterEvent<GeometryVariableUpdate>();
+GeometryAttributeUpdateEvent := RegisterEvent<GeometryAttributeUpdate>();
 
 enum GeometryKind: uint16
 {
@@ -23,64 +39,90 @@ enum IndexKind: uint16
     I32
 }
 
-// state Geometry
-// {
-//     vertices: ArrayView<Vec3>,
-//     indices: ArrayView<uint16>,
-    
-//     attributes: Array<ArrayView<byte>>,
-//     variables: Array<*void>,
-
-//     defHandle: uint32
-// }
-
-// uint32 Geometry::GetAttributeIndex(name: string)
-// {
-//     vertex := MaterialStageFromHandle(this.defHandle, RenderStage.Vertex);
-//     index := FindVariableByName(vertex.attributes, name);
-//     return index;
-// }
-
-// ref VariableDefinition Geometry::GetAttributeDef(index: uint32)
-// {
-//     vertex := MaterialStageFromHandle(this.defHandle, RenderStage.Vertex);
-//     return vertex.attributes[index];
-// }
-
-// uint32 Geometry::GetVariableIndex(name: string)
-// {
-//     vertex := MaterialStageFromHandle(this.defHandle, RenderStage.Vertex);
-//     index := FindVariableByName(vertex.variables, name);
-//     return index;
-// }
-
-// ref VariableDefinition Geometry::GetVariableDef(index: uint32)
-// {
-//     vertex := MaterialStageFromHandle(this.defHandle, RenderStage.Vertex);
-//     return vertex.variables[index];
-// }
-
 state Geometry
 {
-    vertices: ArrayView<Vec3>,
+    attributes: Array<ArrayView<byte>>,
+    variables: *void,
+    
     indices: ArrayView<uint16>,
 
-    normals: ArrayView<Vec3>,
-    tangents: ArrayView<Vec4>,
-
-    colors: ArrayView<Color>,
-
-    uvs: [4]ArrayView<Vec2> = [
-        ArrayView<Vec2>(),
-        ArrayView<Vec2>(),
-        ArrayView<Vec2>(),
-        ArrayView<Vec2>()
-    ],
+    defHandle: AssetDefHandle,
 
     indexKind: IndexKind,
-    kind: GeometryKind
+
+    gpuResourceID: uint32 = uint32(0)
+}
+
+Geometry::(defHandle: AssetDefHandle)
+{
+    this.defHandle = defHandle;
+    this.variables = AllocateVertexVariableSet(defHandle);
+    this.attributes.SizeTo(GetAssetDefVertexAttributeCount(defHandle));
 }
 
 Geometry::delete
 {
 }
+
+uint32 Geometry::GetAttributeIndex(name: string)
+{
+    assetDef := GetAssetDefWithHandle(this.defHandle);
+    vertex := assetDef.vertex;
+    index := FindVariableIndexByName(vertex.attributes, name);
+    return index;
+}
+
+ref VariableDefinition Geometry::GetAttributeDef(index: uint32)
+{
+    assetDef := GetAssetDefWithHandle(this.defHandle);
+    vertex := assetDef.vertex;
+    var := vertex.attributes[index];
+    return var.def;
+}
+
+*ArrayView<byte> Geometry::GetAttributeValue(index: uint32)
+{
+    return this.attributes[index]@;
+}
+
+VariableSetIndex Geometry::GetVariableIndex(name: string)
+{
+    assetDef := GetAssetDefWithHandle(this.defHandle);
+    vertex := assetDef.vertex;
+    index := FindVariableSetIndexByName(vertex.variables, name);
+    return index;
+}
+
+ref VariableDefinition Geometry::GetVariableDef(index: VariableSetIndex)
+{
+    assetDef := GetAssetDefWithHandle(this.defHandle);
+    vertex := assetDef.vertex;
+    set := vertex.variables.sets[index.setIndex];
+    var := set[index.varIndex];
+    return var.def;
+}
+
+*T Geometry::GetVariableValue<T>(index: VariableSetIndex)
+{
+    assetDef := GetAssetDefWithHandle(this.defHandle);
+    vertex := assetDef.vertex;
+    offset := FindVariableSetOffsetAtIndex(vertex.variables, index);
+    return (this.variables + offset) as *T;
+}
+
+Geometry::UpdatedVariableSet(index: VariableSetIndex)
+{
+    event := GeometryVariableUpdate();
+    event.geometry = this@;
+    event.index = index;
+    ECS.instance.events.Emit<GeometryVariableUpdate>(GeometryVariableUpdateEvent, event);
+}
+
+Geometry::UpdatedAttribute(index: uint32)
+{
+    event := GeometryAttributeUpdate();
+    event.geometry = this@;
+    event.index = index;
+    ECS.instance.events.Emit<GeometryAttributeUpdate>(GeometryAttributeUpdateEvent, event);
+}
+

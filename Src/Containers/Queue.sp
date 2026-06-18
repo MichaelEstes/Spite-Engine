@@ -15,6 +15,11 @@ Queue::()
 	this.capacity = InitialCapacity;
 }
 
+Queue::delete
+{
+	this.mem.Dealloc(this.capacity);
+}
+
 Queue::Enqueue(value: Type)
 {
 	if(this.count >= this.capacity) this.Expand();	

@@ -1,29 +1,23 @@
 package RenderComponents
 
+import RenderAssetDef
 import Vec
 import Common
 
-enum AlphaMode: ubyte
+state MaterialVariableUpdate
 {
-	Opaque,
-	Mask,
-	Blend
+    material: *Material,
+    index: VariableSetIndex
 }
 
-enum CullModeFlags: ubyte
+state MaterialTextureUpdate
 {
-	None = 0,
-	Front = 1 << 0,
-	Back = 1 << 1,
-	Both = CullModeFlags.Front | CullModeFlags.Back
+    material: *Material,
+    index: uint32
 }
 
-enum PolygonMode: ubyte
-{
-	Fill,
-	Line,
-	Point
-}
+MaterialVariableUpdateEvent := RegisterEvent<MaterialVariableUpdate>();
+MaterialTextureUpdateEvent := RegisterEvent<MaterialTextureUpdate>();
 
 state TextureMap
 {
@@ -37,43 +31,98 @@ bool TextureMap::operator::!()
 	return this.texture.imageHandle.id == 0;
 }
 
-// state Material
-// {
-// 	variables: Array<*void>,
-
-	
-
-// 	alphaMode: AlphaMode = AlphaMode.Opaque,
-// 	cullMode: CullModeFlags = CullModeFlags.Back,
-// 	polygonMode: PolygonMode = PolygonMode.Fill
-// }
-
-
 state Material
 {
-	color: TextureMap,
-	normal: TextureMap,
-	metallicRoughness: TextureMap,
-	occlusion: TextureMap,
-	emissive: TextureMap,
+	textures: Array<TextureMap>,
+	variables: *void,
+	
+    defHandle: AssetDefHandle,
 
-	vertShader: string,
-	fragShader: string,
+    gpuResourceID: uint32 = uint32(0)
+}
 
-	baseColor: Color = Color(1.0, 1.0, 1.0, 1.0),
-	emissiveFactor: Vec3,
-
-	normalScale := float32(1.0),
-	metallicFactor := float32(1.0),
-	roughnessFactor := float32(1.0),
-	occlusionStrength := float32(1.0),
-	alphaCutoff := float32(0.5),
-
-	alphaMode: AlphaMode = AlphaMode.Opaque,
-	cullMode: CullModeFlags = CullModeFlags.Back,
-	polygonMode: PolygonMode = PolygonMode.Fill
+Material::(defHandle: AssetDefHandle)
+{
+    this.defHandle = defHandle;
+	this.variables = AllocateFragmentVariableSet(defHandle);
+    this.textures.SizeTo(GetAssetDefFragmentTextureCount(defHandle));
 }
 
 Material::delete
 {
+    delete this.textures;
+}
+
+VariableSetIndex Material::GetVariableIndex(name: string)
+{
+    assetDef := GetAssetDefWithHandle(this.defHandle);
+    fragment := assetDef.fragment;
+    index := FindVariableSetIndexByName(fragment.variables, name);
+    return index;
+}
+
+ref VariableDefinition Material::GetVariableDef(index: VariableSetIndex)
+{
+    assetDef := GetAssetDefWithHandle(this.defHandle);
+    fragment := assetDef.fragment;
+    set := fragment.variables.sets[index.setIndex];
+    var := set[index.varIndex];
+    return var.def;
+}
+
+*T Material::GetVariableValue<T>(index: VariableSetIndex)
+{
+	assetDef := GetAssetDefWithHandle(this.defHandle);
+    fragment := assetDef.fragment;
+    offset := FindVariableSetOffsetAtIndex(fragment.variables, index);
+    return (this.variables + offset) as *T;
+}
+
+bool Material::SetVariable<T>(name: string, value: T, update: bool = true)
+{
+	index := this.GetVariableIndex(name);
+	if (index.setIndex == uint32(-1)) return false;
+
+	this.GetVariableValue<T>(index)~ = value;
+	if (update) this.UpdatedVariableSet(index);
+    return true;
+}
+
+uint32 Material::GetTextureIndex(name: string)
+{
+    assetDef := GetAssetDefWithHandle(this.defHandle);
+    fragment := assetDef.fragment;
+    textures := fragment.textures;
+    return FindTextureIndexByName(textures, name);
+}
+
+*TextureMap Material::GetTextureValue(index: uint32)
+{
+    return this.textures[index]@;
+}
+
+bool Material::SetTexture(name: string, texture: TextureMap, update: bool = true)
+{
+    index := this.GetTextureIndex(name);
+	if (index != uint32(-1)) return false;
+			
+	this.GetTextureValue(index)~ = texture;
+	if (update) this.UpdatedTexture(index);
+	return true;
+}
+
+Material::UpdatedVariableSet(index: VariableSetIndex)
+{
+    event := MaterialVariableUpdate();
+    event.material = this@;
+    event.index = index;
+    ECS.instance.events.Emit<MaterialVariableUpdate>(MaterialVariableUpdateEvent, event);
+}
+
+Material::UpdatedTexture(index: uint32)
+{
+	event := MaterialTextureUpdate();
+    event.material = this@;
+    event.index = index;
+    ECS.instance.events.Emit<MaterialVariableUpdate>(MaterialTextureUpdateEvent, event);
 }

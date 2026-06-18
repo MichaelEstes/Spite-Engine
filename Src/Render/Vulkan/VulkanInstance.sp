@@ -22,87 +22,86 @@ validationCount := #compile uint32 => (#typeof validationLayers).FixedArrayCount
 requiredDeviceExtensions := ["VK_KHR_swapchain"[0],];
 requiredDeviceExtensionCount := #compile uint32 => (#typeof requiredDeviceExtensions).FixedArrayCount();
 
+vulkanInstance := VulkanInstance();
+
 state VulkanInstance
 {
 	instance: *VkInstance_T,
 	extensionNames: **byte,
 	physicalDevices: Allocator<*VkPhysicalDevice_T>,
-	devices: Allocator<*VkDevice_T>,
-	deviceFeatures: Allocator<VkPhysicalDeviceFeatures>,
-	deviceProperties: Allocator<VkPhysicalDeviceProperties>,
-	queues: Allocator<VulkanQueues>,
 
-	resourceTables: Allocator<ResourceTables<VulkanRenderer>>,
-	resourceManagers: Allocator<VulkanResourceManager>,
+	device: *VkDevice_T,
+	deviceFeatures: VkPhysicalDeviceFeatures,
+	deviceProperties: VkPhysicalDeviceProperties,
+	queues: VulkanQueues,
 
-	renderPassCaches: Allocator<VulkanRenderPassCache>,
-	frameBufferCaches: Allocator<VulkanFrameBufferCache>,
-	pipelineCaches: Allocator<VulkanPipelineMap>,
-	pipelineLayoutCaches: Allocator<VulkanPipelineLayoutCache>,
+	resourceTables: ResourceTables<VulkanRenderer>,
+	resourceManager: VulkanResourceManager,
 
-	allocators: Allocator<VulkanAllocator>,
-	stagingBuffers: Allocator<VulkanStagingBuffer>,
+	renderPassCache: VulkanRenderPassCache,
+	frameBufferCache: VulkanFrameBufferCache,
+	pipelineCache: VulkanPipelineMap,
+	pipelineLayoutCache: VulkanPipelineLayoutCache,
 
-	devicesInitialized: ZeroedAllocator<bool>,
+	allocator: VulkanAllocator,
+	stagingBuffer: VulkanStagingBuffer,
 
 	physicalDeviceCount: uint32,
-	defaultDevice: uint32,
+	currentDevice: uint32,
 	extensionCount: uint32,
 	initialized := false
 }
 
-ArrayView<*VkPhysicalDevice_T> VulkanInstance::PhysicalDevices()
+*VkPhysicalDevice_T VulkanInstance::GetPhysicalDevice()
 {
-	return ArrayView<*VkPhysicalDevice_T>(this.physicalDevices[0], this.physicalDeviceCount);
+	return this.physicalDevices[this.currentDevice]~;
 }
 
-VulkanInstance::InitializeDevice(deviceIndex: uint32)
+VulkanInstance::InitializeCurrentDevice()
 {
-	i := deviceIndex;
-	log deviceIndex;
-	if (vulkanInstance.devicesInitialized[i]~) return;
-	vulkanInstance.resourceTables[i]~ = ResourceTables<VulkanRenderer>(
+	this.resourceTables = ResourceTables<VulkanRenderer>(
 		::*VkImage_T(createDesc: TextureDesc, renderer: *VulkanRenderer) {
+			device := vulkanInstance.device;
+			allocator := vulkanInstance.allocator;
+			resourceManager := vulkanInstance.resourceManager;
+
 			imageCreateInfo := TextureDescToCreateInfo(createDesc, renderer);
-			image := CreateVkImage(renderer.device, imageCreateInfo);
-			imageHandle := renderer.allocator.AllocImage(image, VulkanMemoryFlags.GPU);
+			image := CreateVkImage(device, imageCreateInfo);
+			imageHandle := allocator.AllocImage(image, VulkanMemoryFlags.GPU);
 			
 			imageViewInfo := DefaultImageView(image, imageCreateInfo);
-			imageView := CreateVkImageView(renderer.device, imageViewInfo);
+			imageView := CreateVkImageView(device, imageViewInfo);
 
 			renderTarget := VulkanRenderTarget();
 			renderTarget.image = image;
 			renderTarget.imageView = imageView;
 			renderTarget.handle = imageHandle;
 
-			resourceManager := vulkanInstance.resourceManagers[renderer.deviceIndex];
 			resourceManager.renderTargetMap.Insert(image, renderTarget);
 
 			return image;
 		},
 		::*VkBuffer_T(createDesc: BufferDesc, renderer: *VulkanRenderer) {
-			return CreateVkBuffer(renderer.device, BufferDescToCreateInfo(createDesc));
+			device := vulkanInstance.device;
+			return CreateVkBuffer(device, BufferDescToCreateInfo(createDesc));
 		}
 	)
-	vulkanInstance.resourceManagers[i]~ = VulkanResourceManager();
-	vulkanInstance.renderPassCaches[i]~ = VulkanRenderPassCache();
-	vulkanInstance.frameBufferCaches[i]~ = VulkanFrameBufferCache();
-	vulkanInstance.pipelineCaches[i]~ = VulkanPipelineMap();
-	vulkanInstance.pipelineLayoutCaches[i]~ = VulkanPipelineLayoutCache();
-	vulkanInstance.stagingBuffers[i]~ = VulkanStagingBuffer();
+	this.resourceManager = VulkanResourceManager();
+	this.renderPassCache = VulkanRenderPassCache();
+	this.frameBufferCache = VulkanFrameBufferCache();
+	this.pipelineCache = VulkanPipelineMap();
+	this.pipelineLayoutCache = VulkanPipelineLayoutCache();
+	this.stagingBuffer = VulkanStagingBuffer();
 
-	physicalDevice := vulkanInstance.physicalDevices[i]~;
+	physicalDevice := this.GetPhysicalDevice();
 
-	deviceFeatures := vulkanInstance.deviceFeatures[i];
-	deviceProperties := vulkanInstance.deviceProperties[i];
-	vkGetPhysicalDeviceFeatures(physicalDevice, deviceFeatures);
-	vkGetPhysicalDeviceProperties(physicalDevice, deviceProperties);
+	vkGetPhysicalDeviceFeatures(physicalDevice, this.deviceFeatures@);
+	vkGetPhysicalDeviceProperties(physicalDevice, this.deviceProperties@);
 
-	queues := vulkanInstance.queues[i];
-	queues~ = VulkanQueues();
-	queues.Create(physicalDevice);
+	this.queues = VulkanQueues();
+	this.queues.Create(physicalDevice);
 
-	queueCreateInfos := queues.DeviceQueueCreateInfo();
+	queueCreateInfos := this.queues.DeviceQueueCreateInfo();
 	defer delete queueCreateInfos;
 
 	createInfo := VkDeviceCreateInfo();
@@ -111,28 +110,26 @@ VulkanInstance::InitializeDevice(deviceIndex: uint32)
 	createInfo.pQueueCreateInfos = queueCreateInfos[0]@;
 	createInfo.enabledExtensionCount = requiredDeviceExtensionCount;
 	createInfo.ppEnabledExtensionNames = requiredDeviceExtensions[0]@;
-	createInfo.pEnabledFeatures = vulkanInstance.deviceFeatures[i];
+	createInfo.pEnabledFeatures = this.deviceFeatures@;
 
-	device := vulkanInstance.devices[i];
 	CheckResult(
-		vkCreateDevice(physicalDevice, createInfo@, null, device),
+		vkCreateDevice(physicalDevice, createInfo@, null, this.device@),
 		"Error creating Vulkan device"
 	);
 
-	queues.GetQueues(device~, physicalDevice, vulkanInstance.instance);
+	this.queues.GetQueues(this.device, physicalDevice, this.instance);
 	
-	vulkanInstance.allocators[i]~ = VulkanAllocator();
-	vulkanInstance.allocators[i].Create(device~, physicalDevice);
-	vulkanInstance.devicesInitialized[i]~ = true;
+	this.allocator = VulkanAllocator();
+	this.allocator.Create(this.device, physicalDevice);
 }
 
-*VulkanStagingBuffer VulkanInstance::GetStagingBuffer(deviceIndex: uint32)
+ref VulkanStagingBuffer VulkanInstance::GetStagingBuffer()
 {
-	stagingBuffer := this.stagingBuffers[deviceIndex];
+	stagingBuffer := this.stagingBuffer;
 	if (!stagingBuffer.buffer)
 	{
-		device := this.devices[deviceIndex]~;
-		physicalDevice := this.physicalDevices[deviceIndex]~;
+		device := this.device;
+		physicalDevice := this.GetPhysicalDevice();
 		stagingBuffer.Create(device, physicalDevice);
 	}
 
@@ -144,7 +141,7 @@ VulkanInstance::SelectDefaultDevice()
 	if (this.physicalDeviceCount == 1)
 	{
 		log "Only one physical device found, using it";
-		this.defaultDevice = 0;
+		this.currentDevice = 0;
 		return;
 	}
 
@@ -154,13 +151,15 @@ VulkanInstance::SelectDefaultDevice()
 
 	for (i .. this.physicalDeviceCount)
 	{
-		deviceProperties := this.deviceProperties[i];
+		physicalDevice := this.physicalDevices[i]~;
+		deviceProperties := VkPhysicalDeviceProperties();
+		vkGetPhysicalDeviceProperties(physicalDevice, deviceProperties@);
 
 		log "Evaluating Device: ", string(256, fixed deviceProperties.deviceName);
 		if (deviceProperties.deviceType == VkPhysicalDeviceType.VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
 		{
 			log "Found discrete GPU, using it";
-			this.defaultDevice = i;
+			this.currentDevice = i;
 			return;
 		}
 		else if (deviceProperties.deviceType == VkPhysicalDeviceType.VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
@@ -173,17 +172,17 @@ VulkanInstance::SelectDefaultDevice()
 	if (backupDevice != -1)
 	{
 		log "No discrete GPU found, using integrated GPU";
-		this.defaultDevice = backupDevice;
+		this.currentDevice = backupDevice;
 		return;
 	}
 
 	log "No backup device found, using first device";
-	this.defaultDevice = 0;
+	this.currentDevice = 0;
 }
 
 VulkanInstance::DebugLogExtensions()
 {
-	physicalDevice := this.physicalDevices[this.defaultDevice]~;
+	physicalDevice := this.physicalDevices[this.currentDevice]~;
 	extCount := uint32(0);
 	vkEnumerateDeviceExtensionProperties(physicalDevice, null, extCount@, null);
 	log "Device ext count: ", extCount;
@@ -208,8 +207,6 @@ VulkanInstance::DebugLogExtensions()
 	}
 	log "End instance ext";
 }
-
-vulkanInstance := VulkanInstance();
 
 InitializeVulkanInstance()
 {
@@ -245,22 +242,9 @@ InitializeVulkanInstance()
 		),
 		"Error finding device for Vulkan"
 	);
-
-	vulkanInstance.devices.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.deviceFeatures.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.deviceProperties.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.queues.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.resourceTables.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.resourceManagers.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.renderPassCaches.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.frameBufferCaches.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.pipelineCaches.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.pipelineLayoutCaches.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.allocators.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.stagingBuffers.Alloc(vulkanInstance.physicalDeviceCount);
-	vulkanInstance.devicesInitialized.Alloc(vulkanInstance.physicalDeviceCount);
  
 	vulkanInstance.SelectDefaultDevice();
+	vulkanInstance.InitializeCurrentDevice();
 
 	ECS.instance.events.On(
 		MeshAddedEvent, 
@@ -274,7 +258,10 @@ InitializeVulkanInstance()
 			for (ec in scene.Iterate<VulkanRenderer>())
 			{
 				renderer := ec.component;
-				renderer.onMeshAdded(sceneEntity, mesh, renderer);
+				if (renderer.meshCallbacks.onMeshAdded)
+				{
+					renderer.meshCallbacks.onMeshAdded(sceneEntity, mesh, renderer);
+				}
 			}
 		}
 	);

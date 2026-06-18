@@ -219,11 +219,14 @@ EmptyTextures::CreateInternal(textureRef: *VulkanTexture, renderer: VulkanRender
 {
 	vulkanTexture := VulkanTexture();
 
-	device := renderer.device;
+	device := vulkanInstance.device;
+	transferQueue := vulkanInstance.queues.transferQueue;
+	graphicsQueue := vulkanInstance.queues.graphicsQueue;
+	allocator := vulkanInstance.allocator;
+	stagingBuffer := vulkanInstance.stagingBuffer;
+
 	commands := renderer.transferCommands;
-	transferQueue := renderer.queues.transferQueue;
 	commandPool := renderer.graphicsCommands.commandPool;
-	graphicsQueue := renderer.queues.graphicsQueue;
 
 	imageInfo := VkImageCreateInfo();
     imageInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -242,7 +245,7 @@ EmptyTextures::CreateInternal(textureRef: *VulkanTexture, renderer: VulkanRender
     imageInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
 
 	vulkanImage := CreateVkImage(device, imageInfo);
-	vulkanImageHandle := renderer.allocator.AllocImage(vulkanImage, VulkanMemoryFlags.GPU);
+	vulkanImageHandle := allocator.AllocImage(vulkanImage, VulkanMemoryFlags.GPU);
 
 	TransitionImageLayout(
 		device, commandPool, graphicsQueue, vulkanImage, 
@@ -250,7 +253,7 @@ EmptyTextures::CreateInternal(textureRef: *VulkanTexture, renderer: VulkanRender
 		format
 	);
 
-	renderer.stagingBuffer.StagedImageCopy(
+	stagingBuffer.StagedImageCopy(
 		device,
 		pixel,
 		size,
@@ -286,7 +289,7 @@ EmptyTextures::CreateInternal(textureRef: *VulkanTexture, renderer: VulkanRender
 	samplerInfo.addressModeV = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	samplerInfo.addressModeW = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	samplerInfo.anisotropyEnable = VkTrue;
-	samplerInfo.maxAnisotropy = vulkanInstance.deviceProperties[renderer.deviceIndex].limits.maxSamplerAnisotropy;
+	samplerInfo.maxAnisotropy = vulkanInstance.deviceProperties.limits.maxSamplerAnisotropy;
 	samplerInfo.borderColor = VkBorderColor.VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	samplerInfo.unnormalizedCoordinates = VkFalse;
 	samplerInfo.compareEnable = VkFalse;

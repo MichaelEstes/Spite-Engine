@@ -11,7 +11,7 @@ import URIManager
 import ImageManager
 import SceneComponents
 import Transform
-import Shaders
+import RenderAssetDef
 
 import RotateComponent
 
@@ -181,57 +181,37 @@ ArrayView<byte> GetAccessorData(gltfData: GLTFLoadData, gltf: GLTF, accessor: ui
 	return ArrayView<byte>(data, gltfAccessor.count);
 }
 
-AssignPositionToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive)
+ArrayView<byte> GetAccessorByteView(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32)
 {
-	view := GetAccessorData(gltfData, gltf, accessor);
-	vertices := ArrayView<Vec3>(view[0]@, view.count);
-	
-	primitive.geometry.vertices = vertices;
+	gltfAccessor := gltf.accessors[accessor];
+
+	data := GetBufferViewData(gltfData, gltf, gltfAccessor.bufferView)[0]@;
+	data = data + gltfAccessor.byteOffset;
+
+	return ArrayView<byte>(data, GetAccessorByteCount(gltfAccessor));
 }
 
-AssignNormalToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive)
+string GLTFAttributeToAssetAttribute(attrName: string)
 {
-	view := GetAccessorData(gltfData, gltf, accessor);
-	normals := ArrayView<Vec3>(view[0]@, view.count);
-	
-	primitive.geometry.normals = normals;
-}
+	if (attrName == "POSITION")        return "position";
+	else if (attrName == "NORMAL")     return "normal";
+	else if (attrName == "TANGENT")    return "tangents";
+	else if (attrName == "COLOR_0")    return "color";
+	else if (attrName == "TEXCOORD_0") return "uv0";
 
-AssignTangentToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive)
-{
-	view := GetAccessorData(gltfData, gltf, accessor);
-	tangents := ArrayView<Vec4>(view[0]@, view.count);
-	
-	primitive.geometry.tangents = tangents;
-}
-
-AssignUVToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive, attrName: string)
-{
-	view := GetAccessorData(gltfData, gltf, accessor);
-	uv := ArrayView<Vec2>(view[0]@, view.count);
-	
-	// TODO string to int
-	primitive.geometry.uvs[0] = uv;
+	return "";
 }
 
 AssignAttributeToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, attrName: string, accessor: uint32, primitive: Primitive)
 {
-	if (attrName == "POSITION")
-	{
-		AssignPositionToPrimitive(gltfData, gltf, accessor, primitive);
-	}
-	else if (attrName == "NORMAL")
-	{
-		AssignNormalToPrimitive(gltfData, gltf, accessor, primitive);
-	}
-	else if (attrName == "TANGENT")
-	{
-		AssignTangentToPrimitive(gltfData, gltf, accessor, primitive);
-	}
-	else if (attrName.StartsWith("TEXCOORD_"))
-	{
-		AssignUVToPrimitive(gltfData, gltf, accessor, primitive, attrName);
-	}
+	assetAttr := GLTFAttributeToAssetAttribute(attrName);
+	if (assetAttr == "") return;
+
+	index := primitive.geometry.GetAttributeIndex(assetAttr);
+	if (index == uint32(-1)) return;
+
+	view := GetAccessorByteView(gltfData, gltf, accessor);
+	primitive.geometry.GetAttributeValue(index)~ = view;
 }
 
 AssignIndiciesToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive)
@@ -299,60 +279,50 @@ AlphaMode GetAlphaMode(gltfMaterial: GLTFMaterial)
 AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uint32, primitive: Primitive)
 {
 	gltfMaterial := gltf.materials[materialIndex];
-	
-	material := Material();
-	material.vertShader = DefaultVertShader;
-	material.fragShader = DefaultFragShader;
 
 	if (gltfMaterial.pbrMetallicRoughness)
 	{
 		pbr := gltfMaterial.pbrMetallicRoughness;
+
+		primitive.material.SetVariable<Color>("baseColor", pbr.baseColorFactor, false);
+		primitive.material.SetVariable<float32>("metallicFactor", pbr.metallicFactor, false);
+		primitive.material.SetVariable<float32>("roughnessFactor", pbr.roughnessFactor, false);
+
 		if (pbr.baseColorTexture)
 		{
-			baseColorTextureMap := LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
-			material.color = baseColorTextureMap;
+			colorTextureMap := LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
+			primitive.material.SetTexture("colorTexture", colorTextureMap, false);
 		}
-
-		if (pbr.metallicRoughnessTexture)
-		{
-			metallicRoughnessTextureMap := LoadTexture(gltfData, gltf, pbr.metallicRoughnessTexture.index);
-			material.metallicRoughness = metallicRoughnessTextureMap;
-		}
-
-		material.baseColor = pbr.baseColorFactor;
-		material.metallicFactor = pbr.metallicFactor;
-		material.roughnessFactor = pbr.roughnessFactor;
 	}
 
 	if (gltfMaterial.normalTexture)
 	{
-		normalTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.normalTexture.info.index);
-		material.normal = normalTextureMap;
-		material.normalScale = gltfMaterial.normalTexture.scale;
+		primitive.material.SetVariable<float32>(
+			"normalScale", 
+			gltfMaterial.normalTexture.scale, 
+			false
+		);
 	}
 
 	if (gltfMaterial.occlusionTexture)
 	{
-		occlusionTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.occlusionTexture.info.index);
-		material.occlusion = occlusionTextureMap;
-		material.occlusionStrength = gltfMaterial.occlusionTexture.strength
+		primitive.material.SetVariable<float32>(
+			"occlusionStrength", 
+			gltfMaterial.occlusionTexture.strength, 
+			false
+		);
 	}
 
-	if (gltfMaterial.emissiveTexture)
-	{
-		emissiveTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.emissiveTexture.index);
-		material.emissive = emissiveTextureMap;
-	}
-
-	material.emissiveFactor = gltfMaterial.emissiveFactor;
-	material.alphaCutoff = gltfMaterial.alphaCutoff;
-	if (gltfMaterial.doubleSided)
-	{
-		material.cullMode = CullModeFlags.None;
-	}
-	material.alphaMode = GetAlphaMode(gltfMaterial);
-
-	primitive.material = material;
+	primitive.material.SetVariable<Vec3>(
+		"emissiveFactor", 
+		gltfMaterial.emissiveFactor, 
+		false
+	);
+	primitive.material.SetVariable<float32>(
+		"alphaCutoff", 
+		gltfMaterial.alphaCutoff, 
+		false
+	);
 }
 
 MeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, entity: Entity)
@@ -360,10 +330,15 @@ MeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, 
 	gltfMesh := gltf.meshes[meshIndex];
 	mesh := Mesh()
 
+	litHandle := AssetDefNameToHandle("Lit");
+
 	mesh.primitives.SizeTo(gltfMesh.primitives.count);
 	for (gltfPrim in gltfMesh.primitives)
 	{
 		primitive := Primitive();
+		primitive.geometry = Geometry(litHandle);
+		primitive.material = Material(litHandle);
+
 		for (attrKV in gltfPrim.attributes)
 		{
 			attrName := attrKV.key~;
@@ -377,7 +352,10 @@ MeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, 
 			AssignIndiciesToPrimitive(gltfData, gltf, gltfPrim.indices, primitive);
 		}
 
-		AssignMaterialToPrimitive(gltfData, gltf, gltfPrim.material, primitive);
+		if (gltfPrim.material != InvalidGLTFIndex)
+		{
+			AssignMaterialToPrimitive(gltfData, gltf, gltfPrim.material, primitive);
+		}
 
 		mesh.primitives.Add(primitive);
 	}

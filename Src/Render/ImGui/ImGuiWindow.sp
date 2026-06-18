@@ -95,13 +95,10 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 		events.On(SDL.EventType.MOUSE_BUTTON_UP, UpdateMouseButton);
 		
 		renderConfig := VulkanRendererConfig();
-		renderConfig.deviceIndex = vulkanInstance.defaultDevice;
 		renderConfig.userData.entity = entity;
 		renderConfig.maxMaterialSets = 8;
 		renderConfig.materialDescriptorCount = 8;
 		renderConfig.useSceneUBO = false;
-		renderConfig.useEmptyStructures = false;
-		renderConfig.onMeshAdded = ::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {};
 		CreateVulkanRenderer(
 			scene, entity,
 			Array<string>(["ImGuiPass",]),
