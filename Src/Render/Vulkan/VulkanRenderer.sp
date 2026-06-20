@@ -38,8 +38,10 @@ FrameCount := 2;
 
 state VulkanMeshCallbacks
 {
-	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer),
-
+	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer) = 
+			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {},
+	onMeshRemoved: ::(SceneEntity, *Mesh, *VulkanRenderer) = 
+			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {},
 }
 
 state VulkanRenderer

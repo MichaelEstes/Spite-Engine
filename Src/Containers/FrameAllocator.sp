@@ -1,5 +1,7 @@
 package FrameAllocator
 
+import Array
+
 state FrameAllocator
 {
 	mem: Allocator<*byte>,
@@ -41,6 +43,19 @@ FrameAllocator::(blockSize: uint32)
 	ptr := block + this.currIndex;
 	this.currIndex += size;
 	return ptr as *Type;
+}
+
+[]Type FrameAllocator::AllocArray<Type>(count: uint32)
+{
+	itemSize := #sizeof Type;
+	totalSize := itemSize * count;
+	ptr := this.Alloc(totalSize);
+
+	arr := []Type;
+	arr.count = count;
+	arr.capacity = count;
+	arr.memory.ptr = ptr;
+	return arr;
 }
 
 FrameAllocator::NextOrExpand()

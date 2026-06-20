@@ -351,8 +351,8 @@ state AssetDef
     fragment: FragmentStage,
 
     compiled: {
-        vertex: *byte,
-        fragment: *byte
+        vertex: string,
+        fragment: string
     }
 }
 

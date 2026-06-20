@@ -335,9 +335,7 @@ MeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, 
 	mesh.primitives.SizeTo(gltfMesh.primitives.count);
 	for (gltfPrim in gltfMesh.primitives)
 	{
-		primitive := Primitive();
-		primitive.geometry = Geometry(litHandle);
-		primitive.material = Material(litHandle);
+		primitive := Primitive(litHandle);
 
 		for (attrKV in gltfPrim.attributes)
 		{

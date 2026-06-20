@@ -6,6 +6,9 @@ UINT64_MAX := uint64(-1);
 VkFalse := uint32(0);
 VkTrue := uint32(1);
 
+// VK_MAKE_API_VERSION(0, 1, 3, 0) => (1 << 22) | (3 << 12)
+VK_API_VERSION_1_3 := uint32(4206592);
+
 appInfo := {
 	VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO,
 	null,
@@ -13,7 +16,7 @@ appInfo := {
 	uint32(0),
 	"Spite Engine"[0],
 	uint32(0),
-	uint32(0),
+	VK_API_VERSION_1_3,
 } as VkApplicationInfo;
 
 validationLayers := ["VK_LAYER_KHRONOS_validation"[0],];
@@ -22,7 +25,7 @@ validationCount := #compile uint32 => (#typeof validationLayers).FixedArrayCount
 requiredDeviceExtensions := ["VK_KHR_swapchain"[0],];
 requiredDeviceExtensionCount := #compile uint32 => (#typeof requiredDeviceExtensions).FixedArrayCount();
 
-vulkanInstance := VulkanInstance();
+vulkanInstance: VulkanInstance = VulkanInstance();
 
 state VulkanInstance
 {
@@ -45,6 +48,7 @@ state VulkanInstance
 
 	allocator: VulkanAllocator,
 	stagingBuffer: VulkanStagingBuffer,
+	transferCommands: VulkanCommands,
 
 	physicalDeviceCount: uint32,
 	currentDevice: uint32,
@@ -98,6 +102,22 @@ VulkanInstance::InitializeCurrentDevice()
 	vkGetPhysicalDeviceFeatures(physicalDevice, this.deviceFeatures@);
 	vkGetPhysicalDeviceProperties(physicalDevice, this.deviceProperties@);
 
+	assert this.deviceProperties.apiVersion >= VK_API_VERSION_1_3, "Selected physical device does not support Vulkan 1.3";
+
+	indexingFeatures := VkPhysicalDeviceVulkan12Features();
+	indexingFeatures.sType = VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+	indexingFeatures.descriptorIndexing = VkTrue;
+	indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VkTrue;
+	indexingFeatures.runtimeDescriptorArray = VkTrue;
+	indexingFeatures.descriptorBindingPartiallyBound = VkTrue;
+	indexingFeatures.descriptorBindingVariableDescriptorCount = VkTrue;
+	indexingFeatures.descriptorBindingSampledImageUpdateAfterBind = VkTrue;
+
+	deviceFeatures2 := VkPhysicalDeviceFeatures2();
+	deviceFeatures2.sType = VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	deviceFeatures2.pNext = indexingFeatures@ as *void;
+	deviceFeatures2.features = this.deviceFeatures;
+
 	this.queues = VulkanQueues();
 	this.queues.Create(physicalDevice);
 
@@ -106,11 +126,12 @@ VulkanInstance::InitializeCurrentDevice()
 
 	createInfo := VkDeviceCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	createInfo.pNext = deviceFeatures2@ as *void;
 	createInfo.queueCreateInfoCount = queueCreateInfos.count;
 	createInfo.pQueueCreateInfos = queueCreateInfos[0]@;
 	createInfo.enabledExtensionCount = requiredDeviceExtensionCount;
 	createInfo.ppEnabledExtensionNames = requiredDeviceExtensions[0]@;
-	createInfo.pEnabledFeatures = this.deviceFeatures@;
+	createInfo.pEnabledFeatures = null;
 
 	CheckResult(
 		vkCreateDevice(physicalDevice, createInfo@, null, this.device@),
@@ -118,7 +139,9 @@ VulkanInstance::InitializeCurrentDevice()
 	);
 
 	this.queues.GetQueues(this.device, physicalDevice, this.instance);
-	
+
+	this.transferCommands.Create(this.device, this.queues.transferQueueIndex, 1);
+
 	this.allocator = VulkanAllocator();
 	this.allocator.Create(this.device, physicalDevice);
 }
@@ -258,11 +281,57 @@ InitializeVulkanInstance()
 			for (ec in scene.Iterate<VulkanRenderer>())
 			{
 				renderer := ec.component;
-				if (renderer.meshCallbacks.onMeshAdded)
-				{
-					renderer.meshCallbacks.onMeshAdded(sceneEntity, mesh, renderer);
-				}
+				renderer.meshCallbacks.onMeshAdded(sceneEntity, mesh, renderer);
 			}
+		}
+	);
+
+	ECS.instance.events.On(
+		MeshRemovedEvent, 
+		::(sceneEntity: SceneEntity, data: *void)
+		{
+			log "Mesh Removed Vulkan Instance";
+			scene := sceneEntity.scene;
+			entity := sceneEntity.entity;
+			mesh := scene.GetComponent<Mesh>(entity);
+
+			for (ec in scene.Iterate<VulkanRenderer>())
+			{
+				renderer := ec.component;
+				renderer.meshCallbacks.onMeshRemoved(sceneEntity, mesh, renderer);
+			}
+		}
+	);
+
+	ECS.instance.events.On(
+		GeometryVariableUpdateEvent,
+		::(update: GeometryVariableUpdate, data: *void)
+		{
+			log "Geometry variable update Vulkan Instance";
+		}
+	);
+
+	ECS.instance.events.On(
+		GeometryAttributeUpdateEvent,
+		::(update: GeometryAttributeUpdate, data: *void)
+		{
+			log "Geometry attribute update Vulkan Instance";
+		}
+	);
+
+	ECS.instance.events.On(
+		MaterialVariableUpdateEvent,
+		::(update: MaterialVariableUpdate, data: *void)
+		{
+			log "Material variable update Vulkan Instance";
+		}
+	);
+
+	ECS.instance.events.On(
+		MaterialTextureUpdateEvent,
+		::(update: MaterialTextureUpdate, data: *void)
+		{
+			log "Material texture update Vulkan Instance";
 		}
 	);
 

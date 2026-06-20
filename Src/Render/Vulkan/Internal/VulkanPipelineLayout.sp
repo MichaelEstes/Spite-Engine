@@ -3,17 +3,16 @@ package VulkanRenderer
 import Array
 import SparseSet
 import Resource
+import RenderAssetDef
 
 state PipelineLayoutKey
 {
-	vertShaderHandle: ResourceHandle,
-	fragShaderHandle: ResourceHandle
+	assetDefHandle: AssetDefHandle
 }
 
-PipelineLayoutKey::(vertShaderHandle: ResourceHandle, fragShaderHandle: ResourceHandle)
+PipelineLayoutKey::(assetDefHandle: AssetDefHandle)
 {
-	this.vertShaderHandle = vertShaderHandle;
-	this.fragShaderHandle = fragShaderHandle;
+	this.assetDefHandle = assetDefHandle;
 }
 
 uint HashPipelineLayoutKey(key: PipelineLayoutKey)
@@ -100,8 +99,9 @@ MergePushConstants(module: SpvReflectShaderModule, pushConstantRanges: Array<VkP
 *VkPipelineLayout_T CreatePipelineLayoutFromKey(device: *VkDevice_T, key: PipelineLayoutKey,
 												cache: VulkanPipelineLayoutCache)
 {
-	vertShaderRes := ShaderResourceManager.GetResource(key.vertShaderHandle).data;
-	fragShaderRes := ShaderResourceManager.GetResource(key.fragShaderHandle).data;
+	shaderRes := ShaderResourceManager.GetResource(UseAssetDefShader(key.assetDefHandle)).data;
+	vertShaderRes := shaderRes.vertex;
+	fragShaderRes := shaderRes.fragment;
 
 	mergedSets := SparseSet<SparseSet<VkDescriptorSetLayoutBinding>>();
 	defer 
