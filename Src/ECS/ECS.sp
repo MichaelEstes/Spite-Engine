@@ -34,7 +34,12 @@ state TagComponent
 	kind: ComponentKind
 }
 
-state SceneSystem { scene: *Scene, system: *System }
+state SceneSystem { scene: *Scene, system: System }
+SceneSystem::(scene: *Scene, system: System)
+{
+	this.scene = scene;
+	this.system = system;
+}
 
 Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
 								  onRemove: ::(Entity, *Type, Scene) = null, 
@@ -95,7 +100,6 @@ state ECS
 	tagComponentEnterCallbacks := SparseSet<::(Entity, Scene)>(),
 
 	recycledScenes := Stack<uint16>(),
-	systemBuffer := RingBuffer<SceneSystem>(),
 	events := Event.Emitter(),
 	frameCount: uint,
 	lastFrameTime: float,
@@ -143,9 +147,9 @@ SystemID ECS::RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemSte
 {	
 	assert run != null, "Cannot register null systems";
 
-	system := {run} as System;
+	system := System();
+	system.run = run;
 	data := this.AddSystem(system, step);
-	this.ExpandSystemBuffer(this.systems.GetSystemCountForStep(step));
 	return data;
 }
 
@@ -163,7 +167,6 @@ FrameSystemID ECS::RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
 		default log "ECS::RegisterFrameSystem Invalid step for frame system";
 	}
 	
-	this.ExpandSystemBuffer(id);
 	return { id, step };
 }
 
@@ -187,12 +190,6 @@ SystemID ECS::AddSystem(system: System, step: SystemStep)
 	return { id, step };
 }
 
-ECS::ExpandSystemBuffer(count: uint32)
-{
-	// Make sure systemBuffer is always large enough to hold the largest array of systems
-	this.systemBuffer.Expand(count);
-}
-
 *Scene ECS::CreateScene()
 {
 	sceneID := this.sceneCount;
@@ -206,18 +203,18 @@ ECS::ExpandSystemBuffer(count: uint32)
 	return scene;
 }
 
-*Scene ECS::GetScene(id: uint16) => this.scenes.Get(id);
+*Scene ECS::GetScene(sceneID: uint16) => this.scenes.Get(sceneID);
 
-ECS::RemoveScene(id: uint16)
+ECS::RemoveScene(sceneID: uint16)
 {
-	scene := this.GetScene(id);
+	scene := this.GetScene(sceneID);
 	this.events.Emit<*Scene>(SceneRemovedEvent, scene);
 	delete scene~;
-	this.scenes.Remove(id);
-	this.recycledScenes.Push(id);
+	this.scenes.Remove(sceneID);
+	this.recycledScenes.Push(sceneID);
 }
 
-Entity ECS::CreateEntity(sceneID: uint) => this.GetScene(sceneID).CreateEntity();
+Entity ECS::CreateEntity(sceneID: uint16) => this.GetScene(sceneID).CreateEntity();
 
 Component ECS::GetComponent<Type>()
 {
@@ -277,7 +274,8 @@ ECS::RunSystems(systems: Array<System>)
 	{
 		for (system in systems) 
 		{
-			sceneSystem := instance.systemBuffer.Insert({scene@, system@} as SceneSystem);
+			sceneSystem := instance.frameAllocator.AllocType<SceneSystem>();
+			sceneSystem~ = SceneSystem(scene@, system);
 			Fiber.AddJob(::(data: *SceneSystem) {
 				scene := data.scene;
 				system := data.system;

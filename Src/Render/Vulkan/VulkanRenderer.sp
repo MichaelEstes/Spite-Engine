@@ -12,6 +12,7 @@ import WindowComponent
 
 import ECS
 import RenderComponents
+import RenderAssetDef
 import UniformBufferObject
 
 CheckResult(result: VkResult, errorMsg: string)
@@ -36,12 +37,26 @@ DestroyAll()
 
 FrameCount := 2;
 
+state VulkanDrawMesh
+{
+	entity: Entity,
+	geometry: uint32, 
+	material: uint32
+}
+
+state VulkanDrawList
+{
+	pipelineMap := Map<VulkanPipelineMeshState, Array<VulkanDrawMesh>, HashPipelineMeshState>()
+}
+
 state VulkanMeshCallbacks
 {
 	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer) = 
 			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {},
 	onMeshRemoved: ::(SceneEntity, *Mesh, *VulkanRenderer) = 
 			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {},
+	
+	drawListUpdate: ::(*Scene, *VulkanRenderer) = null
 }
 
 state VulkanRenderer
@@ -63,6 +78,8 @@ state VulkanRenderer
 	passes: Array<VulkanRenderPass>,
 
 	renderGraph: RenderGraph<VulkanRenderer>,
+
+	drawList: VulkanDrawList,
 
 	meshCallbacks: VulkanMeshCallbacks,
 
@@ -521,8 +538,66 @@ VulkanRenderer::Draw(scene: *Scene)
 	this.currentFrame += 1;
 }
 
+VulkanRenderer::UpdateDrawList(scene: *Scene)
+{
+	if (this.meshCallbacks.drawListUpdate)
+	{
+		this.meshCallbacks.drawListUpdate(scene, this@);
+		return;
+	}
+
+	for (kv in this.drawList.pipelineMap)
+	{
+		kv.value~.Clear();
+	}
+
+	for (ec in scene.Iterate<Mesh>())
+	{
+		entity := ec.entity;
+		mesh := ec.component;
+
+		for (primitive in mesh.primitives)
+		{
+			if (!primitive.geometry.gpuResourceID || !primitive.material.gpuResourceID) continue;
+
+			assetDef := GetAssetDefWithHandle(primitive.defHandle);
+
+			meshState := VulkanPipelineMeshState();
+			meshState.assetDefHandle = primitive.defHandle;
+			// TODO: topology source
+			meshState.SetTopology(VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+			meshState.alphaMode = assetDef.fragment.alphaMode as uint16;
+
+			drawMesh := VulkanDrawMesh();
+			drawMesh.entity = entity;
+			drawMesh.geometry = primitive.geometry.gpuResourceID;
+			drawMesh.material = primitive.material.gpuResourceID;
+
+			meshArr := this.drawList.pipelineMap.Find(meshState);
+			if (!meshArr)
+			{
+				this.drawList.pipelineMap.Insert(meshState, Array<VulkanDrawMesh>());
+				meshArr = this.drawList.pipelineMap.Find(meshState);
+			}
+			meshArr.Add(drawMesh);
+		}
+	}
+}
+
 VulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(
 	ComponentKind.Sparse
+);
+
+vulkanPreDrawSystem := ECS.RegisterSystem(
+	::(scene: Scene, dt: float) 
+	{
+		for (ec in scene.Iterate<VulkanRenderer>())
+		{
+			renderer := ec.component;
+			renderer.UpdateDrawList(scene@);
+		}
+	},
+	SystemStep.PreDraw
 );
 
 vulkanDrawSystem := ECS.RegisterSystem(

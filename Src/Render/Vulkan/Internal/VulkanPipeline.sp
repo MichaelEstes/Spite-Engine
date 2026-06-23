@@ -157,14 +157,14 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 		attr := attributes[i];
 
 		binding := VkVertexInputBindingDescription();
-		binding.binding = uint32(i);
+		binding.binding = i;
 		binding.stride = attr.def.ValueSize();
 		binding.inputRate = perVertex;
 		vertexInputBindings[i] = binding;
 
 		attribute := VkVertexInputAttributeDescription();
-		attribute.location = uint32(i);
-		attribute.binding = uint32(i);
+		attribute.location = i;
+		attribute.binding = i;
 		attribute.format = VariableTypeToVkFormat(attr.def.kind);
 		attribute.offset = 0;
 		vertexInputAttributes[i] = attribute;
@@ -193,6 +193,7 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_SCISSOR)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_CULL_MODE)
+				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE)
 				.SetPipelineLayout(layout);
 	
 	return builder.Create(device, key.renderPass, 0);

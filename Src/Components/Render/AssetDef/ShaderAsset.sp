@@ -120,7 +120,7 @@ layoutVarStart := "\nlayout(location = ";
 varIn := ") in "
 varOut := ") out "
 
-string WriteVariableSets(shader: string, varSets: VariableSets, writeDefines: bool = true)
+string WriteVariableSets(shader: string, varSets: VariableSets, setOffset: uint32, writeDefines: bool = true)
 {
     if (!varSets.sets.count) return shader;
 
@@ -128,7 +128,7 @@ string WriteVariableSets(shader: string, varSets: VariableSets, writeDefines: bo
     {
         set := varSets.sets[setIndex];
         
-        setIndexStr := UIntToString(setIndex);
+        setIndexStr := UIntToString(setIndex + setOffset);
         defer delete setIndexStr;
 
         setStr := layoutSetStart.Copy();
@@ -376,7 +376,7 @@ string WriteVertexShader(assetDef: AssetDef)
     vertexShader := vertexShaderStart.Copy();
 
     vertexShader = WriteVertexAttributes(vertexShader, vertexStage.attributes);
-    vertexShader = WriteVariableSets(vertexShader, vertexStage.variables);
+    vertexShader = WriteVariableSets(vertexShader, vertexStage.variables, 1);
     vertexShader = WriteOutVariables(vertexShader, vertexStage.out);
 
     outPrefix := "out";
@@ -409,7 +409,7 @@ string WriteVertexShader(assetDef: AssetDef)
 bool CompileVertexShader(assetDef: AssetDef, compiler: ShaderCompiler)
 {
     vertexShaderSource := WriteVertexShader(assetDef);
-    //log "VERTEX SHADER", vertexShaderSource;
+    // log "VERTEX SHADER", vertexShaderSource;
     spirv := CompileShader(vertexShaderSource, compiler, assetDef.name);
     assetDef.vertex.compiled = spirv;
     return spirv.count > 0;
@@ -426,11 +426,11 @@ string WriteFragmentShader(assetDef: AssetDef)
     fragmentStage := assetDef.fragment;
     fragmentShader := fragmentShaderStart.Copy();
 
-    fragmentShader = WriteVariableSets(fragmentShader, fragmentStage.variables);
+    fragmentShader = WriteVariableSets(fragmentShader, fragmentStage.variables, assetDef.vertex.variables.sets.count + 1);
     fragmentShader = WriteTextures(
         fragmentShader, 
         fragmentStage.textures, 
-        fragmentStage.variables.sets.count
+        fragmentStage.variables.sets.count + assetDef.vertex.variables.sets.count + 1
     );
 
     inVars := Array<Variable>();

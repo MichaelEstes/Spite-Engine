@@ -99,6 +99,7 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 		renderConfig.maxMaterialSets = 8;
 		renderConfig.materialDescriptorCount = 8;
 		renderConfig.useSceneUBO = false;
+		renderConfig.meshCallbacks.drawListUpdate = ::(scene: *Scene, renderer: *VulkanRenderer) {};
 		CreateVulkanRenderer(
 			scene, entity,
 			Array<string>(["ImGuiPass",]),

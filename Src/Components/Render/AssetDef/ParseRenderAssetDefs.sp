@@ -78,8 +78,8 @@ Value ParseVariableDefault(kind: VariableType, jsonValue: *JSONValue)
     {
         case (VariableType.Bool)   val.val.b = jsonValue.Boolean().value;
         case (VariableType.Float)  val.val.f = jsonValue.Number().value.f;
-        case (VariableType.Int)    val.val.i = int32(jsonValue.Number().value.i);
-        case (VariableType.Uint)   val.val.u = uint32(jsonValue.Number().value.i);
+        case (VariableType.Int)    val.val.i = jsonValue.Number().value.i as int32;
+        case (VariableType.Uint)   val.val.u = jsonValue.Number().value.i as uint32;
         case (VariableType.BVec2)
         {
             arr := jsonValue.Array();
@@ -125,44 +125,44 @@ Value ParseVariableDefault(kind: VariableType, jsonValue: *JSONValue)
         case (VariableType.IVec2)
         {
             arr := jsonValue.Array();
-            val.val.iVec2[0] = int32(arr.GetValue(0).Number().value.i);
-            val.val.iVec2[1] = int32(arr.GetValue(1).Number().value.i);
+            val.val.iVec2[0] = arr.GetValue(0).Number().value.i as int32;
+            val.val.iVec2[1] = arr.GetValue(1).Number().value.i as int32;
         }
         case (VariableType.IVec3)
         {
             arr := jsonValue.Array();
-            val.val.iVec3[0] = int32(arr.GetValue(0).Number().value.i);
-            val.val.iVec3[1] = int32(arr.GetValue(1).Number().value.i);
-            val.val.iVec3[2] = int32(arr.GetValue(2).Number().value.i);
+            val.val.iVec3[0] = arr.GetValue(0).Number().value.i as int32;
+            val.val.iVec3[1] = arr.GetValue(1).Number().value.i as int32;
+            val.val.iVec3[2] = arr.GetValue(2).Number().value.i as int32;
         }
         case (VariableType.IVec4)
         {
             arr := jsonValue.Array();
-            val.val.iVec4[0] = int32(arr.GetValue(0).Number().value.i);
-            val.val.iVec4[1] = int32(arr.GetValue(1).Number().value.i);
-            val.val.iVec4[2] = int32(arr.GetValue(2).Number().value.i);
-            val.val.iVec4[3] = int32(arr.GetValue(3).Number().value.i);
+            val.val.iVec4[0] = arr.GetValue(0).Number().value.i as int32;
+            val.val.iVec4[1] = arr.GetValue(1).Number().value.i as int32;
+            val.val.iVec4[2] = arr.GetValue(2).Number().value.i as int32;
+            val.val.iVec4[3] = arr.GetValue(3).Number().value.i as int32;
         }
         case (VariableType.UVec2)
         {
             arr := jsonValue.Array();
-            val.val.uVec2[0] = uint32(arr.GetValue(0).Number().value.i);
-            val.val.uVec2[1] = uint32(arr.GetValue(1).Number().value.i);
+            val.val.uVec2[0] = arr.GetValue(0).Number().value.i as uint32;
+            val.val.uVec2[1] = arr.GetValue(1).Number().value.i as uint32;
         }
         case (VariableType.UVec3)
         {
             arr := jsonValue.Array();
-            val.val.uVec3[0] = uint32(arr.GetValue(0).Number().value.i);
-            val.val.uVec3[1] = uint32(arr.GetValue(1).Number().value.i);
-            val.val.uVec3[2] = uint32(arr.GetValue(2).Number().value.i);
+            val.val.uVec3[0] = arr.GetValue(0).Number().value.i as uint32;
+            val.val.uVec3[1] = arr.GetValue(1).Number().value.i as uint32;
+            val.val.uVec3[2] = arr.GetValue(2).Number().value.i as uint32;
         }
         case (VariableType.UVec4)
         {
             arr := jsonValue.Array();
-            val.val.uVec4[0] = uint32(arr.GetValue(0).Number().value.i);
-            val.val.uVec4[1] = uint32(arr.GetValue(1).Number().value.i);
-            val.val.uVec4[2] = uint32(arr.GetValue(2).Number().value.i);
-            val.val.uVec4[3] = uint32(arr.GetValue(3).Number().value.i);
+            val.val.uVec4[0] = arr.GetValue(0).Number().value.i as uint32;
+            val.val.uVec4[1] = arr.GetValue(1).Number().value.i as uint32;
+            val.val.uVec4[2] = arr.GetValue(2).Number().value.i as uint32;
+            val.val.uVec4[3] = arr.GetValue(3).Number().value.i as uint32;
         }
         case (VariableType.Mat3)
         {

@@ -49,6 +49,7 @@ state VulkanInstance
 	allocator: VulkanAllocator,
 	stagingBuffer: VulkanStagingBuffer,
 	transferCommands: VulkanCommands,
+	graphicsCommands: VulkanCommands,
 
 	physicalDeviceCount: uint32,
 	currentDevice: uint32,
@@ -90,12 +91,6 @@ VulkanInstance::InitializeCurrentDevice()
 			return CreateVkBuffer(device, BufferDescToCreateInfo(createDesc));
 		}
 	)
-	this.resourceManager = VulkanResourceManager();
-	this.renderPassCache = VulkanRenderPassCache();
-	this.frameBufferCache = VulkanFrameBufferCache();
-	this.pipelineCache = VulkanPipelineMap();
-	this.pipelineLayoutCache = VulkanPipelineLayoutCache();
-	this.stagingBuffer = VulkanStagingBuffer();
 
 	physicalDevice := this.GetPhysicalDevice();
 
@@ -141,9 +136,17 @@ VulkanInstance::InitializeCurrentDevice()
 	this.queues.GetQueues(this.device, physicalDevice, this.instance);
 
 	this.transferCommands.Create(this.device, this.queues.transferQueueIndex, 1);
+	this.graphicsCommands.Create(this.device, this.queues.graphicsQueueIndex, 1);
 
 	this.allocator = VulkanAllocator();
 	this.allocator.Create(this.device, physicalDevice);
+
+	this.resourceManager = VulkanResourceManager();
+	this.renderPassCache = VulkanRenderPassCache();
+	this.frameBufferCache = VulkanFrameBufferCache();
+	this.pipelineCache = VulkanPipelineMap();
+	this.pipelineLayoutCache = VulkanPipelineLayoutCache();
+	this.stagingBuffer = VulkanStagingBuffer();
 }
 
 ref VulkanStagingBuffer VulkanInstance::GetStagingBuffer()
@@ -277,6 +280,13 @@ InitializeVulkanInstance()
 			scene := sceneEntity.scene;
 			entity := sceneEntity.entity;
 			mesh := scene.GetComponent<Mesh>(entity);
+
+			resourceManager := vulkanInstance.resourceManager;
+			for (primitive in mesh.primitives)
+			{
+				resourceManager.UploadGeometry(primitive.geometry@);
+				resourceManager.UploadMaterial(primitive.material@);
+			}
 
 			for (ec in scene.Iterate<VulkanRenderer>())
 			{

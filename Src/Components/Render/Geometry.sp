@@ -57,7 +57,10 @@ Geometry::(defHandle: AssetDefHandle)
 {
     this.defHandle = defHandle;
     this.variables = AllocateVertexVariableSet(defHandle);
-    this.attributes.SizeTo(GetAssetDefVertexAttributeCount(defHandle));
+
+    attrCount := GetAssetDefVertexAttributeCount(defHandle);
+    this.attributes.SizeTo(attrCount);
+    for (i .. attrCount) this.attributes.Add(ArrayView<byte>());
 }
 
 Geometry::delete

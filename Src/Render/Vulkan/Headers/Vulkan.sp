@@ -679,6 +679,7 @@ extern
 
 VK_SUBPASS_EXTERNAL := uint32(^0);
 VK_QUEUE_FAMILY_IGNORED := uint32(^0);
+VK_WHOLE_SIZE := uint64(^0);
 
 enum VkResult: uint32
 {

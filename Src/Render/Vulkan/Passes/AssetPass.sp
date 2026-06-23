@@ -11,6 +11,7 @@ import Math
 import Transform
 import Matrix
 import RenderComponents
+import RenderAssetDef
 
 
 VulkanPipelineKey CreateColorPassPipelineKey(meshState: VulkanPipelineMeshState, renderPass: *VkRenderPass_T)
@@ -67,124 +68,111 @@ assetPass := RegisterRenderPass(
 								
 				commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 
-				// pipelineMeshMap := meshGroupsByScene.Get(scene.id);
-				// for (kv in pipelineMeshMap)
-				// {
-				// 	pipelineMeshState := kv.key~;
-				// 	meshArr := kv.value~;
+				resourceManager := vulkanInstance.resourceManager;
+				bindPoint := VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-				// 	pipelineKey := CreateColorPassPipelineKey(pipelineMeshState, renderPass);
-				// 	vulkanPipeline := FindOrCreatePipeline(
-				// 		device,
-				// 		pipelineKey, 
-				// 		renderer.pipelineCache~
-				// 		renderer.pipelineLayoutCache~
-				// 	);
-				// 	pipeline := vulkanPipeline.pipeline;
-				// 	pipelineLayout := vulkanPipeline.layout;
+				for (kv in renderer.drawList.pipelineMap)
+				{
+					meshState := kv.key~;
+					meshArr := kv.value~;
+					if (!meshArr.count) continue;
 
-				// 	vkCmdBindPipeline(
-				// 		commandBuffer,
-				// 		VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS,
-				// 		pipeline
-				// 	);
-				// 	renderer.SetViewportAndScissor(commandBuffer);
+					vulkanPipeline := FindOrCreatePipeline(
+						device,
+						CreateColorPassPipelineKey(meshState, renderPass),
+						vulkanInstance.pipelineCache,
+						vulkanInstance.pipelineLayoutCache
+					);
+					pipelineLayout := vulkanPipeline.layout;
 
-				// 	vkCmdBindDescriptorSets(
-				// 		commandBuffer, 
-				// 		VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, 
-				// 		pipelineLayout, 
-				// 		uint32(0), 
-				// 		uint32(1), 
-				// 		sceneDescSet@, 
-				// 		uint32(0), 
-				// 		null
-				// 	);
+					vkCmdBindPipeline(commandBuffer, bindPoint, vulkanPipeline.pipeline);
+					renderer.SetViewportAndScissor(commandBuffer);
 
-				// 	for (mesh in meshArr)
-				// 	{
-				// 		entity := mesh.entity;
-				// 		geo := mesh.geometry;
-				// 		mat := mesh.material;
+					// Scene UBO at set 0.
+					vkCmdBindDescriptorSets(
+						commandBuffer, bindPoint, pipelineLayout,
+						uint32(0), uint32(1), sceneDescSet@, uint32(0), null
+					);
 
-				// 		geoAttrFlags := geo.GetAttributesFlags();
-				// 		vertexAlloc := allocator.GetAllocation(geo.vertexHandle);
-				// 		indexAlloc := allocator.GetAllocation(geo.indexHandle);
+					// Bindless sampler/texture arrays at set 1 + V + F.
+					assetDef := GetAssetDefWithHandle(meshState.assetDefHandle);
+					bindlessSet := uint32(1) + assetDef.vertex.variables.sets.count +
+								   assetDef.fragment.variables.sets.count;
+					vkCmdBindDescriptorSets(
+						commandBuffer, bindPoint, pipelineLayout,
+						bindlessSet, uint32(1), resourceManager.textures.set@, uint32(0), null
+					);
 
-				// 		worldTransform := scene.GetComponentDirect<WorldTransform>(entity, WorldTransformComponent);
-				// 		if (!worldTransform) continue;
+					// Set indices for the geometry/material descriptor sets (cached).
+					geomDescriptors := resourceManager.GetGeometryDescriptors(meshState.assetDefHandle);
+					matDescriptors := resourceManager.GetMaterialDescriptors(meshState.assetDefHandle);
 
-				// 		vkCmdBindDescriptorSets(
-				// 			commandBuffer,
-				// 			VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS,
-				// 			pipelineLayout,
-				// 			uint32(1),
-				// 			uint32(2),
-				// 			fixed [mat.uboDescSet, mat.textureDescSet],
-				// 			uint32(0),
-				// 			null
-				// 		);
+					for (drawMesh in meshArr)
+					{
+						worldTransform := scene.GetComponentDirect<WorldTransform>(drawMesh.entity, WorldTransformComponent);
+						if (!worldTransform) continue;
 
-				// 		vertexBuf := vertexAlloc.data.buffer;
+						geometry := resourceManager.geometries.Get(drawMesh.geometry);
+						material := resourceManager.materials.Get(drawMesh.material);
 
-				// 		normalBuf := geo.GetNormalBuffer(renderer);
-				// 		tangentsBuf := geo.GetTagentBuffer(renderer);
-				// 		colorBuf := geo.GetColorBuffer(renderer);
-				// 		uv0Buf := geo.GetUVBuffer(0, renderer);
-				// 		uv1Buf := geo.GetUVBuffer(1, renderer);
-				// 		uv2Buf := geo.GetUVBuffer(2, renderer);
-				// 		uv3Buf := geo.GetUVBuffer(3, renderer);
+						// Geometry vertex variable sets (1..V).
+						for (i .. geometry.descriptorSets.count)
+						{
+							vkCmdBindDescriptorSets(
+								commandBuffer, bindPoint, pipelineLayout,
+								geomDescriptors.setLayouts[i].set, uint32(1),
+								geometry.descriptorSets[i]@, uint32(0), null
+							);
+						}
 
-				// 		vertexBuffers := [
-				// 			vertexBuf,
-				// 			normalBuf,
-				// 			tangentsBuf,
-				// 			colorBuf,
-				// 			uv0Buf,
-				// 			uv1Buf,
-				// 			uv2Buf,
-				// 			uv3Buf
-				// 		];
-				// 		offsets:= uint64:[0, 0, 0, 0, 0, 0, 0, 0];
+						// Material fragment variable + texture-index sets.
+						for (i .. material.descriptorSets.count)
+						{
+							vkCmdBindDescriptorSets(
+								commandBuffer, bindPoint, pipelineLayout,
+								matDescriptors.setLayouts[i].set, uint32(1),
+								material.descriptorSets[i]@, uint32(0), null
+							);
+						}
 
-				// 		vkCmdBindVertexBuffers(
-				// 			commandBuffer, 
-				// 			uint32(0), 
-				// 			uint32(8), 
-				// 			fixed vertexBuffers, 
-				// 			fixed offsets
-				// 		);
+						// One vertex buffer per geometry attribute, bound at bindings 0..N-1.
+						// Defaulted attributes carry stride 0 so their single element feeds
+						// every vertex (VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE).
+						attrCount := geometry.attributes.count;
+						vertexBuffers := ECS.instance.frameAllocator.AllocArray<*VkBuffer_T>(attrCount);
+						offsets := ECS.instance.frameAllocator.AllocArray<uint64>(attrCount);
+						strides := ECS.instance.frameAllocator.AllocArray<uint64>(attrCount);
+						for (i .. attrCount)
+						{
+							vertexBuffers[i] = allocator.GetAllocation(geometry.attributes[i]).data.buffer;
+							offsets[i] = 0;
+							strides[i] = geometry.strides[i] as uint64;
+						}
+						vkCmdBindVertexBuffers2(
+							commandBuffer, uint32(0), attrCount,
+							vertexBuffers[0]@, offsets[0]@, null, strides[0]@
+						);
 
-				// 		modelUBO := ModelUBO();
-				// 		modelUBO.model = worldTransform.mat;
+						// Model matrix push constant.
+						modelUBO := ModelUBO();
+						modelUBO.model = worldTransform.mat;
+						vkCmdPushConstants(
+							commandBuffer, pipelineLayout,
+							uint32(VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT),
+							0, #sizeof ModelUBO, modelUBO@
+						);
 
-				// 		vkCmdPushConstants(
-				// 			commandBuffer,
-				// 			pipelineLayout,
-				// 			VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT,
-				// 			0,
-				// 			#sizeof ModelUBO,
-				// 			modelUBO@
-				// 		);
-						
-				// 		if (indexAlloc)
-				// 		{
-				// 			indexBuf := indexAlloc.data.buffer;
-				// 			vkCmdBindIndexBuffer(
-				// 				commandBuffer,
-				// 				indexBuf,
-				// 				0,
-				// 				geo.indexKind
-				// 			);
+						vkCmdSetCullMode(commandBuffer, material.cullMode);
 
-				// 			vkCmdDrawIndexed(commandBuffer, geo.indexCount, uint32(1), uint32(0), uint32(0), uint32(0));
-				// 		}
-				// 		else
-				// 		{
-						
-				// 		}
-				// 	}
-				// }				
+						if (geometry.indexCount)
+						{
+							indexBuffer := allocator.GetAllocation(geometry.indexHandle).data.buffer;
+							vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, geometry.indexKind);
+							vkCmdDrawIndexed(commandBuffer, geometry.indexCount, uint32(1), uint32(0), uint32(0), uint32(0));
+						}
+					}
+				}
+
 			},
 			RenderPassStage.Graphics,
 			scene

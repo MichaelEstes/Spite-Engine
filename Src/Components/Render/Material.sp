@@ -45,7 +45,10 @@ Material::(defHandle: AssetDefHandle)
 {
     this.defHandle = defHandle;
 	this.variables = AllocateFragmentVariableSet(defHandle);
-    this.textures.SizeTo(GetAssetDefFragmentTextureCount(defHandle));
+
+    texCount := GetAssetDefFragmentTextureCount(defHandle);
+    this.textures.SizeTo(texCount);
+    for (i .. texCount) this.textures.Add(TextureMap());
 }
 
 Material::delete
@@ -104,8 +107,8 @@ uint32 Material::GetTextureIndex(name: string)
 bool Material::SetTexture(name: string, texture: TextureMap, update: bool = true)
 {
     index := this.GetTextureIndex(name);
-	if (index != uint32(-1)) return false;
-			
+	if (index == uint32(-1)) return false;
+
 	this.GetTextureValue(index)~ = texture;
 	if (update) this.UpdatedTexture(index);
 	return true;

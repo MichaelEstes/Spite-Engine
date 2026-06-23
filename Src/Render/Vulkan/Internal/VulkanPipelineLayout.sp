@@ -143,6 +143,23 @@ MergePushConstants(module: SpvReflectShaderModule, pushConstantRanges: Array<VkP
 			setLayoutBindingArr.Add(layoutKV.value~);
 		}
 
+		isBindless := false;
+		for (binding in setLayoutBindingArr)
+		{
+			if (binding.descriptorType == VkDescriptorType.VK_DESCRIPTOR_TYPE_SAMPLER ||
+				binding.descriptorType == VkDescriptorType.VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+			{
+				isBindless = true;
+				break;
+			}
+		}
+		if (isBindless)
+		{
+			descSets.Add(vulkanInstance.resourceManager.textures.layout);
+			setLayoutBindingArr.Clear();
+			continue;
+		}
+
 		createInfo := VkDescriptorSetLayoutCreateInfo();
 		createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		createInfo.bindingCount = setLayoutBindingArr.count;

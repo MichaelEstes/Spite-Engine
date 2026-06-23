@@ -96,7 +96,12 @@ state Value
         uVec4: [4]uint32,
         mat3: [3][3]float32,
         mat4: [4][4]float32,
-    }
+    } = [
+		float32:[0.0, 0.0, 0.0, 0.0],
+		float32:[0.0, 0.0, 0.0, 0.0],
+		float32:[0.0, 0.0, 0.0, 0.0],
+		float32:[0.0, 0.0, 0.0, 0.0],
+	]
 }
 
 state VariableDefinition
@@ -142,6 +147,7 @@ uint32 VariableDefinition::ValueSize()
 
 state TextureDefinition
 {
+    defaultValue: [4]float32,
     name: string,
     kind: TextureType,
     precision: VariablePrecision,
