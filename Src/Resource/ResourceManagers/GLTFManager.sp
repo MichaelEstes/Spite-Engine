@@ -92,7 +92,7 @@ GLTFManagerLoad(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>)
 		scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
 		ParentEntity(rootEntity, sceneEntity, scene);
 
-		log "Loading scene with ", gltfScene.nodes.count, "nodes";
+		log "Loading GLTF scene with ", gltfScene.nodes.count, "nodes";
 		for (nodeIndex in gltfScene.nodes)
 		{
 			NodeToECS(gltfData, gltf, scene, nodeIndex, sceneEntity);
@@ -247,6 +247,8 @@ TextureMap LoadTexture(gltfData: GLTFLoadData, gltf: GLTF, textureIndex: uint32)
 	gltfImage := gltf.images[imageIndex];
 
 	texture := Texture();
+	texture.wrapU = TextureWrap.Repeat;
+	texture.wrapV = TextureWrap.Repeat;
 
 	if (gltfImage.bufferView != InvalidGLTFIndex)
 	{

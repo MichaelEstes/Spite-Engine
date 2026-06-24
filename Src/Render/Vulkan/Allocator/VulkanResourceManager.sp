@@ -15,6 +15,12 @@ state VulkanResourceHandle
 	handle: uint32
 }
 
+state HandleBuffer
+{
+	buffer: *VkBuffer_T,
+	handle: VulkanAllocHandle
+}
+
 state VulkanRenderTarget
 {
 	image: *VkImage_T,
@@ -30,6 +36,9 @@ BindlessTexturesBinding := uint32(1);
 
 MaterialsPerPool := uint32(64);
 MaxMaterialSets := uint32(1024);
+
+DebugTextureSize := uint32(16);
+DebugTextureSquare := uint32(4);
 
 uint HashSamplerInfo(info: VkSamplerCreateInfo)
 {
@@ -52,6 +61,107 @@ state VulkanBindlessTextures
 	set: *VkDescriptorSet_T,
 
 	nextSampler: uint32
+}
+
+VulkanBindlessTextures::RegisterTexture(slot: uint32, imageView: *VkImageView_T)
+{
+	imageInfo := VkDescriptorImageInfo();
+	imageInfo.imageView = imageView;
+	imageInfo.imageLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	write := VkWriteDescriptorSet();
+	write.sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = this.set;
+	write.dstBinding = BindlessTexturesBinding;
+	write.dstArrayElement = slot;
+	write.descriptorCount = 1;
+	write.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	write.pImageInfo = imageInfo@;
+
+	vkUpdateDescriptorSets(vulkanInstance.device, 1, write@, 0, null);
+}
+
+uint32 VulkanBindlessTextures::UploadTexture(textureMap: TextureMap, textureDef: TextureDefinition)
+{
+	imageHandle := textureMap.texture.imageHandle;
+
+	existing := this.images.GetIndex(imageHandle.id);
+	if (existing) return existing - 1;
+
+	image := ImageResourceManager.GetResource(imageHandle).data.image;
+	width := image.w as uint32;
+	height := image.h as uint32;
+	imageSize := height * image.pitch;
+
+	format := VkFormat.VK_FORMAT_R8G8B8A8_SRGB;
+	if (textureDef.colorSpace == ColorSpace.UNORM)
+	{
+		format = VkFormat.VK_FORMAT_R8G8B8A8_UNORM;
+	}
+	vulkanTexture := CreateVulkanTexture(image.pixels as *byte, imageSize, width, height, format);
+
+	this.images.Insert(imageHandle.id, vulkanTexture);
+	slot := this.images.GetIndex(imageHandle.id) - 1;
+	this.RegisterTexture(slot, vulkanTexture.imageView);
+
+	return slot;
+}
+
+uint32 VulkanBindlessTextures::RegisterSampler(sampler: *VkSampler_T)
+{
+	index := this.nextSampler;
+	this.nextSampler += 1;
+
+	imageInfo := VkDescriptorImageInfo();
+	imageInfo.sampler = sampler;
+
+	write := VkWriteDescriptorSet();
+	write.sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = this.set;
+	write.dstBinding = BindlessSamplersBinding;
+	write.dstArrayElement = index;
+	write.descriptorCount = 1;
+	write.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_SAMPLER;
+	write.pImageInfo = imageInfo@;
+
+	vkUpdateDescriptorSets(vulkanInstance.device, 1, write@, 0, null);
+
+	return index;
+}
+
+uint32 VulkanBindlessTextures::UploadSampler(texture: Texture)
+{
+	samplerInfo := VkSamplerCreateInfo();
+	samplerInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = TextureFilterToVk(texture.magFilter);
+	samplerInfo.minFilter = TextureFilterToVk(texture.minFilter);
+	samplerInfo.addressModeU = TextureWrapToVk(texture.wrapU);
+	samplerInfo.addressModeV = TextureWrapToVk(texture.wrapV);
+	samplerInfo.addressModeW = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.anisotropyEnable = VkTrue;
+	samplerInfo.maxAnisotropy = vulkanInstance.deviceProperties.limits.maxSamplerAnisotropy;
+	samplerInfo.borderColor = VkBorderColor.VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VkFalse;
+	samplerInfo.compareEnable = VkFalse;
+	samplerInfo.compareOp = VkCompareOp.VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VkSamplerMipmapMode.VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0;
+	samplerInfo.minLod = 0.0;
+	samplerInfo.maxLod = 0.0;
+
+	cached := this.samplerCache.Find(samplerInfo);
+	if (cached) return cached~;
+
+	sampler: *VkSampler_T = null;
+	CheckResult(
+		vkCreateSampler(vulkanInstance.device, samplerInfo@, null, sampler@),
+		"UploadSampler Error creating Vulkan sampler"
+	);
+
+	index := this.RegisterSampler(sampler);
+	this.samplerCache.Insert(samplerInfo, index);
+
+	return index;
 }
 
 state VulkanUBOSet
@@ -78,7 +188,7 @@ state VulkanResourceManager
 	geometryDescriptors := SparseSet<VulkanUBODescriptors>(),
 	materialDescriptors := SparseSet<VulkanUBODescriptors>(),
 
-	defaultBuffers := Map<Value, VulkanAllocHandle, HashValue>()
+	defaultBuffers := Map<Value, HandleBuffer, HashValue>()
 }
 
 VulkanResourceManager::()
@@ -152,68 +262,53 @@ VulkanResourceManager::()
 		vkAllocateDescriptorSets(device, allocInfo@, this.textures.set@),
 		"VulkanResourceManager Error allocating bindless descriptor set"
 	);
+
+	this.CreateDebugTexture();
 }
 
-VulkanBindlessTextures::RegisterTexture(slot: uint32, imageView: *VkImageView_T)
+VulkanResourceManager::CreateDebugTexture()
 {
-	imageInfo := VkDescriptorImageInfo();
-	imageInfo.imageView = imageView;
-	imageInfo.imageLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	pixels := [512]uint32;
 
-	write := VkWriteDescriptorSet();
-	write.sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.dstSet = this.set;
-	write.dstBinding = BindlessTexturesBinding;
-	write.dstArrayElement = slot;
-	write.descriptorCount = 1;
-	write.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	write.pImageInfo = imageInfo@;
+	pink := uint32(0xFFFF00FF);
+	black := uint32(0xFF000000);
 
-	vkUpdateDescriptorSets(vulkanInstance.device, 1, write@, 0, null);
-}
+	for (y .. DebugTextureSize)
+	{
+		for (x .. DebugTextureSize)
+		{
+			cell := (x / DebugTextureSquare + y / DebugTextureSquare) % 2;
+			color := black;
+			if (cell == 0) color = pink;
+			pixels[y * DebugTextureSize + x] = color;
+		}
+	}
 
-uint32 VulkanBindlessTextures::UploadTexture(textureMap: TextureMap)
-{
-	imageHandle := textureMap.texture.imageHandle;
+	byteSize := DebugTextureSize * DebugTextureSize * uint32(4);
+	debugTexture := CreateVulkanTexture(
+		pixels[0]@ as *byte, byteSize,
+		DebugTextureSize, DebugTextureSize,
+		VkFormat.VK_FORMAT_R8G8B8A8_UNORM
+	);
 
-	existing := this.images.GetIndex(imageHandle.id);
-	if (existing) return existing - 1;
+	this.textures.images.Insert(0, debugTexture);
+	this.textures.RegisterTexture(this.textures.images.GetIndex(0) - 1, debugTexture.imageView);
 
-	image := ImageResourceManager.GetResource(imageHandle).data.image;
-	width := image.w as uint32;
-	height := image.h as uint32;
-	imageSize := height * image.pitch;
+	samplerInfo := VkSamplerCreateInfo();
+	samplerInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VkFilter.VK_FILTER_NEAREST;
+	samplerInfo.minFilter = VkFilter.VK_FILTER_NEAREST;
+	samplerInfo.addressModeU = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.mipmapMode = VkSamplerMipmapMode.VK_SAMPLER_MIPMAP_MODE_NEAREST;
 
-	format := VkFormat.VK_FORMAT_R8G8B8A8_UNORM;
-	vulkanTexture := CreateVulkanTexture(image.pixels as *byte, imageSize, width, height, format);
-
-	this.images.Insert(imageHandle.id, vulkanTexture);
-	slot := this.images.GetIndex(imageHandle.id) - 1;
-	this.RegisterTexture(slot, vulkanTexture.imageView);
-
-	return slot;
-}
-
-uint32 VulkanBindlessTextures::RegisterSampler(sampler: *VkSampler_T)
-{
-	index := this.nextSampler;
-	this.nextSampler += 1;
-
-	imageInfo := VkDescriptorImageInfo();
-	imageInfo.sampler = sampler;
-
-	write := VkWriteDescriptorSet();
-	write.sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.dstSet = this.set;
-	write.dstBinding = BindlessSamplersBinding;
-	write.dstArrayElement = index;
-	write.descriptorCount = 1;
-	write.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_SAMPLER;
-	write.pImageInfo = imageInfo@;
-
-	vkUpdateDescriptorSets(vulkanInstance.device, 1, write@, 0, null);
-
-	return index;
+	sampler: *VkSampler_T = null;
+	CheckResult(
+		vkCreateSampler(vulkanInstance.device, samplerInfo@, null, sampler@),
+		"CreateDebugTexture Error creating default sampler"
+	);
+	this.textures.RegisterSampler(sampler);
 }
 
 VkFilter TextureFilterToVk(filter: TextureFilter)
@@ -237,41 +332,6 @@ VkSamplerAddressMode TextureWrapToVk(wrap: TextureWrap)
 	}
 
 	return VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
-}
-
-uint32 VulkanBindlessTextures::UploadSampler(texture: Texture)
-{
-	samplerInfo := VkSamplerCreateInfo();
-	samplerInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerInfo.magFilter = TextureFilterToVk(texture.magFilter);
-	samplerInfo.minFilter = TextureFilterToVk(texture.minFilter);
-	samplerInfo.addressModeU = TextureWrapToVk(texture.wrapU);
-	samplerInfo.addressModeV = TextureWrapToVk(texture.wrapV);
-	samplerInfo.addressModeW = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.anisotropyEnable = VkTrue;
-	samplerInfo.maxAnisotropy = vulkanInstance.deviceProperties.limits.maxSamplerAnisotropy;
-	samplerInfo.borderColor = VkBorderColor.VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	samplerInfo.unnormalizedCoordinates = VkFalse;
-	samplerInfo.compareEnable = VkFalse;
-	samplerInfo.compareOp = VkCompareOp.VK_COMPARE_OP_ALWAYS;
-	samplerInfo.mipmapMode = VkSamplerMipmapMode.VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.mipLodBias = 0.0;
-	samplerInfo.minLod = 0.0;
-	samplerInfo.maxLod = 0.0;
-
-	cached := this.samplerCache.Find(samplerInfo);
-	if (cached) return cached~;
-
-	sampler: *VkSampler_T = null;
-	CheckResult(
-		vkCreateSampler(vulkanInstance.device, samplerInfo@, null, sampler@),
-		"UploadSampler Error creating Vulkan sampler"
-	);
-
-	index := this.RegisterSampler(sampler);
-	this.samplerCache.Insert(samplerInfo, index);
-
-	return index;
 }
 
 VkBufferCreateInfo VertexBufferCreateInfo(size: uint32)
@@ -309,7 +369,7 @@ VkBufferCreateInfo UniformBufferCreateInfo(size: uint32)
 	return createInfo;
 }
 
-VulkanAllocHandle UploadBuffer(createInfo: VkBufferCreateInfo, data: *byte, size: uint)
+HandleBuffer UploadBuffer(createInfo: VkBufferCreateInfo, data: *byte, size: uint)
 {
 	device := vulkanInstance.device;
 	allocator := vulkanInstance.allocator;
@@ -321,18 +381,21 @@ VulkanAllocHandle UploadBuffer(createInfo: VkBufferCreateInfo, data: *byte, size
 	handle := allocator.AllocBuffer(buffer, VulkanMemoryFlags.GPU);
 	stagingBuffer.StagedBufferCopy(device, data, size, buffer, commands, queue);
 
-	return handle;
+	handleBuf := HandleBuffer();
+	handleBuf.buffer = buffer;
+	handleBuf.handle = handle;
+	return handleBuf;
 }
 
-VulkanAllocHandle VulkanResourceManager::GetDefaultBuffer(value: Value, size: uint32)
+HandleBuffer VulkanResourceManager::GetDefaultBuffer(value: Value, size: uint32)
 {
 	cached := this.defaultBuffers.Find(value);
 	if (cached) return cached~;
 
-	handle := UploadBuffer(VertexBufferCreateInfo(size), value.val@ as *byte, size);
-	this.defaultBuffers.Insert(value, handle);
+	handleBuf := UploadBuffer(VertexBufferCreateInfo(size), value.val@ as *byte, size);
+	this.defaultBuffers.Insert(value, handleBuf);
 
-	return handle;
+	return handleBuf;
 }
 
 Array<VulkanAllocHandle> UploadVariableSets(variables: *void, variableSets: VariableSets)
@@ -369,6 +432,7 @@ Array<VulkanAllocHandle> UploadVariableSets(variables: *void, variableSets: Vari
 
 uint32 VulkanResourceManager::UploadGeometry(geometry: *Geometry)
 {
+	allocator := vulkanInstance.allocator;
 	handleValue := this.geometries.GetNext();
 	vulkanGeometry := handleValue.value;
 	vulkanGeometry~ = VulkanGeometry();
@@ -377,7 +441,8 @@ uint32 VulkanResourceManager::UploadGeometry(geometry: *Geometry)
 
 	attributeCount := geometry.attributes.count;
 	vulkanGeometry.attributes = Array<VulkanAllocHandle>(attributeCount);
-	vulkanGeometry.strides = Array<uint32>(attributeCount);
+	vulkanGeometry.attributeBuffers = Array<*VkBuffer_T>(attributeCount);
+	vulkanGeometry.strides = Array<uint64>(attributeCount);
 	for (i .. attributeCount)
 	{
 		attribute := geometry.attributes[i];
@@ -385,14 +450,16 @@ uint32 VulkanResourceManager::UploadGeometry(geometry: *Geometry)
 
 		if (attribute.count)
 		{
-			vulkanGeometry.attributes.Add(
-				UploadBuffer(VertexBufferCreateInfo(attribute.count), attribute.start, attribute.count)
-			);
+			handleBuf := UploadBuffer(VertexBufferCreateInfo(attribute.count), attribute.start, attribute.count);
+			vulkanGeometry.attributeBuffers.Add(handleBuf.buffer);
+			vulkanGeometry.attributes.Add(handleBuf.handle);
 			vulkanGeometry.strides.Add(attrDef.ValueSize());
 		}
 		else
 		{
-			vulkanGeometry.attributes.Add(this.GetDefaultBuffer(attrDef.defaultValue, attrDef.ValueSize()));
+			handleBuf := this.GetDefaultBuffer(attrDef.defaultValue, attrDef.ValueSize());
+			vulkanGeometry.attributeBuffers.Add(handleBuf.buffer);
+			vulkanGeometry.attributes.Add(handleBuf.handle);
 			vulkanGeometry.strides.Add(0);
 		}
 	}
@@ -402,11 +469,13 @@ uint32 VulkanResourceManager::UploadGeometry(geometry: *Geometry)
 		indices := geometry.indices;
 		indexSize := indices.count * #sizeof uint16;
 
-		vulkanGeometry.indexHandle = UploadBuffer(
+		handleBuf := UploadBuffer(
 			IndexBufferCreateInfo(indexSize),
 			indices.start as *byte,
 			indexSize
 		);
+		vulkanGeometry.indexBuffer = handleBuf.buffer;
+		vulkanGeometry.indexHandle = handleBuf.handle;
 		vulkanGeometry.indexCount = indices.count;
 		vulkanGeometry.indexKind = VkIndexType.VK_INDEX_TYPE_UINT16;
 	}
@@ -593,6 +662,18 @@ uint32 VulkanResourceManager::UploadMaterial(material: *Material)
 	assetDef := GetAssetDefWithHandle(material.defHandle);
 	vulkanMaterial.variables = UploadVariableSets(material.variables, assetDef.fragment.variables);
 
+	descriptors := this.GetMaterialDescriptors(material.defHandle);
+	fragVarSetCount := assetDef.fragment.variables.sets.count;
+	vulkanMaterial.descriptorSets = Array<*VkDescriptorSet_T>(descriptors.setLayouts.count);
+
+	for (i .. fragVarSetCount)
+	{
+		materialSet := descriptors.setLayouts[i];
+		descriptorSet := this.AllocateUBOSet(descriptors, materialSet.layout);
+		this.WriteUBOSet(descriptorSet, vulkanMaterial.variables[i]);
+		vulkanMaterial.descriptorSets.Add(descriptorSet);
+	}
+
 	textureCount := material.textures.count;
 	if (textureCount)
 	{
@@ -601,13 +682,14 @@ uint32 VulkanResourceManager::UploadMaterial(material: *Material)
 		for (i .. textureCount)
 		{
 			textureMap := material.textures[i];
+			textureDef := assetDef.fragment.textures[i];
 			if (!(textureMap~))
 			{
 				indices.Add(0);
 				indices.Add(0);
 				continue;
 			}
-			indices.Add(this.textures.UploadTexture(textureMap~));
+			indices.Add(this.textures.UploadTexture(textureMap, textureDef));
 			indices.Add(this.textures.UploadSampler(textureMap.texture));
 		}
 
@@ -620,21 +702,10 @@ uint32 VulkanResourceManager::UploadMaterial(material: *Material)
 
 		mappedPtr := vulkanInstance.allocator.GetAllocationMappedPtr(vulkanMaterial.textureSet) as *byte;
 		copy_bytes(mappedPtr, indices.memory.ptr as *byte, setSize);
-	}
 
-	descriptors := this.GetMaterialDescriptors(material.defHandle);
-	firstFragSet := 1 + assetDef.vertex.variables.sets.count;
-	fragVarSetCount := assetDef.fragment.variables.sets.count;
-	vulkanMaterial.descriptorSets = Array<*VkDescriptorSet_T>(descriptors.setLayouts.count);
-	for (materialSet in descriptors.setLayouts)
-	{
+		materialSet := descriptors.setLayouts[descriptors.setLayouts.count - 1];
 		descriptorSet := this.AllocateUBOSet(descriptors, materialSet.layout);
-
-		varIndex := materialSet.set - firstFragSet;
-		setBuffer := vulkanMaterial.textureSet;
-		if (varIndex < fragVarSetCount) setBuffer = vulkanMaterial.variables[varIndex];
-
-		this.WriteUBOSet(descriptorSet, setBuffer);
+		this.WriteUBOSet(descriptorSet, vulkanMaterial.textureSet);
 		vulkanMaterial.descriptorSets.Add(descriptorSet);
 	}
 

@@ -28,12 +28,14 @@ indexKindToByteCount := [
 state VulkanGeometry
 {
 	attributes: Array<VulkanAllocHandle>,
-	strides: Array<uint32>,
+	attributeBuffers: Array<*VkBuffer_T>,
+	strides: Array<uint64>,
 
 	variables: Array<VulkanAllocHandle>
 	descriptorSets: Array<*VkDescriptorSet_T>,
 
 	indexHandle: VulkanAllocHandle,
+	indexBuffer: *VkBuffer_T,
 	indexCount: uint32,
 
 	topology: VkPrimitiveTopology,

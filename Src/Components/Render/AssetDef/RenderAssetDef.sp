@@ -53,6 +53,12 @@ enum VariablePrecision: ubyte
     Default
 }
 
+enum ColorSpace: ubyte
+{
+    SRGB,
+    UNORM
+}
+
 enum AlphaMode: ubyte
 {
 	Opaque,
@@ -152,6 +158,7 @@ state TextureDefinition
     kind: TextureType,
     precision: VariablePrecision,
     format: SamplerFormat,
+    colorSpace: ColorSpace,
     multisample: bool,
     filterable: bool
 }

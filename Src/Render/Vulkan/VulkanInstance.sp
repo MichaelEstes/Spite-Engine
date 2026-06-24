@@ -140,13 +140,13 @@ VulkanInstance::InitializeCurrentDevice()
 
 	this.allocator = VulkanAllocator();
 	this.allocator.Create(this.device, physicalDevice);
+	this.stagingBuffer = VulkanStagingBuffer();
 
 	this.resourceManager = VulkanResourceManager();
 	this.renderPassCache = VulkanRenderPassCache();
 	this.frameBufferCache = VulkanFrameBufferCache();
 	this.pipelineCache = VulkanPipelineMap();
 	this.pipelineLayoutCache = VulkanPipelineLayoutCache();
-	this.stagingBuffer = VulkanStagingBuffer();
 }
 
 ref VulkanStagingBuffer VulkanInstance::GetStagingBuffer()

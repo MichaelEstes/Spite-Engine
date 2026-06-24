@@ -49,6 +49,12 @@ SamplerFormat ParseSamplerFormat(name: string)
     return SamplerFormat.Float;
 }
 
+ColorSpace ParseColorSpace(name: string)
+{
+    if (name == "unorm") return ColorSpace.UNORM;
+    return ColorSpace.SRGB;
+}
+
 AlphaMode ParseAlphaMode(name: string)
 {
     if (name == "mask")         return AlphaMode.Mask;
@@ -258,6 +264,10 @@ TextureDefinition ParseTextureDefinition(name: string, value: *JSONValue)
         formatValue := textureObj.GetMember("format");
         if (formatValue)
             textureDef.format = ParseSamplerFormat(formatValue.String().value);
+
+        colorSpaceValue := textureObj.GetMember("colorSpace");
+        if (colorSpaceValue)
+            textureDef.colorSpace = ParseSamplerFormat(colorSpaceValue.String().value);
 
         multisampleValue := textureObj.GetMember("multisample");
         if (multisampleValue)
