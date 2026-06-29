@@ -409,7 +409,7 @@ string WriteVertexShader(assetDef: AssetDef)
 bool CompileVertexShader(assetDef: AssetDef, compiler: ShaderCompiler)
 {
     vertexShaderSource := WriteVertexShader(assetDef);
-    // log "VERTEX SHADER", vertexShaderSource;
+    log "VERTEX SHADER", vertexShaderSource;
     spirv := CompileShader(vertexShaderSource, compiler, assetDef.name);
     assetDef.vertex.compiled = spirv;
     return spirv.count > 0;
@@ -421,17 +421,55 @@ fragmentShaderStart := `
 #extension GL_EXT_nonuniform_qualifier : require
 `
 
+// Clustered Forward+ light data, injected into the fragment shader when the asset
+// def declares the UseLightCulling flag. Lives in set 0 (frame globals) alongside
+// the SceneUBO. Must match the descriptor set AssetPass binds and the LightCullPass
+// buffer layouts (GpuLight, light grid uvec2, index list). Asset-def nodes consume
+// these (clusterLights / lightGrid / lightIndices / clusterInfo) to shade lights.
+fragmentLightCullDecls := `
+struct ClusterLight {
+    vec4 positionRadius;
+    vec4 colorIntensity;
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer ClusterLights {
+    ClusterLight clusterLights[];
+};
+
+layout(std430, set = 0, binding = 2) readonly buffer ClusterLightGrid {
+    uvec2 lightGrid[];
+};
+
+layout(std430, set = 0, binding = 3) readonly buffer ClusterLightIndices {
+    uint lightIndices[];
+};
+
+layout(std430, set = 0, binding = 4) readonly buffer ClusterInfo {
+    mat4 invProj;
+    mat4 invView;
+    vec4 screenAndTile;   // xy = screen px, zw = tile px
+    uvec4 clusterDims;    // xyz = grid dims
+    vec4 zParams;         // x = near, y = far
+} clusterInfo;
+`
+
 string WriteFragmentShader(assetDef: AssetDef)
 {
     fragmentStage := assetDef.fragment;
     fragmentShader := fragmentShaderStart.Copy();
 
+    if (assetDef.flags & AssetDefFlags.UseLightCulling)
+    {
+        fragmentShader.AppendIn(fragmentLightCullDecls);
+    }
+    
     fragmentShader = WriteVariableSets(fragmentShader, fragmentStage.variables, assetDef.vertex.variables.sets.count + 1);
     fragmentShader = WriteTextures(
-        fragmentShader, 
-        fragmentStage.textures, 
+        fragmentShader,
+        fragmentStage.textures,
         fragmentStage.variables.sets.count + assetDef.vertex.variables.sets.count + 1
     );
+
 
     inVars := Array<Variable>();
     defer inVars.Free();
@@ -459,7 +497,7 @@ string WriteFragmentShader(assetDef: AssetDef)
 bool CompileFragmentShader(assetDef: AssetDef, compiler: ShaderCompiler)
 {
     fragmentShaderSource := WriteFragmentShader(assetDef);
-    // log "FRAGMENT SHADER", fragmentShaderSource;
+    log "FRAGMENT SHADER", fragmentShaderSource;
     spirv := CompileShader(fragmentShaderSource, compiler, assetDef.name);
     assetDef.fragment.compiled = spirv;
     return spirv.count > 0;

@@ -5,6 +5,7 @@ import OS
 import SpirvReflect
 import FixedArray
 import RenderAssetDef
+import ShaderTools
 
 state ShaderItem
 {
@@ -102,4 +103,63 @@ ResourceHandle UseAssetDefShader(assetDefHandle: AssetDefHandle)
 	shaderParam.assetDefHandle = assetDefHandle;
 
 	return ShaderResourceManager.LoadResource(shaderParam);
+}
+
+state ComputeShaderResource
+{
+	shader: ShaderItem
+}
+
+state ComputeShaderParam
+{
+	name: string,
+	source: string
+}
+
+ComputeShaderResourceManager := Resource.CreateResourceManager<ComputeShaderResource, ComputeShaderParam>(
+	['v', 'k', 'c', 's'],
+	::ResourceKey(param: ComputeShaderParam) => ResourceKey(param.name.Copy()),
+	::(computeResourceParam: *ResourceParam<ComputeShaderResource, ComputeShaderParam>)
+	{
+		handle := computeResourceParam.handle;
+		param := computeResourceParam.param;
+		resourceManager := computeResourceParam.manager;
+		resource := resourceManager.GetResource(handle);
+
+		device := vulkanInstance.device;
+
+		compiler := InitShaderCompiler();
+		defer delete compiler;
+
+		spirv := CompileShader(param.source, compiler, param.name);
+		if (!spirv.count)
+		{
+			log "ComputeShaderResourceManager failed to compile compute shader: ", param.name;
+			computeResourceParam.onResourceLoad(computeResourceParam, ResourceResult.LoadFailed);
+			return;
+		}
+
+		CreateShaderItem(device, spirv, resource.data.shader@);
+
+		computeResourceParam.onResourceLoad(computeResourceParam, ResourceResult.Loaded);
+	},
+	::(handle: ResourceHandle)
+	{
+		device := vulkanInstance.device;
+		resource := Resource.GetResource<ComputeShaderResource>(handle).data;
+
+		spvReflectDestroyShaderModule(resource.shader.reflectModule@);
+		vkDestroyShaderModule(device, resource.shader.shaderModule, null);
+	}
+);
+
+ComputeShaderResourceManagerID := Resource.RegisterResourceManager(ComputeShaderResourceManager@);
+
+ResourceHandle UseComputeShader(name: string, source: string)
+{
+	param := ComputeShaderParam();
+	param.name = name;
+	param.source = source;
+
+	return ComputeShaderResourceManager.LoadResource(param);
 }

@@ -28,6 +28,17 @@ state VulkanRenderTarget
 	handle: VulkanAllocHandle
 }
 
+state VulkanRenderBuffer
+{
+	handle: VulkanAllocHandle
+}
+
+state DefaultTextureKey
+{
+	pixel: [4]ubyte,
+	colorSpace: ColorSpace
+}
+
 MaxBindlessTextures := uint32(4096);
 MaxBindlessSamplers := uint32(64);
 
@@ -50,15 +61,23 @@ uint HashValue(value: Value)
 	return MHash<Value>(value);
 }
 
+uint HashDefaultTextureKey(key: DefaultTextureKey)
+{
+	return MHash<DefaultTextureKey>(key);
+}
+
 state VulkanBindlessTextures
 {
-	images := SparseSet<VulkanTexture>(),
+	images := Array<VulkanTexture>(),
+	imageHandleCache := SparseSet<uint32>(),
 
 	samplerCache := Map<VkSamplerCreateInfo, uint32, HashSamplerInfo>(),
 
 	layout: *VkDescriptorSetLayout_T,
 	pool: *VkDescriptorPool_T,
 	set: *VkDescriptorSet_T,
+
+	defaultTextures := Map<DefaultTextureKey, uint32, HashDefaultTextureKey>()
 
 	nextSampler: uint32
 }
@@ -85,8 +104,7 @@ uint32 VulkanBindlessTextures::UploadTexture(textureMap: TextureMap, textureDef:
 {
 	imageHandle := textureMap.texture.imageHandle;
 
-	existing := this.images.GetIndex(imageHandle.id);
-	if (existing) return existing - 1;
+	if (this.imageHandleCache.Has(imageHandle.id)) this.imageHandleCache.Get(imageHandle.id)~;
 
 	image := ImageResourceManager.GetResource(imageHandle).data.image;
 	width := image.w as uint32;
@@ -100,8 +118,37 @@ uint32 VulkanBindlessTextures::UploadTexture(textureMap: TextureMap, textureDef:
 	}
 	vulkanTexture := CreateVulkanTexture(image.pixels as *byte, imageSize, width, height, format);
 
-	this.images.Insert(imageHandle.id, vulkanTexture);
-	slot := this.images.GetIndex(imageHandle.id) - 1;
+	slot := this.images.Add(vulkanTexture);
+	this.imageHandleCache.Insert(imageHandle.id, slot);
+	this.RegisterTexture(slot, vulkanTexture.imageView);
+
+	return slot;
+}
+
+uint32 VulkanBindlessTextures::UploadDefaultTexture(textureDef: TextureDefinition)
+{
+	if (!textureDef.hasDefault) return 0;
+
+	key := DefaultTextureKey();
+	key.pixel = textureDef.defaultValue;
+	key.colorSpace = textureDef.colorSpace;
+
+	if (this.defaultTextures.Has(key)) return this.defaultTextures.Find(key)~;
+
+	image := fixed textureDef.defaultValue;
+	width := uint32(1);
+	height := uint32(1);
+	imageSize := uint(4);
+
+	format := VkFormat.VK_FORMAT_R8G8B8A8_SRGB;
+	if (textureDef.colorSpace == ColorSpace.UNORM)
+	{
+		format = VkFormat.VK_FORMAT_R8G8B8A8_UNORM;
+	}
+	vulkanTexture := CreateVulkanTexture(image as *byte, imageSize, width, height, format);
+
+	slot := this.images.Add(vulkanTexture);
+	this.defaultTextures.Insert(key, slot);
 	this.RegisterTexture(slot, vulkanTexture.imageView);
 
 	return slot;
@@ -179,6 +226,7 @@ state VulkanUBODescriptors
 state VulkanResourceManager
 {
 	renderTargetMap := Map<*VkImage_T, VulkanRenderTarget>(),
+	renderBufferMap := Map<*VkBuffer_T, VulkanRenderBuffer>(),
 
 	textures: VulkanBindlessTextures,
 
@@ -291,8 +339,8 @@ VulkanResourceManager::CreateDebugTexture()
 		VkFormat.VK_FORMAT_R8G8B8A8_UNORM
 	);
 
-	this.textures.images.Insert(0, debugTexture);
-	this.textures.RegisterTexture(this.textures.images.GetIndex(0) - 1, debugTexture.imageView);
+	defaultTextureSlot := this.textures.images.Add(debugTexture);
+	this.textures.RegisterTexture(defaultTextureSlot, debugTexture.imageView);
 
 	samplerInfo := VkSamplerCreateInfo();
 	samplerInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -369,6 +417,18 @@ VkBufferCreateInfo UniformBufferCreateInfo(size: uint32)
 	return createInfo;
 }
 
+VkBufferCreateInfo StorageBufferCreateInfo(size: uint32)
+{
+	createInfo := VkBufferCreateInfo();
+	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	createInfo.usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+					   VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	createInfo.size = size;
+	createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+
+	return createInfo;
+}
+
 HandleBuffer UploadBuffer(createInfo: VkBufferCreateInfo, data: *byte, size: uint)
 {
 	device := vulkanInstance.device;
@@ -380,6 +440,37 @@ HandleBuffer UploadBuffer(createInfo: VkBufferCreateInfo, data: *byte, size: uin
 	buffer := CreateVkBuffer(device, createInfo);
 	handle := allocator.AllocBuffer(buffer, VulkanMemoryFlags.GPU);
 	stagingBuffer.StagedBufferCopy(device, data, size, buffer, commands, queue);
+
+	handleBuf := HandleBuffer();
+	handleBuf.buffer = buffer;
+	handleBuf.handle = handle;
+	return handleBuf;
+}
+
+HandleBuffer CreateDeviceStorageBuffer(size: uint32)
+{
+	device := vulkanInstance.device;
+	allocator := vulkanInstance.allocator;
+
+	buffer := CreateVkBuffer(device, StorageBufferCreateInfo(size));
+	handle := allocator.AllocBuffer(buffer, VulkanMemoryFlags.GPU);
+
+	handleBuf := HandleBuffer();
+	handleBuf.buffer = buffer;
+	handleBuf.handle = handle;
+	return handleBuf;
+}
+
+HandleBuffer CreateMappedStorageBuffer(size: uint32)
+{
+	device := vulkanInstance.device;
+	allocator := vulkanInstance.allocator;
+
+	buffer := CreateVkBuffer(device, StorageBufferCreateInfo(size));
+	handle := allocator.AllocBuffer(
+		buffer,
+		VulkanMemoryFlags.Shared | VulkanMemoryFlags.Coherent | VulkanMemoryFlags.Mapped
+	);
 
 	handleBuf := HandleBuffer();
 	handleBuf.buffer = buffer;
@@ -650,6 +741,48 @@ VulkanResourceManager::WriteUBOSet(descriptorSet: *VkDescriptorSet_T, buffer: Vu
 	vkUpdateDescriptorSets(vulkanInstance.device, 1, write@, 0, null);
 }
 
+VulkanResourceManager::WriteStorageSetBuffer(descriptorSet: *VkDescriptorSet_T, binding: uint32,
+											 buffer: *VkBuffer_T)
+{
+	bufferInfo := VkDescriptorBufferInfo();
+	bufferInfo.buffer = buffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = VK_WHOLE_SIZE;
+
+	write := VkWriteDescriptorSet();
+	write.sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = descriptorSet;
+	write.dstBinding = binding;
+	write.dstArrayElement = 0;
+	write.descriptorCount = 1;
+	write.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	write.pBufferInfo = bufferInfo@;
+
+	vkUpdateDescriptorSets(vulkanInstance.device, 1, write@, 0, null);
+}
+
+VulkanResourceManager::WriteStorageSet(descriptorSet: *VkDescriptorSet_T, binding: uint32,
+									   buffer: VulkanAllocHandle)
+{
+	alloc := vulkanInstance.allocator.GetAllocation(buffer);
+
+	bufferInfo := VkDescriptorBufferInfo();
+	bufferInfo.buffer = alloc.data.buffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = VK_WHOLE_SIZE;
+
+	write := VkWriteDescriptorSet();
+	write.sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = descriptorSet;
+	write.dstBinding = binding;
+	write.dstArrayElement = 0;
+	write.descriptorCount = 1;
+	write.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	write.pBufferInfo = bufferInfo@;
+
+	vkUpdateDescriptorSets(vulkanInstance.device, 1, write@, 0, null);
+}
+
 uint32 VulkanResourceManager::UploadMaterial(material: *Material)
 {
 	handleValue := this.materials.GetNext();
@@ -683,10 +816,10 @@ uint32 VulkanResourceManager::UploadMaterial(material: *Material)
 		{
 			textureMap := material.textures[i];
 			textureDef := assetDef.fragment.textures[i];
-			if (!(textureMap~))
+			if (!textureMap)
 			{
-				indices.Add(0);
-				indices.Add(0);
+				indices.Add(this.textures.UploadDefaultTexture(textureDef));
+				indices.Add(this.textures.UploadSampler(Texture()));
 				continue;
 			}
 			indices.Add(this.textures.UploadTexture(textureMap, textureDef));

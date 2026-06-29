@@ -13,9 +13,6 @@ import Matrix
 import RenderComponents
 import RenderAssetDef
 
-
-offsets := uint64:[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
 VulkanPipelineKey CreateAssetPassPipelineKey(meshState: VulkanPipelineMeshState, renderPass: *VkRenderPass_T)
 {
 	key := VulkanPipelineKey();
@@ -26,9 +23,61 @@ VulkanPipelineKey CreateAssetPassPipelineKey(meshState: VulkanPipelineMeshState,
 }
 
 assetPassName := "AssetPass";
+
+frameGlobalPool: *VkDescriptorPool_T = null;
+frameGlobalSet: *VkDescriptorSet_T = null;
+
+*VkDescriptorSet_T GetFrameGlobalSet(assetDefHandle: AssetDefHandle,
+									 context: *RenderPassContext<VulkanRenderer>,
+									 renderer: *VulkanRenderer, lightCull: *LightCullState)
+{
+	if (frameGlobalSet) return frameGlobalSet;
+
+	device := vulkanInstance.device;
+
+	poolSizes := [VkDescriptorPoolSize(), VkDescriptorPoolSize()];
+	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[0].descriptorCount = 1;
+	poolSizes[1].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	poolSizes[1].descriptorCount = 4;
+
+	poolInfo := VkDescriptorPoolCreateInfo();
+	poolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = 2;
+	poolInfo.pPoolSizes = fixed poolSizes;
+	poolInfo.maxSets = 1;
+
+	CheckResult(
+		vkCreateDescriptorPool(device, poolInfo@, null, frameGlobalPool@),
+		"AssetPass Error creating frame-global descriptor pool"
+	);
+
+	descSets := vulkanInstance.pipelineLayoutCache.descLayoutSetMap.Find(PipelineLayoutKey(assetDefHandle))~;
+
+	allocInfo := VkDescriptorSetAllocateInfo();
+	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = frameGlobalPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = descSets[0]@;
+
+	CheckResult(
+		vkAllocateDescriptorSets(device, allocInfo@, frameGlobalSet@),
+		"AssetPass Error allocating frame-global descriptor set"
+	);
+
+	resourceManager := vulkanInstance.resourceManager;
+	resourceManager.WriteUBOSet(frameGlobalSet, renderer.sceneShared.buffer);
+	resourceManager.WriteStorageSetBuffer(frameGlobalSet, 1, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightsHandle));
+	resourceManager.WriteStorageSetBuffer(frameGlobalSet, 2, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightGridHandle));
+	resourceManager.WriteStorageSetBuffer(frameGlobalSet, 3, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightIndexHandle));
+	resourceManager.WriteStorageSetBuffer(frameGlobalSet, 4, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.clusterInfoHandle));
+
+	return frameGlobalSet;
+}
+
 assetPass := RegisterRenderPass(
 	assetPassName,
-	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene) 
+	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene, self: *VulkanRenderPass) 
 	{
 		graph.AddPass(
 			assetPassName,
@@ -36,7 +85,7 @@ assetPass := RegisterRenderPass(
 			{
 				renderer := builder.Renderer();
 				
-				//log "Vulkan Asset pass init";
+				// log "Vulkan Asset pass init";
 				builder.Read(renderer.swapchainHandle, ResourceUsageFlags.Sampled | ResourceUsageFlags.LoadUndefined);
 				builder.Write(renderer.swapchainHandle, ResourceUsageFlags.DefaultWrite);
 				
@@ -54,11 +103,20 @@ assetPass := RegisterRenderPass(
 				builder.Write(depthHandle, ResourceUsageFlags.Depth | ResourceUsageFlags.Store);
 				builder.SetDepthStencilColor(depthHandle, DepthStencilClear(1.0, 0));
 
+				lightCullPass := renderer.GetRenderPassByName(lightCullPassName);
+				if (lightCullPass)
+				{
+					lightCull := lightCullPass.data as *LightCullState;
+					builder.Read(lightCull.lightGridHandle, ResourceUsageFlags.StorageRead);
+					builder.Read(lightCull.lightIndexHandle, ResourceUsageFlags.StorageRead);
+					builder.Read(lightCull.lightsHandle, ResourceUsageFlags.StorageRead);
+				}
+
 				return true;
 			},
 			::(context: *RenderPassContext<VulkanRenderer>, scene: *Scene) 
 			{
-				//log "Vulkan Asset pass";
+				// log "Vulkan Asset pass";
 				renderer := context.renderer;
 
 				device := vulkanInstance.device;
@@ -71,6 +129,12 @@ assetPass := RegisterRenderPass(
 
 				resourceManager := vulkanInstance.resourceManager;
 				bindPoint := VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS;
+
+				lightCull: *LightCullState = null;
+				lightCullPass := renderer.GetRenderPassByName(lightCullPassName);
+				if (lightCullPass) lightCull = lightCullPass.data as *LightCullState;
+
+				offsets := uint64:[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 				for (kv in renderer.drawList.pipelineMap)
 				{
@@ -89,12 +153,24 @@ assetPass := RegisterRenderPass(
 					vkCmdBindPipeline(commandBuffer, bindPoint, vulkanPipeline.pipeline);
 					renderer.SetViewportAndScissor(commandBuffer);
 
-					vkCmdBindDescriptorSets(
-						commandBuffer, bindPoint, pipelineLayout,
-						uint32(0), uint32(1), sceneDescSet@, uint32(0), null
-					);
-
 					assetDef := GetAssetDefWithHandle(meshState.assetDefHandle);
+
+					if (lightCull && (assetDef.flags & AssetDefFlags.UseLightCulling))
+					{
+						set0 := GetFrameGlobalSet(meshState.assetDefHandle, context, renderer, lightCull);
+						vkCmdBindDescriptorSets(
+							commandBuffer, bindPoint, pipelineLayout,
+							uint32(0), uint32(1), set0@, uint32(0), null
+						);
+					}
+					else
+					{
+						vkCmdBindDescriptorSets(
+							commandBuffer, bindPoint, pipelineLayout,
+							uint32(0), uint32(1), sceneDescSet@, uint32(0), null
+						);
+					}
+
 					bindlessSet := uint32(1) + assetDef.vertex.variables.sets.count + assetDef.fragment.variables.sets.count;
 					vkCmdBindDescriptorSets(
 						commandBuffer, bindPoint, pipelineLayout,
@@ -104,13 +180,13 @@ assetPass := RegisterRenderPass(
 					geomDescriptors := resourceManager.GetGeometryDescriptors(meshState.assetDefHandle);
 					matDescriptors := resourceManager.GetMaterialDescriptors(meshState.assetDefHandle);
 
-					for (drawMesh in meshArr)
+					for (mesh in meshArr)
 					{
-						worldTransform := scene.GetComponentDirect<WorldTransform>(drawMesh.entity, WorldTransformComponent);
+						worldTransform := scene.GetComponentDirect<WorldTransform>(mesh.entity, WorldTransformComponent);
 						if (!worldTransform) continue;
 
-						geometry := resourceManager.geometries.Get(drawMesh.geometry);
-						material := resourceManager.materials.Get(drawMesh.material);
+						geometry := resourceManager.geometries.Get(mesh.geometry);
+						material := resourceManager.materials.Get(mesh.material);
 
 						for (i .. geometry.descriptorSets.count)
 						{
@@ -160,7 +236,7 @@ assetPass := RegisterRenderPass(
 			scene
 		);
 	},
-	::(renderer: VulkanRenderer) 
+	::(renderer: VulkanRenderer, self: *VulkanRenderPass) 
 	{
 		log "Color pass added";
 	}

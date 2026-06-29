@@ -244,10 +244,21 @@ state TextureDesc
 	extension: *any
 }
 
+enum GPUMemoryFlags: uint32
+{
+	GPU      = 1 << 0,
+	Shared   = 1 << 1,
+	Coherent = 1 << 2,
+	Cached   = 1 << 3,
+	GPULazy  = 1 << 4,
+	Mapped   = 1 << 5,
+}
+
 state BufferDesc
 {
 	size: uint,
 	usage: GPUBufferUsageFlags,
+	memory: GPUMemoryFlags,
 	shared: bool,
 
 	extension: *any

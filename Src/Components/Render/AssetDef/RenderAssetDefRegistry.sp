@@ -28,8 +28,6 @@ RenderAssetVariableAllocator CreateAssetDefAllocator(assetDef: AssetDef)
 {
     vertexSetSize := assetDef.vertex.variables.GetSetsValueSize();
     fragmentSetSize := assetDef.fragment.variables.GetSetsValueSize();
-    log "Vertext Set Size", vertexSetSize;
-    log "Fragment Set Size", fragmentSetSize;
     itemCount := 128; 
     allocator := RenderAssetVariableAllocator();
     allocator.vertexAllocator = BlockAllocator(

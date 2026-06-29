@@ -38,6 +38,7 @@ RenderResourceHandle RenderResourceHandles::CreateHandle(name: string, desc: Res
 
 	handle := handleValue.handle;
 	this.handleToName.Insert(handle, name);
+	this.nameToHandle.Insert(name, handle);
 
 	return handle as RenderResourceHandle;
 }

@@ -92,7 +92,8 @@ state VulkanRenderer
 	self: Entity,
 	swapchainHandle: RenderResourceHandle,
 	swapchainImageIndex: uint32,
-	currentFrame: uint32,	
+	currentFrame: uint32,
+	needsRecreate: bool,
 }
 
 VulkanRenderer::Destroy()
@@ -165,14 +166,16 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 
 	for (passName in passes)
 	{
-		renderPass := GetRenderPass(passName);
-		if (!renderPass)
+		renderPassBase := GetRenderPass(passName);
+		if (!renderPassBase)
 		{
 			log "Unable to find render pass for Vulkan backend with name: ", passName;
 			continue;
 		}
-		if (renderPass.onInit) renderPass.onInit(vulkanRenderer);
-		vulkanRenderer.passes.Add(renderPass~);
+
+		renderPass := renderPassBase~;
+		if (renderPass.onInit) renderPass.onInit(vulkanRenderer, renderPass@);
+		vulkanRenderer.passes.Add(renderPass);
 	}
 
 	vulkanRenderer.renderGraph.SetResourceTables(vulkanInstance.resourceTables@);
@@ -253,6 +256,16 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 	scene.SetComponent<VulkanRenderer>(entity, vulkanRenderer);
 }
 
+*VulkanRenderPass VulkanRenderer::GetRenderPassByName(name: string)
+{
+	for (pass in this.passes)
+	{
+		if (pass.name == name) return pass@;
+	}
+
+	return null;
+}
+
 VulkanRenderer::CreateSwapchain()
 {
 	this.swapchain.Create(this@);
@@ -279,6 +292,24 @@ VulkanRenderer::RecreateSwapchain()
 		image := this.swapchain.images[i]~;
 		resourceManager.renderTargetMap.Remove(image);
 	}
+
+	resourceTables := vulkanInstance.resourceTables;
+	for (arr in resourceTables.textureTable.descToResource.Values())
+	{
+		for (tracked in arr)
+		{
+			image := tracked.resource as *VkImage_T;
+			renderTarget := resourceManager.renderTargetMap.Find(image);
+			if (renderTarget)
+			{
+				vkDestroyImageView(device, renderTarget.imageView, null);
+				vkDestroyImage(device, image, null);
+				resourceManager.renderTargetMap.Remove(image);
+			}
+			resourceTables.textureToLayout.Remove(image);
+		}
+	}
+	resourceTables.textureTable.descToResource.Clear();
 
 	frameBufferCache := vulkanInstance.frameBufferCache;
 	for (kv in frameBufferCache.frameBufferMap)
@@ -380,6 +411,10 @@ VkResult VulkanRenderer::WaitAndAcquireSwapchain(frame: uint32)
 	fence := this.frameFences[frame]@;
 	vkWaitForFences(device, 1, fence, VkTrue, UINT64_MAX);
 	result := this.swapchain.AcquireNext(device, frame);
+	if (result != VkResult.VK_SUCCESS && result != VkResult.VK_SUBOPTIMAL_KHR)
+	{
+		return result;
+	}
 	vkResetFences(device, 1, fence);
 
 	return result;
@@ -451,6 +486,12 @@ VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 	camera := scene.GetComponent<Camera>(this.self);
 	if (!camera) return;
 
+	if (camera.autoAspect)
+	{
+		camera.aspect = this.swapchain.extent.width as float32 /
+						this.swapchain.extent.height as float32;
+	}
+
 	cameraViewMatrix := camera.GetViewMatrix();
 
 	sceneUBO := SceneUBO();
@@ -469,18 +510,31 @@ VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 VulkanRenderer::UpdateScene(scene: *Scene)
 {
 	frame := this.Frame();
+
 	this.UpdateSceneUBO(scene, frame);
 }
 
 VulkanRenderer::Draw(scene: *Scene)
 {
 	device := vulkanInstance.device;
+
+	if (this.needsRecreate)
+	{
+		this.RecreateSwapchain();
+		this.needsRecreate = false;
+	}
+
 	frame := this.Frame();
 	renderGraph := this.renderGraph;
 	renderGraph.SetRenderer(this@);
 	resourceTables := renderGraph.handles.resourceTables;
 
-	this.WaitAndAcquireSwapchain(frame);
+	result := this.WaitAndAcquireSwapchain(frame);
+	if (result == VkResult.VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		this.needsRecreate = true;
+		return;
+	}
 
 	swapchainImage := this.swapchain.GetCurrentSwapchainImage();
 	swapchainDesc := this.swapchain.GetSwapchainDesc();
@@ -492,7 +546,7 @@ VulkanRenderer::Draw(scene: *Scene)
 
 	for (pass in this.passes)
 	{
-		pass.onDraw(renderGraph, scene);
+		pass.onDraw(renderGraph, scene, pass@);
 	}
 
 	renderGraph.Compile();
@@ -534,7 +588,12 @@ VulkanRenderer::Draw(scene: *Scene)
 		"Error submitting Vulkan draw command buffer"
 	);
 
-	this.swapchain.Present(vulkanInstance.queues.presentQueue, frame);
+	presentResult := this.swapchain.Present(vulkanInstance.queues.presentQueue, frame);
+	if (presentResult == VkResult.VK_ERROR_OUT_OF_DATE_KHR ||
+		presentResult == VkResult.VK_SUBOPTIMAL_KHR)
+	{
+		this.needsRecreate = true;
+	}
 	this.currentFrame += 1;
 }
 

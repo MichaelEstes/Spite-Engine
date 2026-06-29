@@ -32,7 +32,7 @@ enum VariableType: uint32
     Mat4
 }
 
-enum TextureType: uint32
+enum TextureType: ubyte
 {
     Sampler2D,
     Sampler2DArray,
@@ -153,14 +153,15 @@ uint32 VariableDefinition::ValueSize()
 
 state TextureDefinition
 {
-    defaultValue: [4]float32,
     name: string,
+    defaultValue: [4]ubyte,
     kind: TextureType,
     precision: VariablePrecision,
     format: SamplerFormat,
     colorSpace: ColorSpace,
     multisample: bool,
-    filterable: bool
+    filterable: bool,
+    hasDefault: bool = false
 }
 
 TextureDefinition TextureDefinition::Clone()
@@ -357,6 +358,11 @@ FragmentStage FragmentStage::Clone()
     return cloned;
 }
 
+enum AssetDefFlags: uint32
+{
+    UseLightCulling = 1 << 0,
+}
+
 state AssetDef
 {
     name: string,
@@ -366,7 +372,9 @@ state AssetDef
     compiled: {
         vertex: string,
         fragment: string
-    }
+    },
+
+    flags: AssetDefFlags
 }
 
 AssetDef::delete
@@ -382,6 +390,7 @@ AssetDef AssetDef::Clone()
 
     cloned.vertex = this.vertex.Clone();
     cloned.fragment = this.fragment.Clone();
+    cloned.flags = this.flags;
 
     return cloned;
 }

@@ -292,11 +292,54 @@ samplesTable := [
 
 VkFormat GPUTextureSamplesToVkSamples(samples: GPUSampleCount) => samplesTable[samples];
 
+VkBufferUsageFlagBits GPUBufferUsageToVk(usage: GPUBufferUsageFlags)
+{
+	vk := VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+	if (usage & GPUBufferUsageFlags.VERTEX)
+		vk |= VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	if (usage & GPUBufferUsageFlags.INDEX)
+		vk |= VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+	if (usage & GPUBufferUsageFlags.INDIRECT)
+		vk |= VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+	if (usage & (GPUBufferUsageFlags.GRAPHICS_STORAGE_READ |
+				 GPUBufferUsageFlags.COMPUTE_STORAGE_READ |
+				 GPUBufferUsageFlags.COMPUTE_STORAGE_WRITE))
+		vk |= VkBufferUsageFlagBits.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+	return vk;
+}
+
+uint32 GPUMemoryFlagsToVk(memory: GPUMemoryFlags)
+{
+	vk := uint32(0);
+	if (memory & GPUMemoryFlags.GPU)      vk |= VulkanMemoryFlags.GPU;
+	if (memory & GPUMemoryFlags.Shared)   vk |= VulkanMemoryFlags.Shared;
+	if (memory & GPUMemoryFlags.Coherent) vk |= VulkanMemoryFlags.Coherent;
+	if (memory & GPUMemoryFlags.Cached)   vk |= VulkanMemoryFlags.Cached;
+	if (memory & GPUMemoryFlags.GPULazy)  vk |= VulkanMemoryFlags.GPULazy;
+	if (memory & GPUMemoryFlags.Mapped)   vk |= VulkanMemoryFlags.Mapped;
+	return vk;
+}
+
+HostVisibleMemory := GPUMemoryFlags.Shared | GPUMemoryFlags.Coherent | GPUMemoryFlags.Mapped;
+
+BufferDesc StorageBufferDesc(size: uint, memory: GPUMemoryFlags = GPUMemoryFlags.GPU)
+{
+	desc := BufferDesc();
+	desc.size = size;
+	desc.usage = GPUBufferUsageFlags.COMPUTE_STORAGE_READ |
+				 GPUBufferUsageFlags.COMPUTE_STORAGE_WRITE |
+				 GPUBufferUsageFlags.GRAPHICS_STORAGE_READ;
+	desc.memory = memory;
+	return desc;
+}
+
 VkBufferCreateInfo BufferDescToCreateInfo(createDesc: BufferDesc)
 {
 	createInfo := VkBufferCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	createInfo.usage = createDesc.usage;
+	createInfo.usage = GPUBufferUsageToVk(createDesc.usage);
 	createInfo.size = createDesc.size;
 
     if (createDesc.shared)

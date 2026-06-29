@@ -233,7 +233,13 @@ TextureDesc VulkanSwapchain::GetSwapchainDesc()
 
 VulkanSwapchain::Destroy(device: *VkDevice_T)
 {
-	for (i .. this.imageCount) 
+	for (i .. FrameCount)
+	{
+		vkDestroySemaphore(device, this.waitSemaphores[i], null);
+		vkDestroySemaphore(device, this.signalSemaphores[i], null);
+	}
+
+	for (i .. this.imageCount)
 	{
 		vkDestroyImageView(device, this.imageViews[i]~, null);
 	}

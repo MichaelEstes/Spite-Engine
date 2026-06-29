@@ -5,19 +5,27 @@ import ECS
 
 state VulkanRenderPass
 {
-	onDraw: ::(RenderGraph<VulkanRenderer>, *Scene)
-	onInit: ::(VulkanRenderer)
+	name: string,
+	onDraw: ::(RenderGraph<VulkanRenderer>, *Scene, *VulkanRenderPass)
+	onInit: ::(VulkanRenderer, *VulkanRenderPass),
+	onDestroy: ::(VulkanRenderer, *VulkanRenderPass),
+	data: *any
 }
 
 nameToRenderPass := Map<string, VulkanRenderPass>();
 
-VulkanRenderPass RegisterRenderPass(name: string, 
-									onDraw: ::(RenderGraph<VulkanRenderer>, *Scene)
-									onInit: ::(VulkanRenderer) = null)
+VulkanRenderPass RegisterRenderPass(
+	name: string,
+	onDraw: ::(RenderGraph<VulkanRenderer>, *Scene, *VulkanRenderPass)
+	onInit: ::(VulkanRenderer, *VulkanRenderPass) = null
+	onDestroy: ::(VulkanRenderer, *VulkanRenderPass) = null
+)
 {
 	pass := VulkanRenderPass();
+	pass.name = name;
 	pass.onDraw = onDraw;
 	pass.onInit = onInit;
+	pass.onDestroy = onDestroy;
 
 	nameToRenderPass.Insert(name, pass);
 

@@ -295,6 +295,12 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 			colorTextureMap := LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
 			primitive.material.SetTexture("colorTexture", colorTextureMap, false);
 		}
+
+		if (pbr.metallicRoughnessTexture)
+		{
+			metallicRoughnessTextureMap := LoadTexture(gltfData, gltf, pbr.metallicRoughnessTexture.index);
+			primitive.material.SetTexture("metallicRoughnessTexture", metallicRoughnessTextureMap, false);
+		}
 	}
 
 	if (gltfMaterial.normalTexture)
@@ -304,15 +310,25 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 			gltfMaterial.normalTexture.scale, 
 			false
 		);
+		normalTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.normalTexture.info.index);
+		primitive.material.SetTexture("normalTexture", normalTextureMap, false);
 	}
 
 	if (gltfMaterial.occlusionTexture)
 	{
 		primitive.material.SetVariable<float32>(
-			"occlusionStrength", 
-			gltfMaterial.occlusionTexture.strength, 
+			"occlusionStrength",
+			gltfMaterial.occlusionTexture.strength,
 			false
 		);
+		occlusionTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.occlusionTexture.info.index);
+		primitive.material.SetTexture("occlusionTexture", occlusionTextureMap, false);
+	}
+
+	if (gltfMaterial.emissiveTexture)
+	{
+		emissiveTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.emissiveTexture.index);
+		primitive.material.SetTexture("emissiveTexture", emissiveTextureMap, false);
 	}
 
 	primitive.material.SetVariable<Vec3>(

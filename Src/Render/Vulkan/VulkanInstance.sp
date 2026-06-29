@@ -45,6 +45,7 @@ state VulkanInstance
 	frameBufferCache: VulkanFrameBufferCache,
 	pipelineCache: VulkanPipelineMap,
 	pipelineLayoutCache: VulkanPipelineLayoutCache,
+	computePipelineCache: VulkanComputePipelineCache,
 
 	allocator: VulkanAllocator,
 	stagingBuffer: VulkanStagingBuffer,
@@ -81,14 +82,24 @@ VulkanInstance::InitializeCurrentDevice()
 			renderTarget.image = image;
 			renderTarget.imageView = imageView;
 			renderTarget.handle = imageHandle;
-
 			resourceManager.renderTargetMap.Insert(image, renderTarget);
 
 			return image;
 		},
 		::*VkBuffer_T(createDesc: BufferDesc, renderer: *VulkanRenderer) {
 			device := vulkanInstance.device;
-			return CreateVkBuffer(device, BufferDescToCreateInfo(createDesc));
+			allocator := vulkanInstance.allocator;
+			resourceManager := vulkanInstance.resourceManager;
+
+			buffer := CreateVkBuffer(device, BufferDescToCreateInfo(createDesc));
+
+			bufferHandle := allocator.AllocBuffer(buffer, GPUMemoryFlagsToVk(createDesc.memory));
+
+			renderBuffer := VulkanRenderBuffer();
+			renderBuffer.handle = bufferHandle;
+			resourceManager.renderBufferMap.Insert(buffer, renderBuffer);
+
+			return buffer;
 		}
 	)
 
@@ -147,6 +158,7 @@ VulkanInstance::InitializeCurrentDevice()
 	this.frameBufferCache = VulkanFrameBufferCache();
 	this.pipelineCache = VulkanPipelineMap();
 	this.pipelineLayoutCache = VulkanPipelineLayoutCache();
+	this.computePipelineCache = VulkanComputePipelineCache();
 }
 
 ref VulkanStagingBuffer VulkanInstance::GetStagingBuffer()
@@ -359,7 +371,7 @@ InitializeVulkanInstance()
 					if (renderer.window.id == windowID)
 					{
 						log "Window Resized";
-						renderer.RecreateSwapchain();
+						renderer.needsRecreate = true;
 					}
 				}
 			}

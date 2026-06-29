@@ -12,6 +12,8 @@ import VulkanRenderPass
 import GLTFManager
 import RenderComponents
 import SceneComponents
+import Transform
+import Common
 
 import ImGui
 import Utils
@@ -26,7 +28,6 @@ _ := SceneRegistry.RegisterScene(
 		camera := Camera();
 		camera.position = Vec3(0, 1.0, 4.0);
 		camera.fov = Math.Deg2Rad(70.0);
-		camera.aspect = 1.0;
 		camera.near = 0.1;
 		camera.far = 1000.0;
 		camera.LookAt(Vec3(0.0, 0.0, 0.0));
@@ -41,16 +42,24 @@ _ := SceneRegistry.RegisterScene(
 				uint32(1000)
 			},
 			{
-				Array<string>(["ClearPass", "AssetPass"]),
+				Array<string>(["ClearPass", "LightCullPass", "AssetPass"]),
 				RendererFlags.Vulkan
 				//RendererFlags.SDL
 			}
 		});
 
+		lightEntity := scene.CreateEntity();
+		scene.SetComponent<Transform>(lightEntity, Transform(Vec3(-2.0, 1.0, 0.0)));
+		pointLight := PointLight();
+		pointLight.color = Color(1.0, 0.4, 0.2, 1.0);
+		pointLight.intensity = 5.0;
+		pointLight.radius = 10.0;
+		scene.SetComponent<PointLight>(lightEntity, pointLight);
+
 		//model := "./Resource/Models/Box/Box.gltf";
-		//model := "./Resource/Models/BoxTextured/BoxTextured.gltf";
+		model := "./Resource/Models/BoxTextured/BoxTextured.gltf";
 		//model := "./Resource/Models/BrainStem/BrainStem.gltf";
-		model := "./Resource/Models/DamagedHelmet/DamagedHelmet.gltf";
+		//model := "./Resource/Models/DamagedHelmet/DamagedHelmet.gltf";
 		log "Loading GLTF: ", model;
 		gltfHandle := LoadGLTFResource(
 			model, scene,
@@ -60,16 +69,16 @@ _ := SceneRegistry.RegisterScene(
 				scene := param.scene;
 				log "Loaded gltf: ", rootEntity;
 
-				//IterateHierarchy(
-				//	rootEntity, scene,
-				//	::(entity: Entity, scene: *Scene) 
-				//	{
-				//		rotate := RotateOverTime();
-				//		rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
-				//		rotate.speed = 0.25;
-				//		scene.SetComponent<RotateOverTime>(entity, rotate);
-				//	}
-				//);
+				// IterateHierarchy(
+				// 	rootEntity, scene,
+				// 	::(entity: Entity, scene: *Scene) 
+				// 	{
+				// 		rotate := RotateOverTime();
+				// 		rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
+				// 		rotate.speed = 0.25;
+				// 		scene.SetComponent<RotateOverTime>(entity, rotate);
+				// 	}
+				// );
 			},
 		);
 

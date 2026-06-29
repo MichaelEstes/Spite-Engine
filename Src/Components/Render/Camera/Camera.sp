@@ -14,7 +14,9 @@ state Camera
 	fov: float32,
 	aspect: float32,
 	near: float32,
-	far: float32
+	far: float32,
+
+	autoAspect := true
 }
 
 Matrix4 Camera::GetViewMatrix()

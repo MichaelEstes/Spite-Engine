@@ -32,6 +32,7 @@ state ResourceKey
 
 ResourceKey::(name: string)
 {
+	assert name.count, "Resource keys cannot be empty";
 	this.value.name = name;
 }
 

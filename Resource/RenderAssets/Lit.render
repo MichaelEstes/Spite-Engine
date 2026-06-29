@@ -1,5 +1,6 @@
 {
     name: Lit,
+    flags: ["useLightCulling"]
     vertex: {
         attributes: {
             position: vec3,
@@ -47,19 +48,143 @@
             }
         ],
         textures: {
-            colorTexture: sampler2D
+            colorTexture: {
+                type: sampler2D,
+                default: [255, 255, 255, 255]
+            },
+            normalTexture: {
+                type: sampler2D,
+                colorSpace: unorm,
+                default: [128, 128, 255, 255]
+            },
+            metallicRoughnessTexture: {
+                type: sampler2D,
+                colorSpace: unorm,
+                default: [0, 255, 0, 255]
+            },
+            occlusionTexture: {
+                type: sampler2D,
+                colorSpace: unorm,
+                default: [255, 255, 255, 255]
+            },
+            emissiveTexture: {
+                type: sampler2D,
+                default: [0, 0, 0, 255]
+            }
         }
-        using: [color, uv0],
+        using: [normal, tangents, color, uv0],
         out: {
             outColor: vec4
         },
         nodes: [
             {
-                name: litMain,
+                name: litColor,
                 code: `
                     outColor = color * baseColor * texture(colorTexture, uv0);
                 `,
                 after: main
+            },
+            {
+                name: litNormal,
+                code: `
+                    vec3 N = normalize(normal);
+                    vec3 T = normalize(tangents.xyz);
+                    vec3 B = cross(N, T) * tangents.w;
+                    mat3 TBN = mat3(T, B, N);
+
+                    vec3 tangentNormal = texture(normalTexture, uv0).xyz * 2.0 - 1.0;
+                    tangentNormal.xy *= normalScale;
+                    vec3 shadingNormal = normalize(TBN * tangentNormal);
+                `,
+                after: litColor
+            },
+            {
+                name: litMetallicRoughness,
+                code: `
+                    vec4 metallicRoughness = texture(metallicRoughnessTexture, uv0);
+                    float roughness = metallicRoughness.g * roughnessFactor;
+                    float metallic = metallicRoughness.b * metallicFactor;
+                `,
+                after: litNormal
+            },
+            {
+                name: litClusterLightStart,
+                code: `
+                    vec2 clusterNdc = (gl_FragCoord.xy / clusterInfo.screenAndTile.xy) * 2.0 - 1.0;
+                    vec4 clusterView = clusterInfo.invProj * vec4(clusterNdc, gl_FragCoord.z, 1.0);
+                    clusterView /= clusterView.w;
+                    vec3 clusterWorldPos = (clusterInfo.invView * vec4(clusterView.xyz, 1.0)).xyz;
+
+                    float clusterNear = clusterInfo.zParams.x;
+                    float clusterFar = clusterInfo.zParams.y;
+                    uint clusterSlice = uint(max(float(clusterInfo.clusterDims.z) * log(-clusterView.z / clusterNear) / log(clusterFar / clusterNear), 0.0));
+                    clusterSlice = min(clusterSlice, clusterInfo.clusterDims.z - 1u);
+                    uvec2 clusterTile = uvec2(gl_FragCoord.xy / clusterInfo.screenAndTile.zw);
+                    uint clusterIndex = clusterSlice * clusterInfo.clusterDims.x * clusterInfo.clusterDims.y
+                                      + clusterTile.y * clusterInfo.clusterDims.x + clusterTile.x;
+
+                    vec3 clusterViewDir = normalize(clusterInfo.invView[3].xyz - clusterWorldPos);
+
+                    uvec2 clusterGrid = lightGrid[clusterIndex];
+                    vec3 clusterDiffuse = vec3(0.0);
+                    vec3 clusterSpecular = vec3(0.0);
+                    for (uint clusterI = 0u; clusterI < clusterGrid.y; clusterI++)
+                    {
+                        ClusterLight clusterLight = clusterLights[lightIndices[clusterGrid.x + clusterI]];
+                        vec3 clusterToLight = clusterLight.positionRadius.xyz - clusterWorldPos;
+                        float clusterDist = length(clusterToLight);
+                        if (clusterDist >= clusterLight.positionRadius.w) continue;
+                        vec3 clusterLightDir = clusterToLight / clusterDist;
+                        float clusterAtten = 1.0 - clusterDist / clusterLight.positionRadius.w;
+                        vec3 clusterRadiance = clusterLight.colorIntensity.rgb * clusterLight.colorIntensity.a * clusterAtten;
+                `,
+                after: litMetallicRoughness
+            },
+            {
+                name: litClusterDiffuse,
+                code: `
+                        float clusterNdotL = max(dot(shadingNormal, clusterLightDir), 0.0);
+                        clusterDiffuse += clusterRadiance * clusterNdotL;
+                `,
+                after: litClusterLightStart,
+                before: litClusterLightEnd
+            },
+            {
+                name: litClusterSpecular,
+                code: `
+                        vec3 clusterHalf = normalize(clusterLightDir + clusterViewDir);
+                        float clusterShininess = mix(4.0, 256.0, 1.0 - roughness);
+                        float clusterSpec = pow(max(dot(shadingNormal, clusterHalf), 0.0), clusterShininess);
+                        clusterSpecular += clusterRadiance * clusterSpec;
+                `,
+                after: litClusterLightStart,
+                before: litClusterLightEnd
+            },
+            {
+                name: litClusterLightEnd,
+                code: `
+                    }
+                    vec3 clusterAmbient = vec3(0.2);
+                    vec3 clusterSpecColor = mix(vec3(1.0), outColor.rgb, metallic);
+                    outColor.rgb = outColor.rgb * (clusterAmbient + clusterDiffuse) + clusterSpecColor * clusterSpecular * (1.0 - roughness);
+                `,
+                after: litClusterLightStart
+            },
+            {
+                name: litOcclusion,
+                code: `
+                    float occlusion = texture(occlusionTexture, uv0).r;
+                    outColor.rgb *= mix(1.0, occlusion, occlusionStrength);
+                `,
+                after: litClusterLightEnd
+            },
+            {
+                name: litEmissive,
+                code: `
+                    vec3 emissive = texture(emissiveTexture, uv0).rgb * emissiveFactor;
+                    outColor.rgb += emissive;
+                `,
+                after: litOcclusion
             }
         ],
 

@@ -8,7 +8,7 @@ import ImGui
 ImGuiPassName := "ImGuiPass";
 ImGuiPass := RegisterRenderPass(
 	ImGuiPassName,
-	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene) 
+	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene, self: *VulkanRenderPass) 
 	{
 		graph.AddPass(
 			ImGuiPassName,
@@ -71,7 +71,7 @@ ImGuiPass := RegisterRenderPass(
 			scene
 		);
 	},
-	::(renderer: VulkanRenderer) 
+	::(renderer: VulkanRenderer, self: *VulkanRenderPass) 
 	{
 		log "ImGui pass added";
 	}

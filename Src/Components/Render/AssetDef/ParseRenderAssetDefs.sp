@@ -276,6 +276,17 @@ TextureDefinition ParseTextureDefinition(name: string, value: *JSONValue)
         filterableValue := textureObj.GetMember("filterable");
         if (filterableValue)
             textureDef.filterable = filterableValue.Boolean().value;
+
+        defaultValue := textureObj.GetMember("default");
+        if (defaultValue)
+        {
+            arr := defaultValue.Array();
+            textureDef.defaultValue[0] = arr.GetValue(0).Number().value.i;
+            textureDef.defaultValue[1] = arr.GetValue(1).Number().value.i;
+            textureDef.defaultValue[2] = arr.GetValue(2).Number().value.i;
+            textureDef.defaultValue[3] = arr.GetValue(3).Number().value.i;
+            textureDef.hasDefault = true;
+        }
     }
 
     return textureDef;
@@ -387,6 +398,23 @@ ParseRenderAssetDef(assetDef: AssetDef, assetDefObj: *JSONObject)
     log "Parsing asset definition: ", name;
 
     assetDef.name = name;
+
+    flagsValue := assetDefObj.GetMember("flags");
+    if (flagsValue)
+    {
+        flagsArr := flagsValue.Array();
+        assert flagsArr, "Asset def flags must be an array";
+        for (val in flagsArr.values)
+        {
+            flagStr := val.String();
+            assert flagStr, "Values in flags array must be strings";
+
+            if (flagStr.value == "useLightCulling")
+            {
+                assetDef.flags |= AssetDefFlags.UseLightCulling;
+            }
+        }
+    }
 
     vertexValue := assetDefObj.GetMember("vertex");
     if (vertexValue)

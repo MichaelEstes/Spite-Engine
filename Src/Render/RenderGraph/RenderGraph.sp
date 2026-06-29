@@ -21,14 +21,14 @@ state RenderPassContext<Renderer>
 	driverRenderpass: *any
 }
 
-*Texture RenderPassContext::UseTexture<Texture>(handle: RenderResourceHandle)
+*Texture UseRenderPassTexture<Renderer, Texture>(context: *RenderPassContext<Renderer>, handle: RenderResourceHandle)
 {
-	return this.handles.UseResource(handle, this.renderer).resource as *Texture;
+	return context.handles.UseResource(handle, context.renderer).resource as *Texture;
 }
 
-*Buffer RenderPassContext::UseBuffer<Buffer>(handle: RenderResourceHandle)
+*Buffer UseRenderPassBuffer<Renderer, Buffer>(context: *RenderPassContext<Renderer>, handle: RenderResourceHandle)
 {
-	return this.handles.UseResource(handle, this.renderer).resource as *Buffer;
+	return context.handles.UseResource(handle, context.renderer).resource as *Buffer;
 }
 
 state RenderGraph<Renderer>
@@ -175,7 +175,7 @@ RenderGraph::WalkResources(resourceHandle: uint32, passes: PassResourceArray)
 			}
 		}
 
-		if (this.passSet[passIndex])
+		if (!this.passSet[passIndex])
 		{
 			this.passSet.Set(passIndex);
 			this.passOrder.Add(passIndex);

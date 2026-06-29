@@ -8,7 +8,7 @@ clearPassName := "ClearPass";
 
 clearPass := RegisterRenderPass(
 	clearPassName,
-	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene) 
+	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene, self: *VulkanRenderPass) 
 	{
 		graph.AddPass(
 			clearPassName,
