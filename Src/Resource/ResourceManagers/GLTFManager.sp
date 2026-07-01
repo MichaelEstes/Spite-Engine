@@ -15,6 +15,16 @@ import RenderAssetDef
 
 import RotateComponent
 
+gltfModeToTopologyKindTable := [
+	TopologyKind.PointList,
+	TopologyKind.LineList,
+	TopologyKind.LineLoop,
+	TopologyKind.LineStrip,
+	TopologyKind.TriangleList,
+	TopologyKind.TraiangleStrip,
+	TopologyKind.TriangleFan,
+];
+
 state GLTFResource
 {
 	buffers: Array<ResourceHandle>,
@@ -282,25 +292,26 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 {
 	gltfMaterial := gltf.materials[materialIndex];
 
+	pbr := GLTFMaterialPBRMetallicRoughness();
 	if (gltfMaterial.pbrMetallicRoughness)
 	{
-		pbr := gltfMaterial.pbrMetallicRoughness;
+		pbr = gltfMaterial.pbrMetallicRoughness~;
+	}
 
-		primitive.material.SetVariable<Color>("baseColor", pbr.baseColorFactor, false);
-		primitive.material.SetVariable<float32>("metallicFactor", pbr.metallicFactor, false);
-		primitive.material.SetVariable<float32>("roughnessFactor", pbr.roughnessFactor, false);
+	primitive.material.SetVariable<Color>("baseColor", pbr.baseColorFactor, false);
+	primitive.material.SetVariable<float32>("metallicFactor", pbr.metallicFactor, false);
+	primitive.material.SetVariable<float32>("roughnessFactor", pbr.roughnessFactor, false);
 
-		if (pbr.baseColorTexture)
-		{
-			colorTextureMap := LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
-			primitive.material.SetTexture("colorTexture", colorTextureMap, false);
-		}
+	if (pbr.baseColorTexture)
+	{
+		colorTextureMap := LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
+		primitive.material.SetTexture("colorTexture", colorTextureMap, false);
+	}
 
-		if (pbr.metallicRoughnessTexture)
-		{
-			metallicRoughnessTextureMap := LoadTexture(gltfData, gltf, pbr.metallicRoughnessTexture.index);
-			primitive.material.SetTexture("metallicRoughnessTexture", metallicRoughnessTextureMap, false);
-		}
+	if (pbr.metallicRoughnessTexture)
+	{
+		metallicRoughnessTextureMap := LoadTexture(gltfData, gltf, pbr.metallicRoughnessTexture.index);
+		primitive.material.SetTexture("metallicRoughnessTexture", metallicRoughnessTextureMap, false);
 	}
 
 	if (gltfMaterial.normalTexture)
@@ -313,6 +324,15 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 		normalTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.normalTexture.info.index);
 		primitive.material.SetTexture("normalTexture", normalTextureMap, false);
 	}
+	else
+	{
+		normalDefault := GLTFNormalTextureInfo();
+		primitive.material.SetVariable<float32>(
+			"normalScale", 
+			normalDefault.scale, 
+			false
+		);
+	}
 
 	if (gltfMaterial.occlusionTexture)
 	{
@@ -323,6 +343,15 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 		);
 		occlusionTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.occlusionTexture.info.index);
 		primitive.material.SetTexture("occlusionTexture", occlusionTextureMap, false);
+	}
+	else
+	{
+		occlusionDefault := GLTFOcclusionTextureInfo();
+		primitive.material.SetVariable<float32>(
+			"occlusionStrength",
+			occlusionDefault.strength,
+			false
+		);
 	}
 
 	if (gltfMaterial.emissiveTexture)
@@ -354,6 +383,7 @@ MeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, 
 	for (gltfPrim in gltfMesh.primitives)
 	{
 		primitive := Primitive(litHandle);
+		primitive.geometry.topologyKind = gltfModeToTopologyKindTable[gltfPrim.mode];
 
 		for (attrKV in gltfPrim.attributes)
 		{

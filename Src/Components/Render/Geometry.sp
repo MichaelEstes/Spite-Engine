@@ -21,18 +21,18 @@ state GeometryAttributeUpdate
 GeometryVariableUpdateEvent := RegisterEvent<GeometryVariableUpdate>();
 GeometryAttributeUpdateEvent := RegisterEvent<GeometryAttributeUpdate>();
 
-enum GeometryKind: uint16
+enum TopologyKind: ubyte
 {
-    Triangle,
+    PointList
+    LineList,
+    LineStrip,
+    TriangleList,
     TraiangleStrip,
     TriangleFan,
-    Line,
-    LineStrip,
     LineLoop,
-    Point
 }
 
-enum IndexKind: uint16
+enum IndexKind: ubyte
 {
     None,
     I16,
@@ -48,9 +48,10 @@ state Geometry
 
     defHandle: AssetDefHandle,
 
-    indexKind: IndexKind,
+    gpuResourceID: uint32 = uint32(0),
 
-    gpuResourceID: uint32 = uint32(0)
+    topologyKind: TopologyKind = TopologyKind.TriangleList,
+    indexKind: IndexKind
 }
 
 Geometry::(defHandle: AssetDefHandle)

@@ -68,8 +68,8 @@ ResourceTable::ReleaseResources()
 
 state ResourceTables<Renderer>
 {
-	textureTable: ResourceTable<Renderer, TextureDesc>,
-	bufferTable: ResourceTable<Renderer, BufferDesc>,
+	textureTables := [ResourceTable<Renderer, TextureDesc>(), ResourceTable<Renderer, TextureDesc>()],
+	bufferTables := [ResourceTable<Renderer, BufferDesc>(), ResourceTable<Renderer, BufferDesc>()],
 	textureToLayout := Map<*any, GPUTextureLayout>(),
 	createTexture: ::*any(TextureDesc, *Renderer),
 	createBuffer: ::*any(BufferDesc, *Renderer)
@@ -81,9 +81,9 @@ ResourceTables::(createTexture: ::*any(TextureDesc, *any), createBuffer: ::*any(
 	this.createBuffer = createBuffer;
 }
 
-RenderResource ResourceTables::UseTexture(createInfo: TextureDesc, renderer: *Renderer, created: *bool)
+RenderResource ResourceTables::UseTexture(createInfo: TextureDesc, renderer: *Renderer, created: *bool, frame: uint32)
 {
-	table := this.textureTable;
+	table := this.textureTables[frame];
 	texture := table.GetOrCreateResource(
 		createInfo,
 		renderer,
@@ -94,9 +94,9 @@ RenderResource ResourceTables::UseTexture(createInfo: TextureDesc, renderer: *Re
 	return RenderResource().FromTexture(texture);
 }
 
-RenderResource ResourceTables::UseBuffer(createInfo: BufferDesc, renderer: *Renderer)
+RenderResource ResourceTables::UseBuffer(createInfo: BufferDesc, renderer: *Renderer, frame: uint32)
 {
-	table := this.bufferTable;
+	table := this.bufferTables[frame];
 	buffer := table.GetOrCreateResource(
 		createInfo,
 		renderer,
@@ -106,14 +106,14 @@ RenderResource ResourceTables::UseBuffer(createInfo: BufferDesc, renderer: *Rend
 	return RenderResource().FromBuffer(buffer);
 }
 
-RenderResource ResourceTables::UseResource(resourceDesc: ResourceDesc, renderer: *Renderer)
+RenderResource ResourceTables::UseResource(resourceDesc: ResourceDesc, renderer: *Renderer, frame: uint32)
 {
 	switch (resourceDesc.kind)
 	{
 		case (ResourceKind.Texture)
 		{
 			created := false;
-			texture := this.UseTexture(resourceDesc.desc.texture, renderer, created@);
+			texture := this.UseTexture(resourceDesc.desc.texture, renderer, created@, frame);
 			if (created)
 			{
 				this.SetCurrentTextureLayout(texture.resource, resourceDesc.desc.texture.layout);
@@ -122,7 +122,7 @@ RenderResource ResourceTables::UseResource(resourceDesc: ResourceDesc, renderer:
 		}
 		case (ResourceKind.Buffer)
 		{
-			return this.UseBuffer(resourceDesc.desc.buffer, renderer);
+			return this.UseBuffer(resourceDesc.desc.buffer, renderer, frame);
 		}
 	}
 
@@ -147,6 +147,8 @@ GPUTextureLayout ResourceTables::GetCurrentTextureLayout(texture: *any)
 
 ResourceTables::ReleaseTrackedResources()
 {
-	this.textureTable.ReleaseResources();
-	this.bufferTable.ReleaseResources();
+	this.textureTables[0].ReleaseResources();
+	this.bufferTables[0].ReleaseResources();
+	this.textureTables[1].ReleaseResources();
+	this.bufferTables[1].ReleaseResources();
 }

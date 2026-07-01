@@ -9,6 +9,7 @@ state VulkanRenderPass
 	onDraw: ::(RenderGraph<VulkanRenderer>, *Scene, *VulkanRenderPass)
 	onInit: ::(VulkanRenderer, *VulkanRenderPass),
 	onDestroy: ::(VulkanRenderer, *VulkanRenderPass),
+	onResize: ::(VulkanRenderer, *VulkanRenderPass),
 	data: *any
 }
 
@@ -19,6 +20,7 @@ VulkanRenderPass RegisterRenderPass(
 	onDraw: ::(RenderGraph<VulkanRenderer>, *Scene, *VulkanRenderPass)
 	onInit: ::(VulkanRenderer, *VulkanRenderPass) = null
 	onDestroy: ::(VulkanRenderer, *VulkanRenderPass) = null
+	onResize: ::(VulkanRenderer, *VulkanRenderPass) = null
 )
 {
 	pass := VulkanRenderPass();
@@ -26,6 +28,7 @@ VulkanRenderPass RegisterRenderPass(
 	pass.onDraw = onDraw;
 	pass.onInit = onInit;
 	pass.onDestroy = onDestroy;
+	pass.onResize = onResize;
 
 	nameToRenderPass.Insert(name, pass);
 

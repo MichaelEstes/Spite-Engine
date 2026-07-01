@@ -20,8 +20,6 @@ ClusterAABBSize := uint32((#sizeof Vec4) * 2);
 
 MaxLights := uint32(256);
 
-lightCullPassName := "LightCullPass";
-
 state GpuLight
 {
 	positionRadius: Vec4,   // xyz = position, w = radius
@@ -136,6 +134,8 @@ clusterCullSource := `
 #version 460
 #pragma shader_stage(compute)
 
+#extension GL_EXT_control_flow_attributes : require
+
 layout(local_size_x = 64) in;
 
 #define MAX_PER_CLUSTER 64
@@ -178,7 +178,7 @@ layout(push_constant) uniform Params {
 bool sphereIntersectsAABB(vec3 center, float radius, vec3 mn, vec3 mx)
 {
 	float sqDist = 0.0;
-	for (int i = 0; i < 3; i++)
+	[[unroll]] for (int i = 0; i < 3; i++)
 	{
 		float v = center[i];
 		if (v < mn[i]) sqDist += (mn[i] - v) * (mn[i] - v);
@@ -239,6 +239,11 @@ state ClusterInfoData
 }
 ClusterInfoSize := (#sizeof ClusterInfoData) as uint32;
 
+state LightCullFrame
+{
+	cullSet: *VkDescriptorSet_T,
+}
+
 state LightCullState
 {
 	buildPipeline: *VulkanComputePipeline,
@@ -247,36 +252,20 @@ state LightCullState
 
 	cullPipeline: *VulkanComputePipeline,
 	cullPool: *VkDescriptorPool_T,
-	cullSet: *VkDescriptorSet_T,
+	cullFrames: VulkanFrameResource<LightCullFrame>,
 
-	clusterHandle: RenderResourceHandle,
 	lightsHandle: RenderResourceHandle,
 	lightGridHandle: RenderResourceHandle,
 	lightIndexHandle: RenderResourceHandle,
 	counterHandle: RenderResourceHandle,
 	clusterInfoHandle: RenderResourceHandle,
-
-	counterBuffer: *VkBuffer_T,
+	clusterBuffer: HandleBuffer,
 
 	buildParams: ClusterBuildParams,
 	cullParams: ClusterCullParams,
 	lightCount: uint32,
 
-	descriptorsWritten: bool,
-	paramsReady: bool,
-	built: bool,
-	frameCounter: uint32,
-	logged: bool,
-	lightsLogged: bool,
-	cullLogged: bool
-}
-
-*void UseMappedBuffer(handles: *RenderResourceHandles<VulkanRenderer>, renderer: *VulkanRenderer,
-					  handle: RenderResourceHandle)
-{
-	buffer := handles.UseResource(handle, renderer).resource as *VkBuffer_T;
-	renderBuffer := vulkanInstance.resourceManager.renderBufferMap.Find(buffer);
-	return vulkanInstance.allocator.GetAllocationMappedPtr(renderBuffer.handle);
+	built: bool
 }
 
 LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T)
@@ -312,7 +301,6 @@ LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T)
 LightCullState::UpdateCullParams(scene: *Scene, renderer: *VulkanRenderer)
 {
 	camera := scene.GetComponent<Camera>(renderer.self);
-	if (!camera) return;
 
 	this.cullParams.view = camera.GetViewMatrix();
 	this.cullParams.lightCount = this.lightCount;
@@ -323,7 +311,6 @@ LightCullState::UpdateCullParams(scene: *Scene, renderer: *VulkanRenderer)
 LightCullState::UpdateBuildParams(scene: *Scene, renderer: *VulkanRenderer)
 {
 	camera := scene.GetComponent<Camera>(renderer.self);
-	if (!camera) return;
 
 	projection := Matrix4();
 	projection.Perspective(camera.fov, camera.aspect, camera.near, camera.far);
@@ -342,14 +329,11 @@ LightCullState::UpdateBuildParams(scene: *Scene, renderer: *VulkanRenderer)
 		ClusterGridX as float32, ClusterGridY as float32, ClusterGridZ as float32, 0.0
 	);
 	this.buildParams.zParams = Vec4(camera.near, camera.far, 0.0, 0.0);
-
-	this.paramsReady = true;
 }
 
 LightCullState::FillClusterInfo(scene: *Scene, renderer: *VulkanRenderer, buffer: *VkBuffer_T)
 {
 	camera := scene.GetComponent<Camera>(renderer.self);
-	if (!camera) return;
 
 	renderBuffer := vulkanInstance.resourceManager.renderBufferMap.Find(buffer);
 	info := vulkanInstance.allocator.GetAllocationMappedPtr(renderBuffer.handle) as *ClusterInfoData;
@@ -382,40 +366,40 @@ ComputeBarrier(cmd: *VkCommandBuffer_T,
 	);
 }
 
+lightCullPassName := "LightCullPass";
+
 lightCullPass := RegisterRenderPass(
 	lightCullPassName,
 	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene, self: *VulkanRenderPass)
 	{
+		renderer := graph.renderer;
+		frame := renderer.Frame();
 		lightCull := self.data as *LightCullState;
-		lightCull.UpdateBuildParams(scene, graph.renderer);
+		lightCull.UpdateBuildParams(scene, renderer);
 
 		graph.AddPass(
 			lightCullPassName,
 			::bool(builder: *RenderPassBuilder<VulkanRenderer>, data: *LightCullState)
 			{
-
-				// log "Vulkan Light cull pass init";
-
-				data.clusterHandle = builder.CreateBuffer(
-					"clusterAABBs", StorageBufferDesc((ClusterCount * ClusterAABBSize) as uint, HostVisibleMemory)
-				);
 				data.lightsHandle = builder.CreateBuffer(
-					"lights", StorageBufferDesc((MaxLights * LightSize) as uint, HostVisibleMemory)
+					"lights",
+					StorageBufferDesc((MaxLights * LightSize) as uint, HostVisibleMemory)
 				);
 
 				data.lightGridHandle = builder.CreateBuffer(
-					"lightGrid", StorageBufferDesc((ClusterCount * LightGridSize) as uint, HostVisibleMemory)
+					"lightGrid",
+					StorageBufferDesc((ClusterCount * LightGridSize) as uint, GPUMemoryFlags.GPU)
 				);
 				builder.Write(data.lightGridHandle, ResourceUsageFlags.StorageWrite);
 
 				data.lightIndexHandle = builder.CreateBuffer(
 					"lightIndexList",
-					StorageBufferDesc((ClusterCount * MaxLightsPerCluster * uint32(4)) as uint, HostVisibleMemory)
+					StorageBufferDesc((ClusterCount * MaxLightsPerCluster * uint32(4)) as uint, GPUMemoryFlags.GPU)
 				);
 				builder.Write(data.lightIndexHandle, ResourceUsageFlags.StorageWrite);
 
 				data.counterHandle = builder.CreateBuffer(
-					"lightCounter", StorageBufferDesc(uint(4), HostVisibleMemory)
+					"lightCounter", StorageBufferDesc(uint(4), GPUMemoryFlags.GPU)
 				);
 
 				data.clusterInfoHandle = builder.CreateBuffer(
@@ -426,39 +410,21 @@ lightCullPass := RegisterRenderPass(
 			},
 			::(context: *RenderPassContext<VulkanRenderer>, data: *LightCullState)
 			{
-				if (!data.paramsReady) return;
-
-				// log "Vulkan Light cull pass";
-
 				renderer := context.renderer;
 				cmd := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 				bindPoint := VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_COMPUTE;
 				groups := (ClusterCount + uint32(63)) / uint32(64);
+				frame := renderer.Frame();
 
 				resourceManager := vulkanInstance.resourceManager;
+				cullFrame := data.cullFrames.frames[frame];
 
-				if (!data.descriptorsWritten)
-				{
-					clusterBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.clusterHandle);
-					lightsBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.lightsHandle);
-					gridBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.lightGridHandle);
-					indexBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.lightIndexHandle);
-					counterBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.counterHandle);
-
-					resourceManager.WriteStorageSetBuffer(data.buildSet, 0, clusterBuf);
-
-					resourceManager.WriteStorageSetBuffer(data.cullSet, 0, clusterBuf);
-					resourceManager.WriteStorageSetBuffer(data.cullSet, 1, lightsBuf);
-					resourceManager.WriteStorageSetBuffer(data.cullSet, 2, gridBuf);
-					resourceManager.WriteStorageSetBuffer(data.cullSet, 3, indexBuf);
-					resourceManager.WriteStorageSetBuffer(data.cullSet, 4, counterBuf);
-
-					data.counterBuffer = counterBuf;
-					data.descriptorsWritten = true;
-				}
+				clusterBuf := data.clusterBuffer.buffer;
 
 				if (!data.built)
 				{
+					resourceManager.WriteStorageSetBuffer(data.buildSet, 0, clusterBuf);
+
 					vkCmdBindPipeline(cmd, bindPoint, data.buildPipeline.pipeline);
 					vkCmdBindDescriptorSets(
 						cmd, bindPoint, data.buildPipeline.layout,
@@ -482,7 +448,18 @@ lightCullPass := RegisterRenderPass(
 					data.built = true;
 				}
 
-				vkCmdFillBuffer(cmd, data.counterBuffer, 0, 4, 0);
+				lightsBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.lightsHandle, frame);
+				gridBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.lightGridHandle, frame);
+				indexBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.lightIndexHandle, frame);
+				counterBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.counterHandle, frame);
+
+				resourceManager.WriteStorageSetBuffer(cullFrame.cullSet, 0, clusterBuf);
+				resourceManager.WriteStorageSetBuffer(cullFrame.cullSet, 1, lightsBuf);
+				resourceManager.WriteStorageSetBuffer(cullFrame.cullSet, 2, gridBuf);
+				resourceManager.WriteStorageSetBuffer(cullFrame.cullSet, 3, indexBuf);
+				resourceManager.WriteStorageSetBuffer(cullFrame.cullSet, 4, counterBuf);
+
+				vkCmdFillBuffer(cmd, counterBuf, 0, 4, 0);
 				ComputeBarrier(
 					cmd,
 					VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -494,7 +471,7 @@ lightCullPass := RegisterRenderPass(
 				vkCmdBindPipeline(cmd, bindPoint, data.cullPipeline.pipeline);
 				vkCmdBindDescriptorSets(
 					cmd, bindPoint, data.cullPipeline.layout,
-					uint32(0), uint32(1), data.cullSet@, uint32(0), null
+					uint32(0), uint32(1), cullFrame.cullSet@, uint32(0), null
 				);
 				vkCmdPushConstants(
 					cmd, data.cullPipeline.layout,
@@ -515,55 +492,12 @@ lightCullPass := RegisterRenderPass(
 			lightCull
 		);
 
-		lightsBuf := graph.handles.UseResource(lightCull.lightsHandle, graph.renderer).resource as *VkBuffer_T;
+		lightsBuf := graph.handles.UseResource(lightCull.lightsHandle, renderer, frame).resource as *VkBuffer_T;
 		lightCull.GatherLights(scene, lightsBuf);
-		lightCull.UpdateCullParams(scene, graph.renderer);
+		lightCull.UpdateCullParams(scene, renderer);
 
-		clusterInfoBuf := graph.handles.UseResource(lightCull.clusterInfoHandle, graph.renderer).resource as *VkBuffer_T;
-		lightCull.FillClusterInfo(scene, graph.renderer, clusterInfoBuf);
-
-
-		// DEBUG
-		if (lightCull.built && !lightCull.logged)
-		{
-			lightCull.frameCounter += 1;
-			if (lightCull.frameCounter >= 5)
-			{
-				aabbs := UseMappedBuffer(graph.handles@, graph.renderer, lightCull.clusterHandle) as *float32;
-				last := (ClusterCount - 1) * uint32(8);
-				log "Cluster0 min ", aabbs[0]~, aabbs[1]~, aabbs[2]~, " max ", aabbs[4]~, aabbs[5]~, aabbs[6]~;
-				log "ClusterN min ", aabbs[last]~, aabbs[last + 1]~, aabbs[last + 2]~,
-					" max ", aabbs[last + 4]~, aabbs[last + 5]~, aabbs[last + 6]~;
-				lightCull.logged = true;
-			}
-		}
-
-		if (!lightCull.lightsLogged && lightCull.lightCount > 0)
-		{
-			lights := UseMappedBuffer(graph.handles@, graph.renderer, lightCull.lightsHandle) as *float32;
-			log "Lights gathered: ", lightCull.lightCount;
-			log "Light0 pos ", lights[0]~, lights[1]~, lights[2]~, " radius ", lights[3]~;
-			lightCull.lightsLogged = true;
-		}
-
-		if (lightCull.built && !lightCull.cullLogged)
-		{
-			lightCull.frameCounter += 1;
-			if (lightCull.frameCounter >= 8)
-			{
-				counter := UseMappedBuffer(graph.handles@, graph.renderer, lightCull.counterHandle) as *uint32;
-				grid := UseMappedBuffer(graph.handles@, graph.renderer, lightCull.lightGridHandle) as *uint32;
-
-				touched := uint32(0);
-				for (i .. ClusterCount)
-				{
-					if (grid[i * uint32(2) + uint32(1)]~) touched += 1;
-				}
-
-				log "Cull total assignments ", counter[0]~, " clusters touched ", touched;
-				lightCull.cullLogged = true;
-			}
-		}
+		clusterInfoBuf := graph.handles.UseResource(lightCull.clusterInfoHandle, renderer, frame).resource as *VkBuffer_T;
+		lightCull.FillClusterInfo(scene, renderer, clusterInfoBuf);
 	},
 	::(renderer: VulkanRenderer, self: *VulkanRenderPass)
 	{
@@ -572,6 +506,9 @@ lightCullPass := RegisterRenderPass(
 		lightCull := new LightCullState();
 		lightCull.buildPipeline = FindOrCreateComputePipeline("ClusterBuild", clusterBuildSource);
 		lightCull.cullPipeline = FindOrCreateComputePipeline("ClusterCull", clusterCullSource);
+		lightCull.clusterBuffer = CreateDeviceStorageBuffer(
+			(ClusterCount * ClusterAABBSize) as uint32
+		);
 
 		buildPoolSize := VkDescriptorPoolSize();
 		buildPoolSize.type = VkDescriptorType.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -601,29 +538,33 @@ lightCullPass := RegisterRenderPass(
 
 		cullPoolSize := VkDescriptorPoolSize();
 		cullPoolSize.type = VkDescriptorType.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		cullPoolSize.descriptorCount = 5;
+		cullPoolSize.descriptorCount = 5 * FrameCount;
 
 		cullPoolInfo := VkDescriptorPoolCreateInfo();
 		cullPoolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		cullPoolInfo.poolSizeCount = 1;
 		cullPoolInfo.pPoolSizes = cullPoolSize@;
-		cullPoolInfo.maxSets = 1;
+		cullPoolInfo.maxSets = FrameCount;
 
 		CheckResult(
 			vkCreateDescriptorPool(device, cullPoolInfo@, null, lightCull.cullPool@),
 			"LightCullPass Error creating cull descriptor pool"
 		);
 
-		cullAllocInfo := VkDescriptorSetAllocateInfo();
-		cullAllocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		cullAllocInfo.descriptorPool = lightCull.cullPool;
-		cullAllocInfo.descriptorSetCount = 1;
-		cullAllocInfo.pSetLayouts = lightCull.cullPipeline.descSetLayouts[0]@;
+		for (i .. FrameCount)
+		{
+			lightCull.cullFrames.frames[i] = LightCullFrame();
+			cullAllocInfo := VkDescriptorSetAllocateInfo();
+			cullAllocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			cullAllocInfo.descriptorPool = lightCull.cullPool;
+			cullAllocInfo.descriptorSetCount = 1;
+			cullAllocInfo.pSetLayouts = lightCull.cullPipeline.descSetLayouts[0]@;
 
-		CheckResult(
-			vkAllocateDescriptorSets(device, cullAllocInfo@, lightCull.cullSet@),
-			"LightCullPass Error allocating cull descriptor set"
-		);
+			CheckResult(
+				vkAllocateDescriptorSets(device, cullAllocInfo@, lightCull.cullFrames.frames[i].cullSet@),
+				"LightCullPass Error allocating cull descriptor set"
+			);
+		}
 
 		self.data = lightCull;
 	},
@@ -632,6 +573,12 @@ lightCullPass := RegisterRenderPass(
 		lightCull := self.data as *LightCullState;
 		vkDestroyDescriptorPool(vulkanInstance.device, lightCull.buildPool, null);
 		vkDestroyDescriptorPool(vulkanInstance.device, lightCull.cullPool, null);
+		vkDestroyBuffer(vulkanInstance.device, lightCull.clusterBuffer.buffer, null);
 		delete lightCull;
+	},
+	::(renderer: VulkanRenderer, self: *VulkanRenderPass)
+	{
+		lightCull := self.data as *LightCullState;
+		lightCull.built = false;
 	}
 );

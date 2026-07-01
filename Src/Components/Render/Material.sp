@@ -38,7 +38,11 @@ state Material
 	
     defHandle: AssetDefHandle,
 
-    gpuResourceID: uint32 = uint32(0)
+    gpuResourceID: uint32 = uint32(0),
+
+    alphaMode: AlphaMode,
+    cullMode: CullModeFlags,
+    polygonMode: PolygonMode
 }
 
 Material::(defHandle: AssetDefHandle)

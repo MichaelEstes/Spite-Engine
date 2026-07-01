@@ -40,8 +40,9 @@ FrameCount := 2;
 state VulkanDrawMesh
 {
 	entity: Entity,
-	geometry: uint32, 
-	material: uint32
+	geometryHandle: uint32, 
+	materialHandle: uint32,
+	cullMode: VkCullModeFlagBits
 }
 
 state VulkanDrawList
@@ -294,22 +295,26 @@ VulkanRenderer::RecreateSwapchain()
 	}
 
 	resourceTables := vulkanInstance.resourceTables;
-	for (arr in resourceTables.textureTable.descToResource.Values())
+	for (i .. FrameCount)
 	{
-		for (tracked in arr)
+		textureTable := resourceTables.textureTables[i];
+		for (arr in textureTable.descToResource.Values())
 		{
-			image := tracked.resource as *VkImage_T;
-			renderTarget := resourceManager.renderTargetMap.Find(image);
-			if (renderTarget)
+			for (tracked in arr)
 			{
-				vkDestroyImageView(device, renderTarget.imageView, null);
-				vkDestroyImage(device, image, null);
-				resourceManager.renderTargetMap.Remove(image);
+				image := tracked.resource as *VkImage_T;
+				renderTarget := resourceManager.renderTargetMap.Find(image);
+				if (renderTarget)
+				{
+					vkDestroyImageView(device, renderTarget.imageView, null);
+					vkDestroyImage(device, image, null);
+					resourceManager.renderTargetMap.Remove(image);
+				}
+				resourceTables.textureToLayout.Remove(image);
 			}
-			resourceTables.textureToLayout.Remove(image);
 		}
+		textureTable.descToResource.Clear();
 	}
-	resourceTables.textureTable.descToResource.Clear();
 
 	frameBufferCache := vulkanInstance.frameBufferCache;
 	for (kv in frameBufferCache.frameBufferMap)
@@ -321,6 +326,11 @@ VulkanRenderer::RecreateSwapchain()
 	this.swapchain.Destroy(device);
 
 	this.CreateSwapchain();
+
+	for (pass in this.passes)
+	{
+		if (pass.onResize) pass.onResize(this, pass@);
+	}
 }
 
 VulkanRenderer::CreateSurface()
@@ -623,14 +633,15 @@ VulkanRenderer::UpdateDrawList(scene: *Scene)
 
 			meshState := VulkanPipelineMeshState();
 			meshState.assetDefHandle = primitive.defHandle;
-			// TODO: topology source
-			meshState.SetTopology(VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+
+			meshState.SetTopology(primitive.geometry.topologyKind);
 			meshState.alphaMode = assetDef.fragment.alphaMode as uint16;
 
 			drawMesh := VulkanDrawMesh();
 			drawMesh.entity = entity;
-			drawMesh.geometry = primitive.geometry.gpuResourceID;
-			drawMesh.material = primitive.material.gpuResourceID;
+			drawMesh.geometryHandle = primitive.geometry.gpuResourceID;
+			drawMesh.materialHandle = primitive.material.gpuResourceID;
+			drawMesh.cullMode = primitive.material.cullMode;
 
 			meshArr := this.drawList.pipelineMap.Find(meshState);
 			if (!meshArr)

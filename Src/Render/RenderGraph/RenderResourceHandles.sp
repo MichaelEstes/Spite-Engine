@@ -16,7 +16,7 @@ state RenderResourceHandles<Renderer>
 	handles := HandleSet<ResourceDesc>(),
 	handleToName := SparseSet<string>(),
 	nameToHandle := Map<string, uint32>(),
-	resources := SparseSet<RenderResource>(),
+	resources := [SparseSet<RenderResource>(), SparseSet<RenderResource>()],
 	resourceTables: *ResourceTables<Renderer>
 }
 
@@ -53,7 +53,7 @@ RenderResourceHandle RenderResourceHandles::AddExternalResource(name: string, re
 	renderResource.resource = resource;
 	renderResource.kind = kind;
 
-	this.resources.Insert(handle.handle, renderResource);
+	this.resources[0].Insert(handle.handle, renderResource);
 	return handle;
 }
 
@@ -80,17 +80,19 @@ RenderResourceHandle RenderResourceHandles::AddExternalBufferResource(name: stri
 	return this.AddExternalResource(name, buffer, resourceDesc);
 }
 
-RenderResource RenderResourceHandles::UseResource(resourceHandle: RenderResourceHandle, renderer: *any)
+RenderResource RenderResourceHandles::UseResource(resourceHandle: RenderResourceHandle, renderer: *any, frame: uint32 = 0)
 {
 	handle := resourceHandle.handle;
-	if (this.resources.Has(handle))
+	resources := this.resources[frame];
+
+	if (resources.Has(handle))
 	{
-		return this.resources.Get(handle)~;
+		return resources.Get(handle)~;
 	}
 
 	desc := this.handles[handle]~;
-	resource := this.resourceTables.UseResource(desc, renderer);
-	this.resources.Insert(handle, resource);
+	resource := this.resourceTables.UseResource(desc, renderer, frame);
+	resources.Insert(handle, resource);
 
 	return resource;
 }
@@ -100,5 +102,6 @@ RenderResourceHandles::Clear()
 	this.handles.Clear();
 	this.handleToName.Clear();
 	this.nameToHandle.Clear();
-	this.resources.Clear();
+	this.resources[0].Clear();
+	this.resources[1].Clear();
 }

@@ -789,9 +789,6 @@ uint32 VulkanResourceManager::UploadMaterial(material: *Material)
 	vulkanMaterial := handleValue.value;
 	vulkanMaterial~ = VulkanMaterial();
 
-	// TODO: per material cull mode
-	vulkanMaterial.cullMode = VkCullModeFlagBits.VK_CULL_MODE_NONE;
-
 	assetDef := GetAssetDefWithHandle(material.defHandle);
 	vulkanMaterial.variables = UploadVariableSets(material.variables, assetDef.fragment.variables);
 

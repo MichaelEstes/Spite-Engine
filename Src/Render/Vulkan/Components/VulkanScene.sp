@@ -7,18 +7,6 @@ import ImageManager
 import Matrix
 import Common
 
-geometryKindToTopologyTable := [
-	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
-
-	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
-	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
-	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
-
-	VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
-];
-
 indexKindToByteCount := [
 	1,
 	2,
@@ -38,8 +26,7 @@ state VulkanGeometry
 	indexBuffer: *VkBuffer_T,
 	indexCount: uint32,
 
-	topology: VkPrimitiveTopology,
-	indexKind: VkIndexType,
+	indexKind: VkIndexType
 }
 
 state VulkanTexture
@@ -57,11 +44,7 @@ state VulkanMaterial
 	textureSet: VulkanAllocHandle,
 
 	variables: Array<VulkanAllocHandle>,
-	descriptorSets: Array<*VkDescriptorSet_T>,
-
-	polygonMode: VkPolygonMode,
-	cullMode: VkCullModeFlagBits,
-	alphaMode: VulkanAlphaMode
+	descriptorSets: Array<*VkDescriptorSet_T>
 }
 
 bool AddSceneCallbacks()

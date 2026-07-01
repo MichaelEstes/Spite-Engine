@@ -21,14 +21,14 @@ state RenderPassContext<Renderer>
 	driverRenderpass: *any
 }
 
-*Texture UseRenderPassTexture<Renderer, Texture>(context: *RenderPassContext<Renderer>, handle: RenderResourceHandle)
+*Texture UseRenderPassTexture<Renderer, Texture>(context: *RenderPassContext<Renderer>, handle: RenderResourceHandle, frame: uint32 = 0)
 {
-	return context.handles.UseResource(handle, context.renderer).resource as *Texture;
+	return context.handles.UseResource(handle, context.renderer, frame).resource as *Texture;
 }
 
-*Buffer UseRenderPassBuffer<Renderer, Buffer>(context: *RenderPassContext<Renderer>, handle: RenderResourceHandle)
+*Buffer UseRenderPassBuffer<Renderer, Buffer>(context: *RenderPassContext<Renderer>, handle: RenderResourceHandle, frame: uint32 = 0)
 {
-	return context.handles.UseResource(handle, context.renderer).resource as *Buffer;
+	return context.handles.UseResource(handle, context.renderer, frame).resource as *Buffer;
 }
 
 state RenderGraph<Renderer>
