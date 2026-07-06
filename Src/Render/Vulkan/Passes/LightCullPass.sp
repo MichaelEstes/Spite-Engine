@@ -19,27 +19,38 @@ ClusterCount := ClusterGridX * ClusterGridY * ClusterGridZ;
 ClusterAABBSize := uint32((#sizeof Vec4) * 2);
 
 MaxLights := uint32(256);
+InvocationSize := uint32(128);
+
+enum LightKind: uint32
+{
+	Directional,
+	Point
+}
 
 state GpuLight
 {
-	positionRadius: Vec4,   // xyz = position, w = radius
-	colorIntensity: Vec4    // rgb = color, a = intensity
+	positionRadius: Vec4,   // point: xyz = position, w = radius | directional: xyz = direction
+	colorIntensity: Vec4,   // rgb = color, a = intensity
+	kind: LightKind,        // Directional / Point
+	pad0: uint32,
+	pad1: uint32,
+	pad2: uint32
 }
 LightSize := (#sizeof GpuLight) as uint32;
 
 state ClusterBuildParams
 {
 	invProjection: Matrix4,
-	screenAndTile: Vec4,   // x,y = screen px ; z,w = tile px
+	screenAndTile: Vec4,   // x,y = screen px, z,w = tile px
 	clusterParams: Vec4,   // x,y,z = grid dims
-	zParams: Vec4          // x = zNear ; y = zFar
+	zParams: Vec4          // x = zNear, y = zFar
 }
 
 clusterBuildSource := `
 #version 460
 #pragma shader_stage(compute)
 
-layout(local_size_x = 64) in;
+layout(local_size_x = 128) in;
 
 struct ClusterAABB {
 	vec4 minPoint;
@@ -52,9 +63,9 @@ layout(std430, set = 0, binding = 0) buffer Clusters {
 
 layout(push_constant) uniform Params {
 	mat4 invProjection;
-	vec4 screenAndTile;   // x,y = screen px ; z,w = tile px
-	vec4 clusterParams;   // x,y,z = grid dims
-	vec4 zParams;         // x = zNear ; y = zFar
+	vec4 screenAndTile;
+	vec4 clusterParams;
+	vec4 zParams;
 } params;
 
 // Unproject a screen-space pixel coordinate to a view-space ray endpoint.
@@ -136,7 +147,7 @@ clusterCullSource := `
 
 #extension GL_EXT_control_flow_attributes : require
 
-layout(local_size_x = 64) in;
+layout(local_size_x = 128) in;
 
 #define MAX_PER_CLUSTER 64
 
@@ -148,6 +159,7 @@ struct ClusterAABB {
 struct Light {
 	vec4 positionRadius;
 	vec4 colorIntensity;
+	uint kind;   // 0 = directional, 1 = point
 };
 
 layout(std430, set = 0, binding = 0) readonly buffer Clusters {
@@ -203,17 +215,33 @@ void main()
 
 	for (uint i = 0; i < lightCount; i++)
 	{
-		vec3 worldPos = lights[i].positionRadius.xyz;
-		float radius = lights[i].positionRadius.w;
-		vec3 viewPos = (params.view * vec4(worldPos, 1.0)).xyz;
-
-		if (sphereIntersectsAABB(viewPos, radius, mn, mx))
+		switch (lights[i].kind)
 		{
+		case 0u:   // directional light
 			if (localCount < maxPerCluster)
 			{
 				localIndices[localCount] = i;
 				localCount++;
 			}
+			break;
+		case 1u:   // point light
+		{
+			vec3 worldPos = lights[i].positionRadius.xyz;
+			float radius = lights[i].positionRadius.w;
+			vec3 viewPos = (params.view * vec4(worldPos, 1.0)).xyz;
+
+			if (sphereIntersectsAABB(viewPos, radius, mn, mx))
+			{
+				if (localCount < maxPerCluster)
+				{
+					localIndices[localCount] = i;
+					localCount++;
+				}
+			}
+			break;
+		}
+		default:
+			break;
 		}
 	}
 
@@ -274,6 +302,26 @@ LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T)
 	lightsPtr := vulkanInstance.allocator.GetAllocationMappedPtr(renderBuffer.handle) as *GpuLight;
 
 	count := uint32(0);
+
+	for (ec in scene.Iterate<DirectionalLight>())
+	{
+		if (count >= MaxLights) break;
+
+		light := ec.component;
+
+		gpuLight := GpuLight();
+		gpuLight.positionRadius = Vec4(
+			light.direction.x, light.direction.y, light.direction.z, 0.0
+		);
+		gpuLight.colorIntensity = Vec4(
+			light.color.r, light.color.g, light.color.b, light.intensity
+		);
+		gpuLight.kind = LightKind.Directional;
+
+		lightsPtr[count]~ = gpuLight;
+		count += 1;
+	}
+
 	for (ec in scene.Iterate<PointLight>())
 	{
 		if (count >= MaxLights) break;
@@ -290,6 +338,7 @@ LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T)
 		gpuLight.colorIntensity = Vec4(
 			light.color.r, light.color.g, light.color.b, light.intensity
 		);
+		gpuLight.kind = LightKind.Point;
 
 		lightsPtr[count]~ = gpuLight;
 		count += 1;
@@ -298,20 +347,16 @@ LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T)
 	this.lightCount = count;
 }
 
-LightCullState::UpdateCullParams(scene: *Scene, renderer: *VulkanRenderer)
+LightCullState::UpdateCullParams(camera: *Camera)
 {
-	camera := scene.GetComponent<Camera>(renderer.self);
-
 	this.cullParams.view = camera.GetViewMatrix();
 	this.cullParams.lightCount = this.lightCount;
 	this.cullParams.clusterCount = ClusterCount;
 	this.cullParams.maxPerCluster = MaxLightsPerCluster;
 }
 
-LightCullState::UpdateBuildParams(scene: *Scene, renderer: *VulkanRenderer)
+LightCullState::UpdateBuildParams(camera: *Camera, renderer: *VulkanRenderer)
 {
-	camera := scene.GetComponent<Camera>(renderer.self);
-
 	projection := Matrix4();
 	projection.Perspective(camera.fov, camera.aspect, camera.near, camera.far);
 	projection[1][1] *= -1;
@@ -331,10 +376,8 @@ LightCullState::UpdateBuildParams(scene: *Scene, renderer: *VulkanRenderer)
 	this.buildParams.zParams = Vec4(camera.near, camera.far, 0.0, 0.0);
 }
 
-LightCullState::FillClusterInfo(scene: *Scene, renderer: *VulkanRenderer, buffer: *VkBuffer_T)
+LightCullState::FillClusterInfo(camera: *Camera, buffer: *VkBuffer_T)
 {
-	camera := scene.GetComponent<Camera>(renderer.self);
-
 	renderBuffer := vulkanInstance.resourceManager.renderBufferMap.Find(buffer);
 	info := vulkanInstance.allocator.GetAllocationMappedPtr(renderBuffer.handle) as *ClusterInfoData;
 
@@ -375,7 +418,8 @@ lightCullPass := RegisterRenderPass(
 		renderer := graph.renderer;
 		frame := renderer.Frame();
 		lightCull := self.data as *LightCullState;
-		lightCull.UpdateBuildParams(scene, renderer);
+		camera := scene.GetComponent<Camera>(renderer.self);
+		lightCull.UpdateBuildParams(camera, renderer);
 
 		graph.AddPass(
 			lightCullPassName,
@@ -413,7 +457,7 @@ lightCullPass := RegisterRenderPass(
 				renderer := context.renderer;
 				cmd := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 				bindPoint := VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_COMPUTE;
-				groups := (ClusterCount + uint32(63)) / uint32(64);
+				groups := (ClusterCount + (InvocationSize - uint32(1))) / InvocationSize;
 				frame := renderer.Frame();
 
 				resourceManager := vulkanInstance.resourceManager;
@@ -494,10 +538,10 @@ lightCullPass := RegisterRenderPass(
 
 		lightsBuf := graph.handles.UseResource(lightCull.lightsHandle, renderer, frame).resource as *VkBuffer_T;
 		lightCull.GatherLights(scene, lightsBuf);
-		lightCull.UpdateCullParams(scene, renderer);
+		lightCull.UpdateCullParams(camera);
 
 		clusterInfoBuf := graph.handles.UseResource(lightCull.clusterInfoHandle, renderer, frame).resource as *VkBuffer_T;
-		lightCull.FillClusterInfo(scene, renderer, clusterInfoBuf);
+		lightCull.FillClusterInfo(camera, clusterInfoBuf);
 	},
 	::(renderer: VulkanRenderer, self: *VulkanRenderPass)
 	{

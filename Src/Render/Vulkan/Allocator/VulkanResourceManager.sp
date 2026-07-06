@@ -104,7 +104,8 @@ uint32 VulkanBindlessTextures::UploadTexture(textureMap: TextureMap, textureDef:
 {
 	imageHandle := textureMap.texture.imageHandle;
 
-	if (this.imageHandleCache.Has(imageHandle.id)) this.imageHandleCache.Get(imageHandle.id)~;
+	if (this.imageHandleCache.Has(imageHandle.id)) 
+		return this.imageHandleCache.Get(imageHandle.id)~;
 
 	image := ImageResourceManager.GetResource(imageHandle).data.image;
 	width := image.w as uint32;
@@ -523,6 +524,8 @@ Array<VulkanAllocHandle> UploadVariableSets(variables: *void, variableSets: Vari
 
 uint32 VulkanResourceManager::UploadGeometry(geometry: *Geometry)
 {
+	if (geometry.gpuResourceID) return geometry.gpuResourceID;
+
 	allocator := vulkanInstance.allocator;
 	handleValue := this.geometries.GetNext();
 	vulkanGeometry := handleValue.value;
@@ -534,6 +537,14 @@ uint32 VulkanResourceManager::UploadGeometry(geometry: *Geometry)
 	vulkanGeometry.attributes = Array<VulkanAllocHandle>(attributeCount);
 	vulkanGeometry.attributeBuffers = Array<*VkBuffer_T>(attributeCount);
 	vulkanGeometry.strides = Array<uint64>(attributeCount);
+
+	if (attributeCount)
+	{
+		attribute := geometry.attributes[0];
+		attrDef := assetDef.vertex.attributes[0].def;
+		vulkanGeometry.vertexCount = uint32(attribute.count / attrDef.ValueSize());
+	}
+
 	for (i .. attributeCount)
 	{
 		attribute := geometry.attributes[i];
@@ -785,6 +796,8 @@ VulkanResourceManager::WriteStorageSet(descriptorSet: *VkDescriptorSet_T, bindin
 
 uint32 VulkanResourceManager::UploadMaterial(material: *Material)
 {
+	if (material.gpuResourceID) return material.gpuResourceID;
+
 	handleValue := this.materials.GetNext();
 	vulkanMaterial := handleValue.value;
 	vulkanMaterial~ = VulkanMaterial();

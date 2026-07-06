@@ -436,6 +436,12 @@ ParseRenderAssetDef(assetDef: AssetDef, assetDefObj: *JSONObject)
             ParseVariableSets(variablesValue, assetDef.vertex.variables);
         }
 
+        functionsValue := vertexObj.GetMember("functions");
+        if (functionsValue)
+        {
+            ParseShaderNodes(functionsValue, assetDef.vertex.functions);
+        }
+
         nodesValue := vertexObj.GetMember("nodes");
         if (nodesValue)
         {
@@ -494,6 +500,12 @@ ParseRenderAssetDef(assetDef: AssetDef, assetDefObj: *JSONObject)
             {
                 ParseVariables(outObj, assetDef.fragment.out);
             }
+        }
+
+        functionsValue := fragmentObj.GetMember("functions");
+        if (functionsValue)
+        {
+            ParseShaderNodes(functionsValue, assetDef.fragment.functions);
         }
 
         nodesValue := fragmentObj.GetMember("nodes");

@@ -48,6 +48,7 @@ string CompileShader(
     if (status != CompilationStatus.Success)
     {
         log "Shader compilation failed: ", string(shaderc_result_get_error_message(result));
+        log "Shader: ", shaderSource;
         return "";
     }
 

@@ -246,6 +246,8 @@ string WriteInVariables(shader: string, vars: Array<Variable>,
 string WriteTextures(shader: string, textures: Array<TextureDefinition>, 
                      set: uint32, writeDefines: bool = true)
 {
+    if (!textures.count) return shader;
+
     textureArraySetStr := UIntToString(set);
     textureIndexSetStr := UIntToString(set + 1);
     defer delete textureIndexSetStr;
@@ -353,10 +355,11 @@ vertexShaderStart := `
 #version 460
 #pragma shader_stage(vertex)
 
-layout(set = 0, binding = 0) uniform SceneUBO 
+layout(set = 0, binding = 0) uniform SceneUBO
 {
     mat4 view;
     mat4 proj;
+    vec2 screenSize;
 } scene;
 
 layout(push_constant) uniform Model 
@@ -392,6 +395,10 @@ string WriteVertexShader(assetDef: AssetDef)
 
     vertexShader = WriteOutVariables(vertexShader, sharedVars, outPrefix, vertexStage.out.count);
 
+    functions := WriteShaderNodes(vertexStage.functions);
+    defer delete functions;
+    vertexShader.AppendIn(functions);
+
     code := WriteShaderNodes(vertexStage.nodes);
     defer delete code;
 
@@ -399,20 +406,11 @@ string WriteVertexShader(assetDef: AssetDef)
     defer delete outAssignments;
 
     vertexShader.AppendIn(shaderMainStart);
-    vertexShader.AppendIn(code);
     vertexShader.AppendIn(outAssignments);
+    vertexShader.AppendIn(code);
     vertexShader.AppendIn("}");
 
     return vertexShader;
-}
-
-bool CompileVertexShader(assetDef: AssetDef, compiler: ShaderCompiler)
-{
-    vertexShaderSource := WriteVertexShader(assetDef);
-    log "VERTEX SHADER", vertexShaderSource;
-    spirv := CompileShader(vertexShaderSource, compiler, assetDef.name);
-    assetDef.vertex.compiled = spirv;
-    return spirv.count > 0;
 }
 
 fragmentShaderStart := `
@@ -421,15 +419,11 @@ fragmentShaderStart := `
 #extension GL_EXT_nonuniform_qualifier : require
 `
 
-// Clustered Forward+ light data, injected into the fragment shader when the asset
-// def declares the UseLightCulling flag. Lives in set 0 (frame globals) alongside
-// the SceneUBO. Must match the descriptor set AssetPass binds and the LightCullPass
-// buffer layouts (GpuLight, light grid uvec2, index list). Asset-def nodes consume
-// these (clusterLights / lightGrid / lightIndices / clusterInfo) to shade lights.
 fragmentLightCullDecls := `
 struct ClusterLight {
     vec4 positionRadius;
     vec4 colorIntensity;
+    uint kind;   // 0 = directional, 1 = point
 };
 
 layout(std430, set = 0, binding = 1) readonly buffer ClusterLights {
@@ -467,7 +461,7 @@ string WriteFragmentShader(assetDef: AssetDef)
     fragmentShader = WriteTextures(
         fragmentShader,
         fragmentStage.textures,
-        fragmentStage.variables.sets.count + assetDef.vertex.variables.sets.count + 1
+        assetDef.GetBindlessTextureSetIndex()
     );
 
 
@@ -484,6 +478,10 @@ string WriteFragmentShader(assetDef: AssetDef)
     fragmentShader = WriteInVariables(fragmentShader, inVars);
     fragmentShader = WriteOutVariables(fragmentShader, fragmentStage.out);
 
+    functions := WriteShaderNodes(fragmentStage.functions);
+    defer delete functions;
+    fragmentShader.AppendIn(functions);
+
     code := WriteShaderNodes(fragmentStage.nodes);
     defer delete code;
 
@@ -494,10 +492,19 @@ string WriteFragmentShader(assetDef: AssetDef)
     return fragmentShader;
 }
 
+bool CompileVertexShader(assetDef: AssetDef, compiler: ShaderCompiler)
+{
+    vertexShaderSource := WriteVertexShader(assetDef);
+    // log "VERTEX SHADER", vertexShaderSource;
+    spirv := CompileShader(vertexShaderSource, compiler, assetDef.name);
+    assetDef.vertex.compiled = spirv;
+    return spirv.count > 0;
+}
+
 bool CompileFragmentShader(assetDef: AssetDef, compiler: ShaderCompiler)
 {
     fragmentShaderSource := WriteFragmentShader(assetDef);
-    log "FRAGMENT SHADER", fragmentShaderSource;
+    // log "FRAGMENT SHADER", fragmentShaderSource;
     spirv := CompileShader(fragmentShaderSource, compiler, assetDef.name);
     assetDef.fragment.compiled = spirv;
     return spirv.count > 0;

@@ -285,20 +285,35 @@ InitializeVulkanInstance()
 	vulkanInstance.InitializeCurrentDevice();
 
 	ECS.instance.events.On(
-		MeshAddedEvent, 
-		::(sceneEntity: SceneEntity, data: *void)
+		MeshCreatedEvent,
+		::(mesh: *Mesh, data: *void)
 		{
-			log "Mesh Added Vulkan Instance";
-			scene := sceneEntity.scene;
-			entity := sceneEntity.entity;
-			mesh := scene.GetComponent<Mesh>(entity);
-
+			log "Mesh Created Vulkan Instance";
 			resourceManager := vulkanInstance.resourceManager;
 			for (primitive in mesh.primitives)
 			{
 				resourceManager.UploadGeometry(primitive.geometry@);
 				resourceManager.UploadMaterial(primitive.material@);
 			}
+		}
+	);
+
+	ECS.instance.events.On(
+		MeshRemovedEvent,
+		::(mesh: *Mesh, data: *void)
+		{
+			log "Mesh Removed Vulkan Instance";
+		}
+	);
+
+	ECS.instance.events.On(
+		MeshEntityAddedEvent,
+		::(sceneEntity: SceneEntity, data: *void)
+		{
+			log "Mesh Entity Added Vulkan Instance";
+			scene := sceneEntity.scene;
+			entity := sceneEntity.entity;
+			mesh := scene.GetComponent<Mesh>(entity);
 
 			for (ec in scene.Iterate<VulkanRenderer>())
 			{
@@ -309,10 +324,10 @@ InitializeVulkanInstance()
 	);
 
 	ECS.instance.events.On(
-		MeshRemovedEvent, 
+		MeshEntityRemovedEvent,
 		::(sceneEntity: SceneEntity, data: *void)
 		{
-			log "Mesh Removed Vulkan Instance";
+			log "Mesh Entity Removed Vulkan Instance";
 			scene := sceneEntity.scene;
 			entity := sceneEntity.entity;
 			mesh := scene.GetComponent<Mesh>(entity);

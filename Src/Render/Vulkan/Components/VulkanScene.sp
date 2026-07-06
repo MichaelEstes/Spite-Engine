@@ -24,9 +24,10 @@ state VulkanGeometry
 
 	indexHandle: VulkanAllocHandle,
 	indexBuffer: *VkBuffer_T,
+	
 	indexCount: uint32,
-
-	indexKind: VkIndexType
+	indexKind: VkIndexType,
+	vertexCount: uint32,
 }
 
 state VulkanTexture

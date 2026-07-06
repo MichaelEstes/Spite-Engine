@@ -514,6 +514,11 @@ VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 	);
 	sceneUBO.projection[1][1] *= -1;
 
+	sceneUBO.screenSize = Vec2(
+		this.swapchain.extent.width as float32,
+		this.swapchain.extent.height as float32
+	);
+
 	this.sceneShared.Update(frame, sceneUBO);
 }
 

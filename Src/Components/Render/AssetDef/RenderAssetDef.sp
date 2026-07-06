@@ -260,6 +260,7 @@ state VertexStage
     attributes: Array<Variable>,
     variables: VariableSets,
     out: Array<Variable>,
+    functions: Array<ShaderNode>,
     nodes: Array<ShaderNode>,
 
     compiled: string
@@ -270,6 +271,7 @@ VertexStage::delete
     delete this.attributes;
     delete this.variables;
     delete this.out;
+    delete this.functions;
     delete this.nodes;
     delete this.compiled;
 }
@@ -290,6 +292,12 @@ VertexStage VertexStage::Clone()
             return variable.Clone();
         }
     );
+    cloned.functions = this.functions.Copy(
+        ::ShaderNode(node: ShaderNode)
+        {
+            return node.Clone();
+        }
+    );
     cloned.nodes = this.nodes.Copy(
         ::ShaderNode(node: ShaderNode)
         {
@@ -305,6 +313,7 @@ state FragmentStage
     textures: Array<TextureDefinition>,
     using: Array<string>,
     out: Array<Variable>,
+    functions: Array<ShaderNode>,
     nodes: Array<ShaderNode>,
 
     compiled: string,
@@ -320,6 +329,7 @@ FragmentStage::delete
     delete this.textures;
     delete this.using;
     delete this.out;
+    delete this.functions;
     delete this.nodes;
     delete this.compiled;
 }
@@ -344,6 +354,12 @@ FragmentStage FragmentStage::Clone()
         ::Variable(variable: Variable)
         {
             return variable.Clone();
+        }
+    );
+    cloned.functions = this.functions.Copy(
+        ::ShaderNode(node: ShaderNode)
+        {
+            return node.Clone();
         }
     );
     cloned.nodes = this.nodes.Copy(
@@ -395,6 +411,8 @@ AssetDef AssetDef::Clone()
     return cloned;
 }
 
+uint32 AssetDef::GetBindlessTextureSetIndex() =>
+    this.vertex.variables.sets.count + this.fragment.variables.sets.count + uint32(1);
 
 AssetDef::Compile(compiler: ShaderCompiler)
 {

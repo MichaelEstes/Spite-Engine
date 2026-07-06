@@ -14,22 +14,12 @@ state UniformBufferObject
 state SceneUBO
 {
 	view: Matrix4,
-	projection: Matrix4
+	projection: Matrix4,
+	screenSize: Vec2,
+	_pad: Vec2
 }
 
 state ModelUBO
 {
 	model: Matrix4
-}
-
-state MaterialUBO
-{
-	baseColor: Color,
-	emissiveFactor: Vec3,
-
-	normalScale: float32,
-	metallicFactor: float32,
-	roughnessFactor: float32,
-	occlusionStrength: float32,
-	alphaCutoff: float32
 }

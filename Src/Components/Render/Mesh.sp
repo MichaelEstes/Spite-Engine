@@ -4,8 +4,12 @@ import Array
 import ECS
 import Event
 
-MeshAddedEvent := RegisterEvent<SceneEntity>();
-MeshRemovedEvent := RegisterEvent<SceneEntity>();
+MeshCreatedEvent := RegisterEvent<*Mesh>();
+MeshRemovedEvent := RegisterEvent<*Mesh>();
+
+MeshEntityAddedEvent := RegisterEvent<SceneEntity>();
+MeshEntityRemovedEvent := RegisterEvent<SceneEntity>();
+
 
 state Mesh
 {
@@ -18,15 +22,17 @@ Mesh::delete
 }
 
 MeshComponent := ECS.RegisterComponent<Mesh>(
-	ComponentKind.Sparse, 
-	::(entity: Entity, mesh: *Mesh, scene: Scene) 
+	ComponentKind.Sparse,
+	::(entity: Entity, mesh: *Mesh, scene: Scene)
 	{
-		ECS.instance.events.Emit<SceneEntity>(MeshRemovedEvent, SceneEntity(scene@, entity));
+		ECS.instance.events.Emit<SceneEntity>(MeshEntityRemovedEvent, SceneEntity(scene@, entity));
+		ECS.instance.events.Emit<*Mesh>(MeshRemovedEvent, mesh);
 		delete mesh~;
 	}
-	::(entity: Entity, mesh: *Mesh, scene: Scene) 
+	::(entity: Entity, mesh: *Mesh, scene: Scene)
 	{
 		log "Adding mesh component";
-		ECS.instance.events.Emit<SceneEntity>(MeshAddedEvent, SceneEntity(scene@, entity));
+		ECS.instance.events.Emit<*Mesh>(MeshCreatedEvent, mesh);
+		ECS.instance.events.Emit<SceneEntity>(MeshEntityAddedEvent, SceneEntity(scene@, entity));
 	}
 );

@@ -25,24 +25,36 @@ gltfModeToTopologyKindTable := [
 	TopologyKind.TriangleFan,
 ];
 
-state GLTFResource
+state GLTFLoadParam
+{
+	file: string,
+	scene: *Scene,
+	data: *any
+}
+
+state GLTFResources
 {
 	buffers: Array<ResourceHandle>,
 	images: Array<ResourceHandle>
 }
 
-state GLTFLoadParam
+state GLTFNodeResource
 {
-	file: string,
-	scene: *Scene,
-	rootEntity: Entity
+	mesh: Mesh,
+	transform: Transform,
+	children: Array<GLTFNodeResource>
 }
 
-state GLTFLoadData
+state GLTFSceneResource
 {
-	scene: *Scene,
-	resource: *GLTFResource,
-	handle: ResourceHandle
+	nodes: Array<GLTFNodeResource>
+}
+
+state GLTFResource
+{
+	gltf: GLTF,
+	scenes: Array<GLTFSceneResource>,
+	resources: GLTFResources,
 }
 
 GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadParam>(
@@ -52,18 +64,9 @@ GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadPara
 	::(handle: ResourceHandle) {
 		resource := Resource.GetResource<GLTFResource>(handle);
 		gltfResource := resource.data;
-
-		for (bufferHandle in gltfResource.buffers) Resource.ReleaseResourceRef(bufferHandle);
 	},
 	::(handle: ResourceHandle, child: ResourceHandle) {
 		resource := Resource.GetResource<GLTFResource>(handle);
-		if (resource.result == ResourceResult.Released) return;
-
-		gltfResource := resource.data;
-		gltfResource.buffers.RemoveAll(child);
-
-		heldResourceCount := gltfResource.buffers.count + gltfResource.images.count;
-		if (!gltfResource.buffers.count) Resource.ReleaseResourceRef(handle);
 	}
 );
 
@@ -76,66 +79,103 @@ GLTFManagerLoad(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>)
 	param := resourceParam.param;
 	handle := resourceParam.handle;
 	resourceManager := resourceParam.manager;
-	resource := resourceManager.GetResource(handle).data@;
+	resource := resourceManager.GetResource(handle);
 	
 	file := param.file;
-	scene := param.scene;
-	
+
 	gltf := LoadGLTF(file);
 	
-	gltfData := GLTFLoadData();
-	gltfData.scene = scene;
-	gltfData.resource = resource;
-	gltfData.handle = handle;
-	
-	if (!param.rootEntity)
-	{
-		param.rootEntity = scene.CreateEntity();
-		scene.SetComponent<Hierarchy>(param.rootEntity, Hierarchy());
-	}
-	
-	rootEntity := param.rootEntity;
+	gltfData := resource.data;
+	gltfData.gltf = gltf;
+	gltfData.scenes = Array<GLTFSceneResource>(gltf.scenes.count);
+	gltfData.resources = GLTFResources();
 
-	for (gltfScene in gltf.scenes)
+	for (sceneIndex .. gltf.scenes.count)
 	{
-		sceneEntity := scene.CreateEntity();
-		scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
-		ParentEntity(rootEntity, sceneEntity, scene);
-
-		log "Loading GLTF scene with ", gltfScene.nodes.count, "nodes";
+		gltfScene := gltf.scenes[sceneIndex];
+		sceneResourceIndex := gltfData.scenes.Add(GLTFSceneResource());
+		sceneResource := gltfData.scenes[sceneResourceIndex];
+		sceneResource.nodes = Array<GLTFNodeResource>(gltfScene.nodes.count);
 		for (nodeIndex in gltfScene.nodes)
 		{
-			NodeToECS(gltfData, gltf, scene, nodeIndex, sceneEntity);
+			nodeResourceIndex := sceneResource.nodes.Add(GLTFNodeResource());
+			NodeToNodeResource(gltfData, nodeIndex, sceneResource.nodes[nodeResourceIndex]@);
 		}
 	}
 	
 	resourceParam.onResourceLoad(resourceParam, ResourceResult.Loaded);
 }
 
-ResourceHandle LoadGLTFResource(file: string, scene: *Scene, onLoad: ::(ResourceHandle, *GLTFLoadParam) = null, rootEntity: Entity = NullEntity)
+AssignGLTFNodeToECS(nodeResource: *GLTFNodeResource, scene: *Scene, parent: Entity)
+{
+	nodeEntity := scene.CreateEntity();
+	scene.SetComponent<Hierarchy>(nodeEntity, Hierarchy());
+	ParentEntity(parent, nodeEntity, scene);
+
+	scene.SetComponent<Mesh>(nodeEntity, nodeResource.mesh);
+	scene.SetComponent<Transform>(nodeEntity, nodeResource.transform);
+
+	for (child in nodeResource.children)
+	{
+		AssignGLTFNodeToECS(child@, scene, nodeEntity);
+	}
+}
+
+ResourceHandle UseGLTFResource(file: string, scene: *Scene, onLoad: ::(*Scene, Entity) = null)
 {
 	gltfParam := GLTFLoadParam();
 	gltfParam.file = file;
 	gltfParam.scene = scene;
-	gltfParam.rootEntity = rootEntity;
+	gltfParam.data = onLoad as *any;
+	
+	return GLTFResourceManager.LoadResource(
+		gltfParam, 
+		::(resourceHandle: ResourceHandle, params: *GLTFLoadParam)
+		{
+			onLoad := params.data as ::(*Scene, Entity);
+			gltfResource := GLTFResourceManager.TakeResourceRef(resourceHandle);
+			gltfResult := gltfResource.result;
+			gltfData := gltfResource.data;
 
-	return GLTFResourceManager.LoadResource(gltfParam, onLoad);
+			scene := params.scene;
+			rootEntity := scene.CreateEntity();
+			scene.SetComponent<Hierarchy>(rootEntity, Hierarchy());
+
+			for (sceneResource in gltfData.scenes)
+			{
+				sceneEntity := scene.CreateEntity();
+				scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
+				ParentEntity(rootEntity, sceneEntity, scene);
+
+				for (nodeResource in sceneResource.nodes)
+				{
+					AssignGLTFNodeToECS(nodeResource@, scene, sceneEntity);
+				}
+			}
+
+			if (onLoad)
+			{
+				onLoad(scene, rootEntity);
+			}
+		});
 }
 
-ResourceHandle GetBufferHandle(gltfData: GLTFLoadData, gltf: GLTF, buffer: uint32)
+ResourceHandle GetBufferHandle(gltfData: GLTFResource, buffer: uint32)
 {
+	gltf := gltfData.gltf;
 	gltfBuffer := gltf.buffers[buffer];
 
 	uri := gltfBuffer.uri.uri~;
-	return LoadURIResource(uri, gltf.path, gltfData.handle);
+	return LoadURIResource(uri, gltf.path);
 }
 
-ArrayView<byte> GetBufferViewData(gltfData: GLTFLoadData, gltf: GLTF, bufferView: uint32)
+ArrayView<byte> GetBufferViewData(gltfData: GLTFResource, bufferView: uint32)
 {
+	gltf := gltfData.gltf;
 	gltfBufferView := gltf.bufferViews[bufferView];
 
-	handle := GetBufferHandle(gltfData, gltf, gltfBufferView.buffer);
-	gltfData.resource.buffers.Add(handle);
+	handle := GetBufferHandle(gltfData, gltfBufferView.buffer);
+	gltfData.resources.buffers.Add(handle);
 
 	data := URIResourceManager.TakeResourceRef(handle).data.buffer;
 	data = data + gltfBufferView.byteOffset;
@@ -181,21 +221,23 @@ uint GetAccessorByteCount(accessor: GLTFAccessor)
 	return count * itemByteLength * itemByteCount;
 }
 
-ArrayView<byte> GetAccessorData(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32)
+ArrayView<byte> GetAccessorData(gltfData: GLTFResource, accessor: uint32)
 {
+	gltf := gltfData.gltf;
 	gltfAccessor := gltf.accessors[accessor];
 
-	data := GetBufferViewData(gltfData, gltf, gltfAccessor.bufferView)[0]@;
+	data := GetBufferViewData(gltfData, gltfAccessor.bufferView)[0]@;
 	data = data + gltfAccessor.byteOffset;
 
 	return ArrayView<byte>(data, gltfAccessor.count);
 }
 
-ArrayView<byte> GetAccessorByteView(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32)
+ArrayView<byte> GetAccessorByteView(gltfData: GLTFResource, accessor: uint32)
 {
+	gltf := gltfData.gltf;
 	gltfAccessor := gltf.accessors[accessor];
 
-	data := GetBufferViewData(gltfData, gltf, gltfAccessor.bufferView)[0]@;
+	data := GetBufferViewData(gltfData, gltfAccessor.bufferView)[0]@;
 	data = data + gltfAccessor.byteOffset;
 
 	return ArrayView<byte>(data, GetAccessorByteCount(gltfAccessor));
@@ -212,21 +254,23 @@ string GLTFAttributeToAssetAttribute(attrName: string)
 	return "";
 }
 
-AssignAttributeToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, attrName: string, accessor: uint32, primitive: Primitive)
+AssignAttributeToPrimitive(gltfData: GLTFResource, attrName: string, accessor: uint32, primitive: Primitive)
 {
+	gltf := gltfData.gltf;
 	assetAttr := GLTFAttributeToAssetAttribute(attrName);
 	if (assetAttr == "") return;
 
 	index := primitive.geometry.GetAttributeIndex(assetAttr);
 	if (index == uint32(-1)) return;
 
-	view := GetAccessorByteView(gltfData, gltf, accessor);
+	view := GetAccessorByteView(gltfData, accessor);
 	primitive.geometry.GetAttributeValue(index)~ = view;
 }
 
-AssignIndiciesToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, primitive: Primitive)
+AssignIndiciesToPrimitive(gltfData: GLTFResource, accessor: uint32, primitive: Primitive)
 {
-	view := GetAccessorData(gltfData, gltf, accessor);
+	gltf := gltfData.gltf;
+	view := GetAccessorData(gltfData, accessor);
 
 	count := view.count;
 	gltfAccessor := gltf.accessors[accessor];
@@ -250,8 +294,9 @@ AssignIndiciesToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, accessor: uint32, 
 	primitive.geometry.indices = indices;
 }
 
-TextureMap LoadTexture(gltfData: GLTFLoadData, gltf: GLTF, textureIndex: uint32)
+TextureMap LoadTexture(gltfData: GLTFResource, textureIndex: uint32)
 {
+	gltf := gltfData.gltf;
 	gltfTexture := gltf.textures[textureIndex];
 	imageIndex := gltfTexture.source;
 	gltfImage := gltf.images[imageIndex];
@@ -269,7 +314,7 @@ TextureMap LoadTexture(gltfData: GLTFLoadData, gltf: GLTF, textureIndex: uint32)
 	else
 	{
 		uri := gltfImage.uri.uri~;
-		imageHandle := LoadImageResource(uri, gltf.path, gltfData.handle);
+		imageHandle := LoadImageResource(uri, gltf.path);
 
 		texture.imageHandle = imageHandle;
 	}
@@ -288,8 +333,9 @@ AlphaMode GetAlphaMode(gltfMaterial: GLTFMaterial)
 	else return AlphaMode.Opaque;
 }
 
-AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uint32, primitive: Primitive)
+AssignMaterialToPrimitive(gltfData: GLTFResource, materialIndex: uint32, primitive: Primitive)
 {
+	gltf := gltfData.gltf;
 	gltfMaterial := gltf.materials[materialIndex];
 
 	pbr := GLTFMaterialPBRMetallicRoughness();
@@ -304,13 +350,13 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 
 	if (pbr.baseColorTexture)
 	{
-		colorTextureMap := LoadTexture(gltfData, gltf, pbr.baseColorTexture.index);
+		colorTextureMap := LoadTexture(gltfData, pbr.baseColorTexture.index);
 		primitive.material.SetTexture("colorTexture", colorTextureMap, false);
 	}
 
 	if (pbr.metallicRoughnessTexture)
 	{
-		metallicRoughnessTextureMap := LoadTexture(gltfData, gltf, pbr.metallicRoughnessTexture.index);
+		metallicRoughnessTextureMap := LoadTexture(gltfData, pbr.metallicRoughnessTexture.index);
 		primitive.material.SetTexture("metallicRoughnessTexture", metallicRoughnessTextureMap, false);
 	}
 
@@ -321,7 +367,7 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 			gltfMaterial.normalTexture.scale, 
 			false
 		);
-		normalTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.normalTexture.info.index);
+		normalTextureMap := LoadTexture(gltfData, gltfMaterial.normalTexture.info.index);
 		primitive.material.SetTexture("normalTexture", normalTextureMap, false);
 	}
 	else
@@ -341,7 +387,7 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 			gltfMaterial.occlusionTexture.strength,
 			false
 		);
-		occlusionTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.occlusionTexture.info.index);
+		occlusionTextureMap := LoadTexture(gltfData, gltfMaterial.occlusionTexture.info.index);
 		primitive.material.SetTexture("occlusionTexture", occlusionTextureMap, false);
 	}
 	else
@@ -356,7 +402,7 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 
 	if (gltfMaterial.emissiveTexture)
 	{
-		emissiveTextureMap := LoadTexture(gltfData, gltf, gltfMaterial.emissiveTexture.index);
+		emissiveTextureMap := LoadTexture(gltfData, gltfMaterial.emissiveTexture.index);
 		primitive.material.SetTexture("emissiveTexture", emissiveTextureMap, false);
 	}
 
@@ -372,12 +418,18 @@ AssignMaterialToPrimitive(gltfData: GLTFLoadData, gltf: GLTF, materialIndex: uin
 	);
 }
 
-MeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, entity: Entity)
+AssignGLTFMesh(gltfData: GLTFResource, meshIndex: uint32, nodeResource: *GLTFNodeResource)
 {
+	gltf := gltfData.gltf;
 	gltfMesh := gltf.meshes[meshIndex];
 	mesh := Mesh()
 
-	litHandle := AssetDefNameToHandle("Lit");
+	// litHandle := AssetDefNameToHandle("Lit");
+	// litHandle := AssetDefNameToHandle("LitBlinnPhong");
+	// litHandle := AssetDefNameToHandle("LitBurley");
+	// litHandle := AssetDefNameToHandle("LitCookTorrance");
+	litHandle := AssetDefNameToHandle("LitHammon");
+	// litHandle := AssetDefNameToHandle("LitPBR");
 
 	mesh.primitives.SizeTo(gltfMesh.primitives.count);
 	for (gltfPrim in gltfMesh.primitives)
@@ -390,37 +442,35 @@ MeshToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, meshIndex: uint32, 
 			attrName := attrKV.key~;
 			attrAccessor := attrKV.value~;
 
-			AssignAttributeToPrimitive(gltfData, gltf, attrName, attrAccessor, primitive);
+			AssignAttributeToPrimitive(gltfData, attrName, attrAccessor, primitive);
 		}
 
 		if (gltfPrim.indices != InvalidGLTFIndex)
 		{
-			AssignIndiciesToPrimitive(gltfData, gltf, gltfPrim.indices, primitive);
+			AssignIndiciesToPrimitive(gltfData, gltfPrim.indices, primitive);
 		}
 
 		if (gltfPrim.material != InvalidGLTFIndex)
 		{
-			AssignMaterialToPrimitive(gltfData, gltf, gltfPrim.material, primitive);
+			AssignMaterialToPrimitive(gltfData, gltfPrim.material, primitive);
 		}
 
 		mesh.primitives.Add(primitive);
 	}
 
-	scene.SetComponent<Mesh>(entity, mesh);
+	nodeResource.mesh = mesh;
+	ECS.instance.events.Emit<*Mesh>(MeshCreatedEvent, nodeResource.mesh@);
 }
 
-NodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uint32, parentEntity: Entity)
+NodeToNodeResource(gltfData: GLTFResource, nodeIndex: uint32, nodeResource: *GLTFNodeResource)
 {
+	gltf := gltfData.gltf;
 	gltfNode := gltf.nodes[nodeIndex];
-
-	entity := scene.CreateEntity();
-	scene.SetComponent<Hierarchy>(entity, Hierarchy());
-	ParentEntity(parentEntity, entity, scene);
 
 	if (gltfNode.trs)
 	{
 		trs := gltfNode.transform.trs;
-		scene.SetComponent<Transform>(entity, Transform(trs.translation, trs.rotation, trs.scale));
+		nodeResource.transform = Transform(trs.translation, trs.rotation, trs.scale);
 	}
 	else
 	{
@@ -429,16 +479,21 @@ NodeToECS(gltfData: GLTFLoadData, gltf: GLTF, scene: *Scene, nodeIndex: uint32, 
 		rot := Quaternion();
 		scale := Vec3();
 		matrix.Decompose(pos@, rot@, scale@);
-		scene.SetComponent<Transform>(entity, Transform(pos, rot, scale));
+		nodeResource.transform = Transform(pos, rot, scale);
 	}
 
 	if (gltfNode.mesh != InvalidGLTFIndex)
 	{
-		MeshToECS(gltfData, gltf, scene, gltfNode.mesh, entity);
+		AssignGLTFMesh(gltfData, gltfNode.mesh, nodeResource);
 	}
 
-	for (childIndex in gltfNode.children)
+	if (gltfNode.children.count)
 	{
-		NodeToECS(gltfData, gltf, scene, childIndex, entity);
+		nodeResource.children = Array<GLTFNodeResource>(gltfNode.children.count);
+		for (childIndex in gltfNode.children)
+		{
+			childResourceIndex := nodeResource.children.Add(GLTFNodeResource());
+			NodeToNodeResource(gltfData, childIndex, nodeResource.children[childResourceIndex]@);
+		}
 	}
 }

@@ -71,22 +71,43 @@ _ := SceneRegistry.RegisterScene(
 
 			pointLight := PointLight();
 			pointLight.color = lightColors[i];
-			pointLight.intensity = 5.0;
-			pointLight.radius = 3.0;
+			pointLight.intensity = 4.0;
+			pointLight.radius = 5.0;
 			scene.SetComponent<PointLight>(lightEntity, pointLight);
 		}
+
+		sunEntity := scene.CreateEntity();
+		directionalLight := DirectionalLight();
+		directionalLight.direction = Vec3(-0.15, -1.0, -0.15);   // mostly top-down, slight angle for form
+		directionalLight.color = Color(1.0, 0.85, 0.45, 1.0);   // warm yellow sun
+		directionalLight.intensity = 3.0;
+		directionalLight.castShadow = false;
+		scene.SetComponent<DirectionalLight>(sunEntity, directionalLight);
+
+		lineEntity := scene.CreateEntity();
+		scene.SetComponent<LineMesh>(lineEntity, LineMesh(
+			Vec3(-1.0, 0.0, 0.0),
+			Vec3(1.0, 0.0, 0.0),
+			Color(1.0, 0.0, 0.0, 1.0)
+		));
+
+		thickLineEntity := scene.CreateEntity();
+		scene.SetComponent<LineMesh>(thickLineEntity, LineMesh(
+			Vec3(-1.0, 0.5, 0.0),
+			Vec3(1.0, 0.5, 0.0),
+			Color(0.0, 1.0, 0.0, 1.0),
+			8.0
+		));
 
 		// model := "./Resource/Models/Box/Box.gltf";
 		// model := "./Resource/Models/BoxTextured/BoxTextured.gltf";
 		// model := "./Resource/Models/BrainStem/BrainStem.gltf";
 		model := "./Resource/Models/DamagedHelmet/DamagedHelmet.gltf";
 		log "Loading GLTF: ", model;
-		gltfHandle := LoadGLTFResource(
+		gltfHandle := UseGLTFResource(
 			model, scene,
-			::(handle: ResourceHandle, param: *GLTFLoadParam) 
+			::(scene: *Scene, rootEntity: Entity) 
 			{
-				rootEntity := param.rootEntity;
-				scene := param.scene;
 				log "Loaded gltf: ", rootEntity;
 
 				// IterateHierarchy(

@@ -190,19 +190,26 @@ assetPass := RegisterRenderPass(
 						);
 					}
 
-					bindlessSet := uint32(1) + assetDef.vertex.variables.sets.count + assetDef.fragment.variables.sets.count;
-					vkCmdBindDescriptorSets(
-						commandBuffer, bindPoint, pipelineLayout,
-						bindlessSet, uint32(1), resourceManager.textures.set@, uint32(0), null
-					);
+					if (assetDef.fragment.textures.count)
+					{
+						bindlessSet := assetDef.GetBindlessTextureSetIndex();
+						vkCmdBindDescriptorSets(
+							commandBuffer, bindPoint, pipelineLayout,
+							bindlessSet, uint32(1), resourceManager.textures.set@, uint32(0), null
+						);
+					}
 
 					geomDescriptors := resourceManager.GetGeometryDescriptors(meshState.assetDefHandle);
 					matDescriptors := resourceManager.GetMaterialDescriptors(meshState.assetDefHandle);
 
 					for (mesh in meshArr)
 					{
+						modelUBO := ModelUBO();
 						worldTransform := scene.GetComponentDirect<WorldTransform>(mesh.entity, WorldTransformComponent);
-						if (!worldTransform) continue;
+						if (worldTransform)
+						{
+							modelUBO.model = worldTransform.mat;
+						}
 
 						geometry := resourceManager.geometries.Get(mesh.geometryHandle);
 						material := resourceManager.materials.Get(mesh.materialHandle);
@@ -231,9 +238,6 @@ assetPass := RegisterRenderPass(
 							geometry.attributeBuffers[0]@, fixed offsets, null, geometry.strides[0]@
 						);
 
-						// Model matrix push constant.
-						modelUBO := ModelUBO();
-						modelUBO.model = worldTransform.mat;
 						vkCmdPushConstants(
 							commandBuffer, pipelineLayout,
 							uint32(VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT),
@@ -246,6 +250,10 @@ assetPass := RegisterRenderPass(
 						{
 							vkCmdBindIndexBuffer(commandBuffer, geometry.indexBuffer, 0, geometry.indexKind);
 							vkCmdDrawIndexed(commandBuffer, geometry.indexCount, uint32(1), uint32(0), uint32(0), uint32(0));
+						}
+						else
+						{
+							vkCmdDraw(commandBuffer, geometry.vertexCount, uint32(1), uint32(0), uint32(0));
 						}
 					}
 				}

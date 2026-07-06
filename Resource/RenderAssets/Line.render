@@ -1,0 +1,41 @@
+{
+    name: Line,
+    vertex: {
+        attributes: {
+            position: vec3,
+            color: {
+                type: vec4,
+                default: [1.0, 1.0, 1.0, 1.0]
+            }
+        },
+        variables: [],
+        nodes: [
+            {
+                name: default,
+                code: `
+                    gl_Position = scene.proj * scene.view * model.model * vec4(position, 1.0);
+                `,
+                after: main
+            }
+        ]
+    },
+    fragment: {
+        using: [color],
+        out: {
+            outColor: vec4
+        },
+        nodes: [
+            {
+                name: lineColor,
+                code: `
+                    outColor = color;
+                `,
+                after: main
+            }
+        ],
+
+        alphaMode: opaque,
+	    cullMode: none,
+	    polygonMode: fill
+    }
+}
