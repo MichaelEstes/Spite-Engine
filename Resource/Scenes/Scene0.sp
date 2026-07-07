@@ -48,38 +48,32 @@ _ := SceneRegistry.RegisterScene(
 		});
 
 		lightPositions := [
-			Vec3(-2.0, 1.0, 0.0),
-			Vec3(2.0, 1.0, 0.0),
-			Vec3(0.0, 1.5, -2.0),
-			Vec3(0.0, 2.0, 2.0),
-			Vec3(0.0, -1.5, 0.5),
-			Vec3(-1.5, -1.0, 1.5)
+			Vec3(-2.0, 0.0, 0.0),   // left
+			Vec3(2.0, 0.0, 0.0),    // right
+			Vec3(0.0, 0.0, 2.0)     // front
 		];
 		lightColors := [
-			Color(1.0, 0.4, 0.2, 1.0),   // orange
-			Color(0.2, 0.5, 1.0, 1.0),   // blue
-			Color(0.3, 1.0, 0.4, 1.0),   // green
-			Color(1.0, 0.9, 0.4, 1.0),   // yellow
-			Color(1.0, 0.3, 0.8, 1.0),   // magenta
-			Color(0.4, 1.0, 1.0, 1.0)    // cyan
+			Color(0.0, 0.0, 1.0, 1.0),
+			Color(1.0, 0.0, 0.0, 1.0),
+			Color(0.0, 1.0, 0.0, 1.0)
 		];
 
-		for (i .. 6)
+		for (i .. 3)
 		{
 			lightEntity := scene.CreateEntity();
 			scene.SetComponent<Transform>(lightEntity, Transform(lightPositions[i]));
 
 			pointLight := PointLight();
 			pointLight.color = lightColors[i];
-			pointLight.intensity = 4.0;
-			pointLight.radius = 5.0;
+			pointLight.intensity = 6.0;
+			pointLight.radius = 2.0;
 			scene.SetComponent<PointLight>(lightEntity, pointLight);
 		}
 
 		sunEntity := scene.CreateEntity();
 		directionalLight := DirectionalLight();
-		directionalLight.direction = Vec3(-0.15, -1.0, -0.15);   // mostly top-down, slight angle for form
-		directionalLight.color = Color(1.0, 0.85, 0.45, 1.0);   // warm yellow sun
+		directionalLight.direction = Vec3(0.0, -1.0, 0.0);
+		directionalLight.color = Color(1.0, 0.85, 0.45, 1.0);
 		directionalLight.intensity = 3.0;
 		directionalLight.castShadow = false;
 		scene.SetComponent<DirectionalLight>(sunEntity, directionalLight);

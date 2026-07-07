@@ -1,0 +1,72 @@
+{
+    name: ThickLine,
+    vertex: {
+        attributes: {
+            position: vec3,
+            otherEnd: {
+                type: vec3,
+                default: [0.0, 0.0, 0.0]
+            },
+            side: {
+                type: float,
+                default: 1.0
+            },
+            color: {
+                type: vec4,
+                default: [1.0, 1.0, 1.0, 1.0]
+            }
+        },
+        variables: [
+            {
+                thickness: {
+                    type: float,
+                    default: 2.0
+                }
+            }
+        ],
+        nodes: [
+            {
+                name: default,
+                code: `
+                    mat4 mvp = scene.proj * scene.view * model.model;
+                    vec4 clipThis  = mvp * vec4(position, 1.0);
+                    vec4 clipOther = mvp * vec4(otherEnd, 1.0);
+
+                    vec2 halfScreen = scene.screenSize * 0.5;
+                    vec2 sThis  = (clipThis.xy  / clipThis.w)  * halfScreen;
+                    vec2 sOther = (clipOther.xy / clipOther.w) * halfScreen;
+
+                    vec2 delta = sOther - sThis;
+                    vec2 dir = length(delta) > 0.0 ? normalize(delta) : vec2(1.0, 0.0);
+                    vec2 normal = vec2(-dir.y, dir.x);
+
+                    vec2 offsetPixels = normal * (thickness * 0.5) * side;
+                    vec2 offsetNdc = offsetPixels / halfScreen;
+
+                    gl_Position = clipThis;
+                    gl_Position.xy += offsetNdc * clipThis.w;
+                `,
+                after: main
+            }
+        ]
+    },
+    fragment: {
+        using: [color],
+        out: {
+            outColor: vec4
+        },
+        nodes: [
+            {
+                name: lineColor,
+                code: `
+                    outColor = color;
+                `,
+                after: main
+            }
+        ],
+
+        alphaMode: opaque,
+	    cullMode: none,
+	    polygonMode: fill
+    }
+}

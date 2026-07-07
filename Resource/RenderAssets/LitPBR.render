@@ -1,5 +1,5 @@
 {
-    name: Lit,
+    name: LitPBR,
     flags: ["useLightCulling"]
     vertex: {
         attributes: {
@@ -10,7 +10,7 @@
             },
             tangents: {
                 type: vec4,
-                default: [1.0, 0.0, 0.0, 1.0]
+                default: [0.0, 0.0, 0.0, 0.0]
             },
             color: {
                 type: vec4,
@@ -35,7 +35,7 @@
                 code: `
                     mat3 normalMatrix = mat3(model.model);
                     outnormal = normalize(normalMatrix * normal);
-                    //outtangents = vec4(normalize(normalMatrix * tangents.xyz), tangents.w);
+                    outtangents = vec4(normalMatrix * tangents.xyz, tangents.w);
                 `,
                 after: default
             }
@@ -81,10 +81,66 @@
                 default: [0, 0, 0, 255]
             }
         }
-        using: [normal, color, uv0],
+        using: [normal, tangents, color, uv0],
         out: {
             outColor: vec4
         },
+        functions: [
+            {
+                name: constants,
+                code: `
+                    #define PI 3.14159265359
+                `
+            },
+            {
+                name: fresnelSchlick,
+                code: `
+                    vec3 fresnelSchlick(float cosTheta, vec3 F0)
+                    {
+                        return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+                    }
+                `
+            },
+            {
+                name: DistributionGGX,
+                code: `
+                    float DistributionGGX(vec3 N, vec3 H, float roughness)
+                    {
+                        float a = roughness * roughness;
+                        float a2 = a * a;
+                        float NdotH = max(dot(N, H), 0.0);
+                        float denom = NdotH * NdotH * (a2 - 1.0) + 1.0;
+
+                        return a2 / (PI * denom * denom);
+                    }
+                `
+            },
+            {
+                name: VisibilityHammon,
+                code: `
+                    float VisibilityHammon(float NdotL, float NdotV, float alpha)
+                    {
+                        return 0.5 / max(mix(2.0 * NdotL * NdotV, NdotL + NdotV, alpha), 1e-4);
+                    }
+                `
+            },
+            {
+                name: DiffuseHammon,
+                code: `
+                    vec3 DiffuseHammon(vec3 albedo, float alpha, float NdotL, float NdotV, float NdotH, float LdotV)
+                    {
+                        float facing = 0.5 + 0.5 * LdotV;
+                        float rough = facing * (0.9 - 0.4 * facing) * ((0.5 + NdotH) / max(NdotH, 1e-2));
+                        float viewFalloff = max(1.0 - pow(1.0 - NdotV, 5.0), 0.35);
+                        float smoothTerm = 1.05 * (1.0 - pow(1.0 - NdotL, 5.0)) * viewFalloff;
+                        float single = mix(smoothTerm, rough, alpha) / PI;
+                        float multi = 0.1159 * alpha;
+
+                        return albedo * (single + albedo * multi);
+                    }
+                `
+            }
+        ]
         nodes: [
             {
                 name: litColor,
@@ -96,11 +152,18 @@
             {
                 name: litNormal,
                 code: `
-                    vec4 tangents = vec4(1.0, 0.0, 0.0, 1.0);
                     vec3 N = normalize(normal);
+
+                    vec2 tbnNdc = (gl_FragCoord.xy / clusterInfo.screenAndTile.xy) * 2.0 - 1.0;
+                    vec4 tbnView = clusterInfo.invProj * vec4(tbnNdc, gl_FragCoord.z, 1.0);
+                    vec3 tbnPos = (clusterInfo.invView * vec4(tbnView.xyz / tbnView.w, 1.0)).xyz;
+                    vec3 dp1 = dFdx(tbnPos);
+                    vec3 dp2 = dFdy(tbnPos);
+                    vec2 duv1 = dFdx(uv0);
+                    vec2 duv2 = dFdy(uv0);
+
                     vec3 T = normalize(tangents.xyz);
-                    vec3 B = cross(N, T);
-                    mat3 TBN = mat3(T, B, N);
+                    mat3 TBN = mat3(T, cross(N, T) * tangents.w, N);
 
                     vec3 tangentNormal = texture(normalTexture, uv0).xyz * 2.0 - 1.0;
                     tangentNormal.xy *= normalScale;
@@ -114,6 +177,7 @@
                     vec4 metallicRoughness = texture(metallicRoughnessTexture, uv0);
                     float roughness = metallicRoughness.g * roughnessFactor;
                     float metallic = metallicRoughness.b * metallicFactor;
+                    float alpha = roughness * roughness;
                 `,
                 after: litNormal
             },
@@ -134,10 +198,12 @@
                                       + clusterTile.y * clusterInfo.clusterDims.x + clusterTile.x;
 
                     vec3 viewDir = normalize(clusterInfo.invView[3].xyz - worldPos);
+                    vec3 F0 = mix(vec3(0.04), outColor.rgb, metallic);
+                    float NdotV = max(dot(shadingNormal, viewDir), 0.0);
+
+                    vec3 lightOut = vec3(0.0);
 
                     uvec2 clusterGrid = lightGrid[clusterIndex];
-                    vec3 diffuse = vec3(0.0);
-                    vec3 specular = vec3(0.0);
                     for (uint clusterI = 0u; clusterI < clusterGrid.y; clusterI++)
                     {
                         ClusterLight light = clusterLights[lightIndices[clusterGrid.x + clusterI]];
@@ -162,14 +228,21 @@
                         }
 
                         vec3 radiance = light.colorIntensity.rgb * light.colorIntensity.a * attenuation;
+                        vec3 halfDir = normalize(viewDir + lightDir);
                 `,
                 after: litMetallicRoughness
             },
             {
                 name: litDiffuse,
                 code: `
-                        float NdotL = max(dot(shadingNormal, lightDir), 0.0);
-                        diffuse += radiance * NdotL;
+                        float NdotL = dot(shadingNormal, lightDir);
+                        if (NdotL <= 0.0) continue;
+
+                        float NdotH = max(dot(shadingNormal, halfDir), 0.0);
+                        float LdotV = dot(lightDir, viewDir);
+
+                        vec3 albedo = (1.0 - metallic) * outColor.rgb;
+                        vec3 diffuse = DiffuseHammon(albedo, alpha, NdotL, NdotV, NdotH, LdotV);
                 `,
                 after: litLightStart,
                 before: litLightEnd
@@ -177,31 +250,32 @@
             {
                 name: litSpecular,
                 code: `
-                        vec3 halfDir = normalize(lightDir + viewDir);
-                        float shininess = mix(4.0, 256.0, 1.0 - roughness);
-                        float spec = pow(max(dot(shadingNormal, halfDir), 0.0), shininess);
-                        specular += radiance * spec;
+                        float NDF = DistributionGGX(shadingNormal, halfDir, roughness);
+                        float V = VisibilityHammon(NdotL, NdotV, alpha);
+                        vec3 F = fresnelSchlick(max(dot(halfDir, viewDir), 0.0), F0);
+
+                        vec3 specular = NDF * V * F;
                 `,
-                after: litLightStart,
+                after: litDiffuse,
+                before: litLightEnd
+            },
+            {
+                name: litLightOut,
+                code: `
+                        lightOut += (diffuse + specular) * radiance * NdotL;
+                `,
+                after: litSpecular,
                 before: litLightEnd
             },
             {
                 name: litLightEnd,
                 code: `
                     }
-                    vec3 ambient = vec3(0.03);
-                    vec3 specColor = mix(vec3(1.0), outColor.rgb, metallic);
-                    outColor.rgb = outColor.rgb * (ambient + diffuse) + specColor * specular * (1.0 - roughness);
+                    float occlusion = texture(occlusionTexture, uv0).r;
+                    vec3 ambient = vec3(0.03) * outColor.rgb * mix(1.0, occlusion, occlusionStrength);
+                    outColor = vec4(ambient + lightOut, outColor.a);
                 `,
                 after: litLightStart
-            },
-            {
-                name: litOcclusion,
-                code: `
-                    float occlusion = texture(occlusionTexture, uv0).r;
-                    outColor.rgb *= mix(1.0, occlusion, occlusionStrength);
-                `,
-                after: litLightEnd
             },
             {
                 name: litEmissive,
@@ -209,7 +283,15 @@
                     vec3 emissive = texture(emissiveTexture, uv0).rgb * emissiveFactor;
                     outColor.rgb += emissive;
                 `,
-                after: litOcclusion
+                after: litLightEnd
+            },
+            {
+                name: litTone,
+                code: `
+                    vec3 toneColor = outColor.rgb / (outColor.rgb + vec3(1.0));
+                    outColor = vec4(toneColor, outColor.a);
+                `,
+                after: litEmissive
             }
         ],
 

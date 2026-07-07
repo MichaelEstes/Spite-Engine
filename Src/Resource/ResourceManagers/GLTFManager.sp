@@ -35,7 +35,8 @@ state GLTFLoadParam
 state GLTFResources
 {
 	buffers: Array<ResourceHandle>,
-	images: Array<ResourceHandle>
+	images: Array<ResourceHandle>,
+	generatedBuffers: Array<Allocator<byte>>
 }
 
 state GLTFNodeResource
@@ -294,6 +295,108 @@ AssignIndiciesToPrimitive(gltfData: GLTFResource, accessor: uint32, primitive: P
 	primitive.geometry.indices = indices;
 }
 
+GenerateTangentsForPrimitive(gltfData: GLTFResource, primitive: Primitive)
+{
+	if (primitive.geometry.topologyKind != TopologyKind.TriangleList) return;
+
+	tangentIndex := primitive.geometry.GetAttributeIndex("tangents");
+	positionIndex := primitive.geometry.GetAttributeIndex("position");
+	normalIndex := primitive.geometry.GetAttributeIndex("normal");
+	uvIndex := primitive.geometry.GetAttributeIndex("uv0");
+
+	if (primitive.geometry.GetAttributeValue(tangentIndex)~.count) return;
+
+	positionView := primitive.geometry.GetAttributeValue(positionIndex)~;
+	normalView := primitive.geometry.GetAttributeValue(normalIndex)~;
+	uvView := primitive.geometry.GetAttributeValue(uvIndex)~;
+	if (!positionView.count || !normalView.count || !uvView.count) return;
+
+	vertexCount := positionView.count / (#sizeof Vec3);
+	positions := positionView.start as *Vec3;
+	normals := normalView.start as *Vec3;
+	uvs := uvView.start as *Vec2;
+
+	indices16 := primitive.geometry.indices.start;
+	indices32 := primitive.geometry.indices.start as *uint32;
+	hasIndices := primitive.geometry.indexKind != IndexKind.None &&
+				  primitive.geometry.indices.count > 0;
+
+	indexCount := vertexCount; 
+	if (hasIndices)
+	{
+		indexCount = primitive.geometry.indices.count;
+		if (primitive.geometry.indexKind == IndexKind.I32) indexCount = indexCount / 2;
+	}
+
+	tanAcc := ZeroedAllocator<Vec3>();
+	tanAcc.Alloc(vertexCount);
+	bitanAcc := ZeroedAllocator<Vec3>();
+	bitanAcc.Alloc(vertexCount);
+	defer {
+		tanAcc.Dealloc(vertexCount);
+		bitanAcc.Dealloc(vertexCount);
+	}
+
+	triangleCount := indexCount / 3;
+	for (tri .. triangleCount)
+	{
+		base := tri * 3;
+		i0 := base as uint;
+		i1 := (base + 1) as uint;
+		i2 := (base + 2) as uint;
+		if (hasIndices)
+		{
+			if (primitive.geometry.indexKind == IndexKind.I32)
+			{
+				i0 = indices32[base]~ as uint;
+				i1 = indices32[base + 1]~ as uint;
+				i2 = indices32[base + 2]~ as uint;
+			}
+			else
+			{
+				i0 = indices16[base]~ as uint;
+				i1 = indices16[base + 1]~ as uint;
+				i2 = indices16[base + 2]~ as uint;
+			}
+		}
+		edge1 := positions[i1]~ - positions[i0]~;
+		edge2 := positions[i2]~ - positions[i0]~;
+		duv1 := uvs[i1]~ - uvs[i0]~;
+		duv2 := uvs[i2]~ - uvs[i0]~;
+
+		invDet := 1.0 / (duv1.x * duv2.y - duv2.x * duv1.y);
+
+		tangent := (edge1 * duv2.y - edge2 * duv1.y) * invDet;
+		bitangent := (edge2 * duv1.x - edge1 * duv2.x) * invDet;
+
+		tanAcc[i0]~ = tanAcc[i0]~ + tangent;
+		tanAcc[i1]~ = tanAcc[i1]~ + tangent;
+		tanAcc[i2]~ = tanAcc[i2]~ + tangent;
+		bitanAcc[i0]~ = bitanAcc[i0]~ + bitangent;
+		bitanAcc[i1]~ = bitanAcc[i1]~ + bitangent;
+		bitanAcc[i2]~ = bitanAcc[i2]~ + bitangent;
+	}
+
+	tangentData := Allocator<Vec4>();
+	tangentData.Alloc(vertexCount);
+	gltfData.resources.generatedBuffers.Add(tangentData as Allocator<byte>);
+
+	for (i .. vertexCount)
+	{
+		normal := normals[i]~;
+		tangent := tanAcc[i]~;
+
+		tangent = tangent - (normal * normal.Dot(tangent));
+		tangent.Normalize();
+
+		tangentData[i]~ = Vec4(tangent.x, tangent.y, tangent.z, 1.0);
+		if (normal.Cross(tangent).Dot(bitanAcc[i]~) < 0.0) tangentData[i].w = -1.0;
+	}
+
+	primitive.geometry.GetAttributeValue(tangentIndex)~ =
+		ArrayView<byte>(tangentData.ptr as *byte, vertexCount * (#sizeof Vec4));
+}
+
 TextureMap LoadTexture(gltfData: GLTFResource, textureIndex: uint32)
 {
 	gltf := gltfData.gltf;
@@ -425,11 +528,7 @@ AssignGLTFMesh(gltfData: GLTFResource, meshIndex: uint32, nodeResource: *GLTFNod
 	mesh := Mesh()
 
 	// litHandle := AssetDefNameToHandle("Lit");
-	// litHandle := AssetDefNameToHandle("LitBlinnPhong");
-	// litHandle := AssetDefNameToHandle("LitBurley");
-	// litHandle := AssetDefNameToHandle("LitCookTorrance");
-	litHandle := AssetDefNameToHandle("LitHammon");
-	// litHandle := AssetDefNameToHandle("LitPBR");
+	litHandle := AssetDefNameToHandle("LitPBR");
 
 	mesh.primitives.SizeTo(gltfMesh.primitives.count);
 	for (gltfPrim in gltfMesh.primitives)
@@ -449,6 +548,8 @@ AssignGLTFMesh(gltfData: GLTFResource, meshIndex: uint32, nodeResource: *GLTFNod
 		{
 			AssignIndiciesToPrimitive(gltfData, gltfPrim.indices, primitive);
 		}
+
+		GenerateTangentsForPrimitive(gltfData, primitive);
 
 		if (gltfPrim.material != InvalidGLTFIndex)
 		{
