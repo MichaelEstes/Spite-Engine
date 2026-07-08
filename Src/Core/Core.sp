@@ -24,7 +24,6 @@ Initialize()
 	SDLEvents.Insert(0, Event.Emitter());
 	
 	InitializeInput();
-	InitializeImGui();
 	InitializeRenderAssetDefs();
 
 	globalEvents := GetGlobalEventEmitter();

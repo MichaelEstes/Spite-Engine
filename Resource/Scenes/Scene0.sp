@@ -18,6 +18,8 @@ import Common
 import ImGui
 import Utils
 
+import Editor
+
 _ := SceneRegistry.RegisterScene(
 	0,
 	::(scene: *Scene) {
@@ -119,16 +121,17 @@ _ := SceneRegistry.RegisterScene(
 
 		imGuiWindowEntity := scene.CreateEntity();
 		scene.SetComponent<ImGuiWindow>(imGuiWindowEntity, ImGuiWindow(
-			[::(window: *ImGuiWindow, data: *any) 
-			{
-				ImGui_ShowDemoWindow(true@);
-				ImGui_ShowMetricsWindow(true@);
-				ImGui_ShowDebugLogWindow(true@);
-			},],
-			null,
+			[
+				ImGuiRenderFunc(::(window: *ImGuiWindow, data: *any) 
+				{
+					ImGui_ShowMetricsWindow(true@);
+				}),
+			],
 			uint32(1000),
 			uint32(1000)
 		));
+
+		CreateSceneGraphEditor(imGuiWindowEntity, scene);
 
 		//AddProfilerToWindow(scene, imGuiWindowEntity);
 

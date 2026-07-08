@@ -18,6 +18,15 @@ ArrayView::(arr: []Type)
 	this.count = arr.count;
 }
 
+[]Type ArrayView::log()
+{
+	arr := []Type;
+	arr.count = this.count;
+	arr.capacity = this.count;
+	arr.memory = this.start as Allocator<Type>;
+	return arr;
+}
+
 ref Type ArrayView::operator::[](index: uint32)
 {
 	return this.start[index]~;

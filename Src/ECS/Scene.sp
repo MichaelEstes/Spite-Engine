@@ -286,6 +286,27 @@ Scene::SetComponentDirect<Type>(entity: Entity, value: Type, component: Componen
 	return null;
 }
 
+*any Scene::GetComponentUntyped(entity: Entity, component: Component)
+{
+	id := component.id;
+
+	switch (component.kind)
+	{
+		case (ComponentKind.Common)
+		{
+			if (!this.commonComponents.Has(id)) break;
+			return this.commonComponents.Get(id).GetUntyped(entity, component.size);
+		}
+		case (ComponentKind.Sparse)
+		{
+			if (!this.sparseComponents.Has(id)) break;
+			return this.sparseComponents.Get(id).GetUntyped(entity, component.size);
+		}
+	}
+
+	return null;
+}
+
 Scene::RemoveComponent<Type>(entity: Entity)
 {
 	component := instance.GetComponent<Type>();

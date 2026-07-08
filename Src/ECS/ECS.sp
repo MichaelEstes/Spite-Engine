@@ -90,7 +90,8 @@ state ECS
 	systems := Systems(),
 
 	componentTypeMap := Map<*_Type, Component>(),
-	componentIDMap := SparseSet<Component>(),
+	componentIDSet := SparseSet<Component>(),
+	componentTypeSet := SparseSet<*_Type>(),
 	tagComponentNameMap := Map<string, TagComponent>(),
 	tagComponentSerializeMap := SparseSet<string>(),
 	
@@ -120,7 +121,8 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 
 	component := { this.componentCount, componentKind, uint32(#sizeof Type) } as Component;
 	this.componentTypeMap.Insert(type, component);
-	this.componentIDMap.Insert(component.id, component);
+	this.componentIDSet.Insert(component.id, component);
+	this.componentTypeSet.Insert(component.id, type);
 	if (onRemove) this.componentRemoveCallbacks.Insert(component.id, onRemove);
 	if (onEnter) this.componentEnterCallbacks.Insert(component.id, onEnter);
 	this.componentCount += 1;
@@ -226,7 +228,7 @@ Component ECS::GetComponent<Type>()
 
 Component ECS::GetComponentByID(id: uint32)
 {
-	return this.componentIDMap.Get(id)~;
+	return this.componentIDSet.Get(id)~;
 }
 
 ECS::OnComponentRemove(id: uint32, entity: Entity, componentData: *any, scene: Scene)

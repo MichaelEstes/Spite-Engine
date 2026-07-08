@@ -8,6 +8,8 @@ extern
     *bool SDL_GetKeyboardState(numKeys: *int);
     uint32 SDL_GetMouseState(x: *float32, y: *float32);
     *Window SDL_GetMouseFocus();
+    bool SDL_StartTextInput(window: *Window);
+    bool SDL_StopTextInput(window: *Window);
 }
 
 enum Scancode: uint32
@@ -372,7 +374,32 @@ enum MouseButton: uint32
     X2
 }
 
+enum Keymod: uint32
+{
+    None    = 0x0000, // no modifier is applicable
+    LShift  = 0x0001, // the left Shift key is down
+    RShift  = 0x0002, // the right Shift key is down
+    Level5  = 0x0004, // the Level 5 Shift key is down
+    LCtrl   = 0x0040, // the left Ctrl (Control) key is down
+    RCtrl   = 0x0080, // the right Ctrl (Control) key is down
+    LAlt    = 0x0100, // the left Alt key is down
+    RAlt    = 0x0200, // the right Alt key is down
+    LGui    = 0x0400, // the left GUI key (often the Windows key) is down
+    RGui    = 0x0800, // the right GUI key (often the Windows key) is down
+    Num     = 0x1000, // the Num Lock key (may be located on an extended keypad) is down
+    Caps    = 0x2000, // the Caps Lock key is down
+    Mode    = 0x4000, // the AltGr key is down
+    Scroll  = 0x8000, // the Scroll Lock key is down
+    Ctrl    = 0x00C0, // any Ctrl key is down (LCtrl | RCtrl)
+    Shift   = 0x0003, // any Shift key is down (LShift | RShift)
+    Alt     = 0x0300, // any Alt key is down (LAlt | RAlt)
+    Gui     = 0x0C00  // any GUI key is down (LGui | RGui)
+}
+
 *bool GetKeyboardState(numKeys: *int) => SDL_GetKeyboardState(numKeys);
 
 uint32 GetMouseState(x: *float32, y: *float32) => SDL_GetMouseState(x, y);
 *Window GetMouseFocus() => SDL_GetMouseFocus();
+
+bool StartTextInput(window: *Window) => SDL_StartTextInput(window);
+bool StopTextInput(window: *Window) => SDL_StopTextInput(window);

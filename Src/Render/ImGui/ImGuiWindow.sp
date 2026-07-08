@@ -10,17 +10,24 @@ import Fiber
 import SystemInfo
 import Array
 
-InitializeImGui()
+state ImGuiRenderFunc
 {
-	ImGui_CreateContext(null);
+	func: ::(*ImGuiWindow, *any),
+	data: *any,
+}
+
+ImGuiRenderFunc::(renderFunc: ::(*ImGuiWindow, *any), data: *any = null)
+{
+	this.func = renderFunc;
+	this.data = data;
 }
 
 state ImGuiWindow
 {
+	ctx: *ImGuiContext_t,
 	window: *SDL.Window,
 	windowHandle: *void,
-	renderFuncs: Array<::(*ImGuiWindow, *any)>,
-	data: *any,
+	renderFuncs: Array<ImGuiRenderFunc>,
 
 	renderer: VulkanRenderer,
 
@@ -30,10 +37,10 @@ state ImGuiWindow
 	initialized: bool = false
 }
 
-ImGuiWindow::(renderFuncs: []::(*ImGuiWindow, *any), data: *any, width: uint32, height: uint32)
+ImGuiWindow::(renderFuncs: []ImGuiRenderFunc, width: uint32, height: uint32)
 {
-	this.renderFuncs = Array<::(*ImGuiWindow, *any)>(renderFuncs);
-	this.data = data;
+	this.ctx = ImGui_CreateContext(null);
+	this.renderFuncs = Array<ImGuiRenderFunc>(renderFuncs);
 	this.width = width;
 	this.height = height;
 }
@@ -45,9 +52,17 @@ ImGuiWindow::delete
 	events.Remove(SDL.EventType.MOUSE_WHEEL, UpdateMouseWheel);
 	events.Remove(SDL.EventType.MOUSE_BUTTON_DOWN, UpdateMouseButton);
 	events.Remove(SDL.EventType.MOUSE_BUTTON_UP, UpdateMouseButton);
+	events.Remove(SDL.EventType.KEY_DOWN, UpdateKey);
+	events.Remove(SDL.EventType.KEY_UP, UpdateKey);
+	events.Remove(SDL.EventType.TEXT_INPUT, UpdateTextInput);
 
+	SDL.StopTextInput(this.window);
 	DestroyWindow(this.window);
-	delete this.data;
+
+	for (renderFunc in this.renderFuncs)
+	{
+		delete renderFunc.data;
+	}
 }
 
 ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
@@ -93,7 +108,12 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 		events.On(SDL.EventType.MOUSE_WHEEL, UpdateMouseWheel);
 		events.On(SDL.EventType.MOUSE_BUTTON_DOWN, UpdateMouseButton);
 		events.On(SDL.EventType.MOUSE_BUTTON_UP, UpdateMouseButton);
-		
+		events.On(SDL.EventType.KEY_DOWN, UpdateKey);
+		events.On(SDL.EventType.KEY_UP, UpdateKey);
+		events.On(SDL.EventType.TEXT_INPUT, UpdateTextInput);
+
+		SDL.StartTextInput(window);
+
 		renderConfig := VulkanRendererConfig();
 		renderConfig.userData.entity = entity;
 		renderConfig.maxMaterialSets = 8;
@@ -111,7 +131,30 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 
 ImGuiWindow::Render()
 {
-	for (renderFunc in this.renderFuncs) renderFunc(this@, this.data);
+	ImGui_SetCurrentContext(this.ctx);
+	for (renderFunc in this.renderFuncs)
+	{
+		renderFunc.func(this@, renderFunc.data);
+	}
+}
+
+uint32 ImGuiWindow::AddRenderFunc(renderFunc: ImGuiRenderFunc)
+{
+	return this.renderFuncs.Add(renderFunc);
+}
+
+bool ImGuiWindow::RemoveRenderFunc(renderFunc: ImGuiRenderFunc)
+{
+	for (curr in this.renderFuncs)
+	{
+		if (curr.func == renderFunc.func && curr.data == renderFunc.data)
+		{
+			delete curr.data;
+			break;
+		}
+	}
+
+	return this.renderFuncs.Remove(renderFunc);
 }
 
 ImGuiComponent := ECS.RegisterComponent<ImGuiWindow>(
