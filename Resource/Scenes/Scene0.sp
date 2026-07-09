@@ -119,21 +119,7 @@ _ := SceneRegistry.RegisterScene(
 			},
 		);
 
-		imGuiWindowEntity := scene.CreateEntity();
-		scene.SetComponent<ImGuiWindow>(imGuiWindowEntity, ImGuiWindow(
-			[
-				ImGuiRenderFunc(::(window: *ImGuiWindow, data: *any) 
-				{
-					ImGui_ShowMetricsWindow(true@);
-				}),
-			],
-			uint32(1000),
-			uint32(1000)
-		));
-
-		CreateSceneGraphEditor(imGuiWindowEntity, scene);
-
-		//AddProfilerToWindow(scene, imGuiWindowEntity);
+		CreateEditorWindow(scene);
 
 		log "Loaded Main Scene";
 

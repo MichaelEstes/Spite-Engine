@@ -13,13 +13,15 @@ import Array
 state ImGuiRenderFunc
 {
 	func: ::(*ImGuiWindow, *any),
-	data: *any,
+	data: *any = null,
+	onRemove: ::(*any) = null
 }
 
-ImGuiRenderFunc::(renderFunc: ::(*ImGuiWindow, *any), data: *any = null)
+ImGuiRenderFunc::(renderFunc: ::(*ImGuiWindow, *any), data: *any = null, onRemove: ::(*any) = null)
 {
 	this.func = renderFunc;
 	this.data = data;
+	this.onRemove = onRemove;
 }
 
 state ImGuiWindow
@@ -149,7 +151,7 @@ bool ImGuiWindow::RemoveRenderFunc(renderFunc: ImGuiRenderFunc)
 	{
 		if (curr.func == renderFunc.func && curr.data == renderFunc.data)
 		{
-			delete curr.data;
+			if (curr.onRemove) curr.onRemove(curr.data);
 			break;
 		}
 	}

@@ -87,6 +87,8 @@ LineMeshComponent := ECS.RegisterComponent<LineMesh>(
     null,
     ::(entity: Entity, lineMesh: *LineMesh, scene: Scene)
     {
+        scene.RemoveComponent<Mesh>(entity);
+
         if (lineMesh.thickness > 1.0)
         {
             BuildThickLine(entity, lineMesh, scene);

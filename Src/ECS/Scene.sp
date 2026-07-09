@@ -255,6 +255,39 @@ Scene::SetComponentDirect<Type>(entity: Entity, value: Type, component: Componen
 	instance.OnComponentEnter(id, entity, inserted, this);
 }
 
+Scene::SetComponentUntyped(entity: Entity, data: *any, component: Component)
+{
+	id := component.id;
+
+	inserted: *any = null;
+	switch (component.kind)
+	{
+		case (ComponentKind.Common)
+		{
+			componentArrPtr := this.GetCommon<any>(id);
+			if (!componentArrPtr)
+			{
+				log "Scene::SetComponentUntyped Cannot create common component container in untyped flow";
+				return;
+			}
+			inserted = componentArrPtr.SetUntyped(entity, data, component.size);
+		}
+		case (ComponentKind.Sparse)
+		{
+			componentMapPtr := this.GetSparse<any>(id);
+			if (!componentMapPtr)
+			{
+				log "Scene::SetComponentUntyped Cannot create sparse component container in untyped flow";
+				return;
+			}
+			inserted = componentMapPtr.SetUntyped(entity, data, component.size);
+		}
+		default return;
+	}
+
+	instance.OnComponentEnter(id, entity, inserted, this);
+}
+
 *Type Scene::GetComponent<Type>(entity: Entity)
 {
 	component := instance.GetComponent<Type>();

@@ -8,62 +8,62 @@ state TypeValue
     val: *any
 }
 
-ByteValueEditor(label: string, val: *byte)
+bool ByteValueEditor(label: string, val: *byte)
 {
-    ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_S8, val);
+    return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_S8, val);
 }
 
-UByteValueEditor(label: string, val: *ubyte)
+bool UByteValueEditor(label: string, val: *ubyte)
 {
-    ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_U8, val);
+    return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_U8, val);
 }
 
-Int16ValueEditor(label: string, val: *int16)
+bool Int16ValueEditor(label: string, val: *int16)
 {
-    ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_S16, val);
+    return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_S16, val);
 }
 
-UInt16ValueEditor(label: string, val: *uint16)
+bool UInt16ValueEditor(label: string, val: *uint16)
 {
-    ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_U16, val);
+    return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_U16, val);
 }
 
-Int32ValueEditor(label: string, val: *int32)
+bool Int32ValueEditor(label: string, val: *int32)
 {
-    ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_S32, val);
+    return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_S32, val);
 }
 
-UInt32ValueEditor(label: string, val: *uint32)
+bool UInt32ValueEditor(label: string, val: *uint32)
 {
-    ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_U32, val);
+    return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_U32, val);
 }
 
-IntValueEditor(label: string, val: *int)
+bool IntValueEditor(label: string, val: *int)
 {
-    ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_S64, val);
+    return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_S64, val);
 }
 
-UIntValueEditor(label: string, val: *uint)
+bool UIntValueEditor(label: string, val: *uint)
 {
-    ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_U64, val);
+    return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_U64, val);
 }
 
-Float32ValueEditor(label: string, val: *float32)
+bool Float32ValueEditor(label: string, val: *float32)
 {
-    ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_Float, val);
+    return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_Float, val);
 }
 
-Float64ValueEditor(label: string, val: *float64)
+bool Float64ValueEditor(label: string, val: *float64)
 {
-    ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_Double, val);
+    return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_Double, val);
 }
 
-BoolValueEditor(label: string, val: *bool)
+bool BoolValueEditor(label: string, val: *bool)
 {
-    ImGui_Checkbox(label[0], val);
+    return ImGui_Checkbox(label[0], val);
 }
 
-TypeValueEditor(label: string, val: TypeValue)
+bool TypeValueEditor(label: string, val: TypeValue)
 {
     type := val.meta;
     typeData := type.type;
@@ -75,30 +75,30 @@ TypeValueEditor(label: string, val: TypeValue)
         {
             switch (typeData.primitive.primitiveKind)
             {
-                case (_PrimitiveKind.Bool) BoolValueEditor(label, valuePtr);
+                case (_PrimitiveKind.Bool) return BoolValueEditor(label, valuePtr);
                 case (_PrimitiveKind.Byte)
                 {
-                    if (typeData.primitive.isSigned) ByteValueEditor(label, valuePtr);
-                    else UByteValueEditor(label, valuePtr);
+                    if (typeData.primitive.isSigned) return ByteValueEditor(label, valuePtr);
+                    else return UByteValueEditor(label, valuePtr);
                 }
                 case (_PrimitiveKind.I16)
                 {
-                    if (typeData.primitive.isSigned) Int16ValueEditor(label, valuePtr);
-                    else UInt16ValueEditor(label, valuePtr);
+                    if (typeData.primitive.isSigned) return Int16ValueEditor(label, valuePtr);
+                    else return UInt16ValueEditor(label, valuePtr);
                 }
                 case (_PrimitiveKind.I32)
                 {
-                    if (typeData.primitive.isSigned) Int32ValueEditor(label, valuePtr);
-                    else UInt32ValueEditor(label, valuePtr);
+                    if (typeData.primitive.isSigned) return Int32ValueEditor(label, valuePtr);
+                    else return UInt32ValueEditor(label, valuePtr);
                 }
                 case (_PrimitiveKind.I64) continue;
                 case (_PrimitiveKind.Int)
                 {
-                    if (typeData.primitive.isSigned) IntValueEditor(label, valuePtr);
-                    else UIntValueEditor(label, valuePtr);
+                    if (typeData.primitive.isSigned) return IntValueEditor(label, valuePtr);
+                    else return UIntValueEditor(label, valuePtr);
                 }
-                case (_PrimitiveKind.F32) Float32ValueEditor(label, valuePtr);
-                case (_PrimitiveKind.Float) Float64ValueEditor(label, valuePtr);
+                case (_PrimitiveKind.F32) return Float32ValueEditor(label, valuePtr);
+                case (_PrimitiveKind.Float) return Float64ValueEditor(label, valuePtr);
             }
         }
         case (_TypeKind.StateType)
@@ -106,14 +106,17 @@ TypeValueEditor(label: string, val: TypeValue)
             _state := typeData.stateType;
             if (ImGui_TreeNode(label[0]))
             {
+                changed := false;
                 for (member: **_Member in _state.members)
                 {
                     memberLabel := member.value.name.ToString();
                     memberPtr := (valuePtr as *byte) + member.offset;
-                    TypeValueEditor(memberLabel, { member.value.type, memberPtr } as TypeValue);
+                    memberChanged := TypeValueEditor(memberLabel, { member.value.type, memberPtr } as TypeValue);
+                    changed = changed | memberChanged;
                 }
 
                 ImGui_TreePop();
+                return changed;
             }
         }
         case (_TypeKind.StructureType) {}
@@ -124,4 +127,6 @@ TypeValueEditor(label: string, val: TypeValue)
         case (_TypeKind.DynamicArrayType) {}
         case (_TypeKind.FixedArrayType) {}
     }
+
+    return false;
 }

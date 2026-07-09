@@ -95,6 +95,14 @@ bool EntityComponentArray::Has(entity: Entity)
 	return this.componentArr[index];
 }
 
+EntityComponentArray::Remove(entity: Entity)
+{
+	if (!this.Has(entity)) return;
+
+	index := entity.id;
+	this.entitySet.Clear(index);
+}
+
 *any EntityComponentArray::GetUntyped(entity: Entity, size: uint32)
 {
 	if (!this.Has(entity)) return null;
@@ -104,10 +112,17 @@ bool EntityComponentArray::Has(entity: Entity)
 	return byteArr[index * size];
 }
 
-EntityComponentArray::Remove(entity: Entity)
+*any EntityComponentArray::SetUntyped(entity: Entity, data: *any, size: uint32)
 {
-	if (!this.Has(entity)) return;
+	assert !!entity, "Cannot insert null entity";
+
+	if (entity.id >= this.capacity) this.Resize(entity.id);
 
 	index := entity.id;
-	this.entitySet.Clear(index);
+	this.entitySet.Set(index);
+
+	byteArr := this.componentArr.ptr as *byte;
+	dst := byteArr[index * size];
+	copy_bytes(dst, data, size);
+	return dst;
 }

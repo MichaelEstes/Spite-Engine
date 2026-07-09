@@ -131,16 +131,6 @@ uint16 EntityComponentMap::GetIndex(entity: Entity)
 	return this.componentArr[index];
 }
 
-*any EntityComponentMap::GetUntyped(entity: Entity, size: uint32)
-{
-	index := this.GetIndex(entity);
-	if (!index) return null;
-	index -= 1;
-
-	byteArr := this.componentArr.ptr as *byte;
-	return byteArr[index * size];
-}
-
 EntityComponentMap::Remove(entity: Entity)
 {
 	index := this.GetIndex(entity);
@@ -158,6 +148,34 @@ EntityComponentMap::Remove(entity: Entity)
 	this.entityArr[index]~ = endEntity;
 	this.componentArr[index]~ = endComponent;
 	this.sparseArr[endEntity.id]~ = index + 1;
+}
+
+*any EntityComponentMap::GetUntyped(entity: Entity, size: uint32)
+{
+	index := this.GetIndex(entity);
+	if (!index) return null;
+	index -= 1;
+
+	byteArr := this.componentArr.ptr as *byte;
+	return byteArr[index * size];
+}
+
+*any EntityComponentMap::SetUntyped(entity: Entity, data: *any, size: uint32)
+{
+	assert !!entity, "Cannot insert null entity";
+
+	if (entity.id >= this.sparseCapacity) this.ResizeSparse(entity.id);
+	if (this.count >= this.capacity) this.ResizeDense();
+
+	this.entityArr[this.count]~ = entity;
+
+	byteArr := this.componentArr.ptr as *byte;
+	dst := byteArr[this.count * size];
+	copy_bytes(dst, data, size);
+
+	this.count += 1;
+	this.sparseArr[entity.id]~ = this.count;
+	return dst;
 }
 
 EntityComponentMap::RemoveUntyped(entity: Entity, size: uint32)
