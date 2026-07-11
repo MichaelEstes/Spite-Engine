@@ -219,6 +219,11 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 					attachmentIndex += 1;
 
 					textureDesc := renderGraph.handles.GetResourceDesc(handle).desc.texture;
+					if (textureDesc.flags & GPUTextureFlags.SizeSwapchainRelative)
+					{
+						textureDesc.width = renderer.swapchain.extent.width;
+						textureDesc.height = renderer.swapchain.extent.height;
+					}
 					if (textureDesc.width > width) width = textureDesc.width;
 					if (textureDesc.height > height) height = textureDesc.height;
 				}
@@ -242,6 +247,7 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 			renderPassInfo.renderArea = renderArea;
 			renderPassInfo.clearValueCount = attachmentIndex;
 			renderPassInfo.pClearValues = fixed clearValues;
+
 			
 			vkCmdBeginRenderPass(commandBuffer, renderPassInfo@, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
 

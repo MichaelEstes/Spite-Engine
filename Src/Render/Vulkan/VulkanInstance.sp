@@ -52,6 +52,8 @@ state VulkanInstance
 	transferCommands: VulkanCommands,
 	graphicsCommands: VulkanCommands,
 
+	debugInfo: *VulkanDebugInfo,
+
 	physicalDeviceCount: uint32,
 	currentDevice: uint32,
 	extensionCount: uint32,
@@ -65,6 +67,8 @@ state VulkanInstance
 
 VulkanInstance::InitializeCurrentDevice()
 {
+	InitializeVulkanDebug();
+
 	this.resourceTables = ResourceTables<VulkanRenderer>(
 		::*VkImage_T(createDesc: TextureDesc, renderer: *VulkanRenderer) {
 			device := vulkanInstance.device;
@@ -135,8 +139,18 @@ VulkanInstance::InitializeCurrentDevice()
 	createInfo.pNext = deviceFeatures2@ as *void;
 	createInfo.queueCreateInfoCount = queueCreateInfos.count;
 	createInfo.pQueueCreateInfos = queueCreateInfos[0]@;
-	createInfo.enabledExtensionCount = requiredDeviceExtensionCount;
-	createInfo.ppEnabledExtensionNames = requiredDeviceExtensions[0]@;
+
+	if (VKDebug)
+	{
+		createInfo.enabledExtensionCount = debugDeviceExtensionCount;
+		createInfo.ppEnabledExtensionNames = fixed debugRequiredDeviceExtensions;
+	}
+	else
+	{
+		createInfo.enabledExtensionCount = requiredDeviceExtensionCount;
+		createInfo.ppEnabledExtensionNames = fixed requiredDeviceExtensions;
+	}
+
 	createInfo.pEnabledFeatures = null;
 
 	CheckResult(
@@ -152,6 +166,8 @@ VulkanInstance::InitializeCurrentDevice()
 	this.allocator = VulkanAllocator();
 	this.allocator.Create(this.device, physicalDevice);
 	this.stagingBuffer = VulkanStagingBuffer();
+
+	VulkanDebugQueryMemoryBudget(physicalDevice);
 
 	this.resourceManager = VulkanResourceManager();
 	this.renderPassCache = VulkanRenderPassCache();
@@ -280,7 +296,7 @@ InitializeVulkanInstance()
 		),
 		"Error finding device for Vulkan"
 	);
- 
+	 
 	vulkanInstance.SelectDefaultDevice();
 	vulkanInstance.InitializeCurrentDevice();
 

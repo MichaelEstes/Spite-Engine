@@ -12520,7 +12520,7 @@ state VkDeviceDeviceMemoryReportCreateInfoEXT
         sType: VkStructureType,
         pNext: *void,
         flags: uint32,
-        pfnUserCallback: ::(),
+        pfnUserCallback: ::(*VkDeviceMemoryReportCallbackDataEXT, *void),
         pUserData: *void
 }
 

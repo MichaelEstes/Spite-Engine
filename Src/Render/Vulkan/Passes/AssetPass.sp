@@ -13,15 +13,6 @@ import Matrix
 import RenderComponents
 import RenderAssetDef
 
-VulkanPipelineKey CreateAssetPassPipelineKey(meshState: VulkanPipelineMeshState, renderPass: *VkRenderPass_T)
-{
-	key := VulkanPipelineKey();
-	key.meshState = meshState;
-	key.renderPass = renderPass;
-
-	return key;
-}
-
 state AssetFrameGlobal
 {
 	set: *VkDescriptorSet_T
@@ -91,7 +82,7 @@ AssetPassState::Init()
 	return globalFrame.set;
 }
 
-assetPassName := "AssetPass";
+assetPassName: string = "AssetPass";
 assetPass := RegisterRenderPass(
 	assetPassName,
 	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene, self: *VulkanRenderPass) 
@@ -105,20 +96,10 @@ assetPass := RegisterRenderPass(
 				// log "Vulkan Asset pass init";
 				builder.Read(renderer.swapchainHandle, ResourceUsageFlags.Sampled | ResourceUsageFlags.LoadUndefined);
 				builder.Write(renderer.swapchainHandle, ResourceUsageFlags.DefaultWrite);
-				
-				depthTexture := TextureDesc();
-				depthTexture.format = renderer.swapchain.depthFormat;
-				depthTexture.usage = GPUTextureUsage.DepthStencil;
-				depthTexture.depth = 1;
-				depthTexture.layerCount = 1;
-				depthTexture.mipLevels = 1;
-				depthTexture.flags = GPUTextureFlags.SizeSwapchainRelative;
-				depthTexture.layout = GPUTextureLayout.Undefined;
-				
-				depthHandle := builder.CreateTexture("depth", depthTexture);
-				builder.Read(depthHandle, ResourceUsageFlags.Sampled | ResourceUsageFlags.LoadUndefined);
-				builder.Write(depthHandle, ResourceUsageFlags.Depth | ResourceUsageFlags.Store);
-				builder.SetDepthStencilColor(depthHandle, DepthStencilClear(1.0, 0));
+
+				depthState := renderer.GetRenderPassByName(depthPassName).data as *DepthPassState;
+				builder.Read(depthState.depthHandle);
+				builder.Write(depthState.depthHandle, ResourceUsageFlags.Depth | ResourceUsageFlags.Store);
 
 				lightCullPass := renderer.GetRenderPassByName(lightCullPassName);
 				if (lightCullPass)
@@ -163,7 +144,7 @@ assetPass := RegisterRenderPass(
 
 					vulkanPipeline := FindOrCreatePipeline(
 						device,
-						CreateAssetPassPipelineKey(meshState, renderPass),
+						CreatePipelineKey(meshState, renderPass),
 						vulkanInstance.pipelineCache,
 						vulkanInstance.pipelineLayoutCache
 					);

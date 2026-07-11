@@ -464,7 +464,6 @@ string WriteFragmentShader(assetDef: AssetDef)
         assetDef.GetBindlessTextureSetIndex()
     );
 
-
     inVars := Array<Variable>();
     defer inVars.Free();
     for (using in fragmentStage.using)

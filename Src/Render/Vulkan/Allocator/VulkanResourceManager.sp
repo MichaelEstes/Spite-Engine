@@ -15,7 +15,7 @@ state VulkanResourceHandle
 	handle: uint32
 }
 
-state HandleBuffer
+state BufferHandle
 {
 	buffer: *VkBuffer_T,
 	handle: VulkanAllocHandle
@@ -237,10 +237,16 @@ state VulkanResourceManager
 	geometryDescriptors := SparseSet<VulkanUBODescriptors>(),
 	materialDescriptors := SparseSet<VulkanUBODescriptors>(),
 
-	defaultBuffers := Map<Value, HandleBuffer, HashValue>()
+	defaultBuffers := Map<Value, BufferHandle, HashValue>()
 }
 
 VulkanResourceManager::()
+{
+	this.CreateBindlessTextures();
+	this.CreateDebugTexture();
+}
+
+VulkanResourceManager::CreateBindlessTextures()
 {
 	device := vulkanInstance.device;
 
@@ -311,8 +317,6 @@ VulkanResourceManager::()
 		vkAllocateDescriptorSets(device, allocInfo@, this.textures.set@),
 		"VulkanResourceManager Error allocating bindless descriptor set"
 	);
-
-	this.CreateDebugTexture();
 }
 
 VulkanResourceManager::CreateDebugTexture()
@@ -430,7 +434,7 @@ VkBufferCreateInfo StorageBufferCreateInfo(size: uint32)
 	return createInfo;
 }
 
-HandleBuffer UploadBuffer(createInfo: VkBufferCreateInfo, data: *byte, size: uint)
+BufferHandle UploadBuffer(createInfo: VkBufferCreateInfo, data: *byte, size: uint)
 {
 	device := vulkanInstance.device;
 	allocator := vulkanInstance.allocator;
@@ -442,13 +446,13 @@ HandleBuffer UploadBuffer(createInfo: VkBufferCreateInfo, data: *byte, size: uin
 	handle := allocator.AllocBuffer(buffer, VulkanMemoryFlags.GPU);
 	stagingBuffer.StagedBufferCopy(device, data, size, buffer, commands, queue);
 
-	handleBuf := HandleBuffer();
+	handleBuf := BufferHandle();
 	handleBuf.buffer = buffer;
 	handleBuf.handle = handle;
 	return handleBuf;
 }
 
-HandleBuffer CreateDeviceStorageBuffer(size: uint32)
+BufferHandle CreateDeviceStorageBuffer(size: uint32)
 {
 	device := vulkanInstance.device;
 	allocator := vulkanInstance.allocator;
@@ -456,13 +460,13 @@ HandleBuffer CreateDeviceStorageBuffer(size: uint32)
 	buffer := CreateVkBuffer(device, StorageBufferCreateInfo(size));
 	handle := allocator.AllocBuffer(buffer, VulkanMemoryFlags.GPU);
 
-	handleBuf := HandleBuffer();
+	handleBuf := BufferHandle();
 	handleBuf.buffer = buffer;
 	handleBuf.handle = handle;
 	return handleBuf;
 }
 
-HandleBuffer CreateMappedStorageBuffer(size: uint32)
+BufferHandle CreateMappedStorageBuffer(size: uint32)
 {
 	device := vulkanInstance.device;
 	allocator := vulkanInstance.allocator;
@@ -473,13 +477,13 @@ HandleBuffer CreateMappedStorageBuffer(size: uint32)
 		VulkanMemoryFlags.Shared | VulkanMemoryFlags.Coherent | VulkanMemoryFlags.Mapped
 	);
 
-	handleBuf := HandleBuffer();
+	handleBuf := BufferHandle();
 	handleBuf.buffer = buffer;
 	handleBuf.handle = handle;
 	return handleBuf;
 }
 
-HandleBuffer VulkanResourceManager::GetDefaultBuffer(value: Value, size: uint32)
+BufferHandle VulkanResourceManager::GetDefaultBuffer(value: Value, size: uint32)
 {
 	cached := this.defaultBuffers.Find(value);
 	if (cached) return cached~;

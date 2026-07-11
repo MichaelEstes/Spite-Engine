@@ -52,6 +52,18 @@ state VulkanPipelineKey
 	meshState: VulkanPipelineMeshState
 }
 
+VulkanPipelineKey CreatePipelineKey(
+	meshState: VulkanPipelineMeshState, 
+	renderPass: *VkRenderPass_T
+)
+{
+	key := VulkanPipelineKey();
+	key.meshState = meshState;
+	key.renderPass = renderPass;
+
+	return key;
+}
+
 state VulkanPipeline
 {
 	pipeline: *VkPipeline_T,
@@ -126,10 +138,17 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 	meshState := key.meshState;
 	depthTestEnable := VkTrue;
 	depthWriteEnable := VkTrue;
+	depthCompareOp := VkCompareOp.VK_COMPARE_OP_LESS;
 	blendState := ColorBlendAttachment();
 	assetDef := GetAssetDefWithHandle(meshState.assetDefHandle);
 
-	if (meshState.GetAlphaMode() == VulkanAlphaMode.Blend)
+	alphaMode := meshState.GetAlphaMode();
+	if (alphaMode == VulkanAlphaMode.Opaque)
+	{
+		depthWriteEnable = VkFalse;
+		depthCompareOp = VkCompareOp.VK_COMPARE_OP_EQUAL;
+	}
+	else if (alphaMode == VulkanAlphaMode.Blend)
 	{
 		depthWriteEnable = VkFalse;
 
@@ -186,7 +205,7 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 					VkCullModeFlagBits.VK_CULL_MODE_NONE
 				)
 				.SetMultisampling()
-				.SetDepthStencil(depthTestEnable, depthWriteEnable)
+				.SetDepthStencil(depthTestEnable, depthWriteEnable, depthCompareOp)
 				.SetColorBlend(
 					VkPipelineColorBlendAttachmentState:[blendState,]
 				)
@@ -195,8 +214,83 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_CULL_MODE)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE)
 				.SetPipelineLayout(layout);
-	
+
 	return builder.Create(device, key.renderPass, 0);
+}
+
+VulkanPipeline CreateDepthPipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey,
+										  layoutCache: VulkanPipelineLayoutCache)
+{
+	meshState := key.meshState;
+	assetDef := GetAssetDefWithHandle(meshState.assetDefHandle);
+
+	shaderHandle := UseAssetDefShader(meshState.assetDefHandle);
+
+	layoutKey := PipelineLayoutKey(meshState.assetDefHandle, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
+	layout := FindOrCreatePipelineLayout(device, layoutKey, layoutCache);
+
+	attributes := assetDef.vertex.attributes;
+	vertexInputBindings := ECS.instance.frameAllocator.AllocArray<VkVertexInputBindingDescription>(attributes.count);
+	vertexInputAttributes := ECS.instance.frameAllocator.AllocArray<VkVertexInputAttributeDescription>(attributes.count);
+
+	perVertex := VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX;
+	for (i .. attributes.count)
+	{
+		attr := attributes[i];
+
+		binding := VkVertexInputBindingDescription();
+		binding.binding = i;
+		binding.stride = attr.def.ValueSize();
+		binding.inputRate = perVertex;
+		vertexInputBindings[i] = binding;
+
+		attribute := VkVertexInputAttributeDescription();
+		attribute.location = i;
+		attribute.binding = i;
+		attribute.format = VariableTypeToVkFormat(attr.def.kind);
+		attribute.offset = 0;
+		vertexInputAttributes[i] = attribute;
+	}
+
+	builder := VulkanPipelineBuilder()
+				.SetShader(shaderHandle)
+				.SetVertexOnly(true)
+				.SetVertexInput(
+					vertexInputBindings,
+					vertexInputAttributes,
+				)
+				.SetInputAssembly(meshState.GetTopology())
+				.SetViewportState(1, 1)
+				.SetRasterizer(
+					VkFalse,
+					VkFalse,
+					PolygonModeToVk(assetDef.fragment.polygonMode),
+					1.0,
+					VkCullModeFlagBits.VK_CULL_MODE_NONE
+				)
+				.SetMultisampling()
+				.SetDepthStencil(VkTrue, VkTrue)
+				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT)
+				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_SCISSOR)
+				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_CULL_MODE)
+				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE)
+				.SetPipelineLayout(layout);
+
+	return builder.Create(device, key.renderPass, 0);
+}
+
+VulkanPipeline FindOrCreateDepthPipeline(device: *VkDevice_T, key: VulkanPipelineKey,
+										 cache: VulkanPipelineMap, layoutCache: VulkanPipelineLayoutCache)
+{
+	pipeline := cache.pipelineMap.Find(key);
+	if (pipeline)
+	{
+		return pipeline~;
+	}
+
+	createdPipeline := CreateDepthPipelineFromKey(device, key, layoutCache);
+	cache.pipelineMap.Insert(key, createdPipeline);
+	return createdPipeline;
 }
 
 state VulkanPipelineBuilder
@@ -215,8 +309,9 @@ state VulkanPipelineBuilder
     depthStencil: VkPipelineDepthStencilStateCreateInfo,
     colorBlend: VkPipelineColorBlendStateCreateInfo,
     dynamicStates: [MaxDynamicStates]VkDynamicState,
-	
+
 	dynamicStateCount: uint32,
+	vertexOnly: bool,
 }
 
 VulkanPipelineBuilder::()
@@ -243,6 +338,12 @@ VulkanPipelineBuilder::()
 ref VulkanPipelineBuilder VulkanPipelineBuilder::SetShader(shaderHandle: ResourceHandle)
 {
 	this.shaderHandle = shaderHandle;
+	return this;
+}
+
+ref VulkanPipelineBuilder VulkanPipelineBuilder::SetVertexOnly(vertexOnly: bool)
+{
+	this.vertexOnly = vertexOnly;
 	return this;
 }
 
@@ -383,8 +484,13 @@ VulkanPipeline VulkanPipelineBuilder::Create(device: *VkDevice_T, renderPass: *V
 	{
 		shaderRes := ShaderResourceManager.GetResource(this.shaderHandle).data;
 		shaderStages[0] = shaderRes.vertex.shaderStageInfo;
-		shaderStages[1] = shaderRes.fragment.shaderStageInfo;
-		shaderCount = 2;
+		shaderCount = 1;
+
+		if (!this.vertexOnly)
+		{
+			shaderStages[1] = shaderRes.fragment.shaderStageInfo;
+			shaderCount = 2;
+		}
 	}
 
     dynamicState := VkPipelineDynamicStateCreateInfo();

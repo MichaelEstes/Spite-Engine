@@ -18,11 +18,11 @@ EditorPanel::(title: string, create: ::ImGuiRenderFunc(EditorPanel, Entity, *Sce
     this.data = data;
 }
 
-registeredEditorPanels := Array<EditorPanel>();
+registeredEditorPanels := Array<{ panel: EditorPanel, defaultEnabled: bool }>();
 
-uint32 RegisterEditorPanel(panel: EditorPanel)
+uint32 RegisterEditorPanel(panel: EditorPanel, defaultEnabled: bool = false)
 {
-    return registeredEditorPanels.Add(panel);
+    return registeredEditorPanels.Add({ panel, defaultEnabled });
 }
 
 state EditorWindow
@@ -37,11 +37,12 @@ EditorWindow::(scene: *Scene)
 {
     this.sceneEntity = new SceneEntity();
     this.sceneEntity.scene = scene;
-    for (panel in registeredEditorPanels)
+    for (editorPanel in registeredEditorPanels)
     {
-        this.panels.Add(panel);
-        this.active.Add(false);
+        this.panels.Add(editorPanel.panel);
+        this.active.Add(editorPanel.defaultEnabled);
     }
+
     this.renderFuncs = Array<ImGuiRenderFunc>(this.panels.count);
 }
 
@@ -102,6 +103,17 @@ EditorWindowComponent := ECS.RegisterComponent<EditorWindow>(
 			uint32(1000),
 			uint32(1000)
 		));
+
+        window := scene.GetComponent<ImGuiWindow>(entity);
+        for (i .. editorWindow.panels.count)
+        {
+            if (editorWindow.active[i])
+            {
+                panel := editorWindow.panels[i];
+                editorWindow.renderFuncs[i] = panel.create(panel, entity, scene@);
+                window.AddRenderFunc(editorWindow.renderFuncs[i]);
+            }
+        }
 	}
 );
 

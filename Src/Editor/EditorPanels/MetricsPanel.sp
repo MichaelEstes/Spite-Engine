@@ -12,4 +12,4 @@ ImGuiRenderFunc CreateMetricsPanel(panel: EditorPanel, entity: Entity, scene: *S
 	});
 }
 
-MetricsPanel := RegisterEditorPanel(EditorPanel("Metrics", CreateMetricsPanel));
+MetricsPanel := RegisterEditorPanel(EditorPanel("Metrics", CreateMetricsPanel), true);

@@ -44,7 +44,7 @@ _ := SceneRegistry.RegisterScene(
 				uint32(1000)
 			},
 			{
-				Array<string>(["ClearPass", "LightCullPass", "AssetPass"]),
+				Array<string>(["ClearPass", "LightCullPass", "DepthPass", "AssetPass"]),
 				RendererFlags.Vulkan
 			}
 		});

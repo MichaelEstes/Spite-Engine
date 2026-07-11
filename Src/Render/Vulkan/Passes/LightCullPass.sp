@@ -287,7 +287,7 @@ state LightCullState
 	lightIndexHandle: RenderResourceHandle,
 	counterHandle: RenderResourceHandle,
 	clusterInfoHandle: RenderResourceHandle,
-	clusterBuffer: HandleBuffer,
+	clusterBuffer: BufferHandle,
 
 	buildParams: ClusterBuildParams,
 	cullParams: ClusterCullParams,

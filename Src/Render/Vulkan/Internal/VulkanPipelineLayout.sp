@@ -7,12 +7,15 @@ import RenderAssetDef
 
 state PipelineLayoutKey
 {
-	assetDefHandle: AssetDefHandle
+	assetDefHandle: AssetDefHandle,
+	stages: VkShaderStageFlagBits
 }
 
-PipelineLayoutKey::(assetDefHandle: AssetDefHandle)
+PipelineLayoutKey::(assetDefHandle: AssetDefHandle,
+					 stages: VkShaderStageFlagBits = VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT | VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT)
 {
 	this.assetDefHandle = assetDefHandle;
+	this.stages = stages;
 }
 
 uint HashPipelineLayoutKey(key: PipelineLayoutKey)
@@ -110,10 +113,16 @@ MergePushConstants(module: SpvReflectShaderModule, pushConstantRanges: Array<VkP
 		delete mergedSets;
 	}
 
-	vertStageFlag := vertShaderRes.reflectModule.shader_stage;
-	fragStageFlag := fragShaderRes.reflectModule.shader_stage;
-	MergeShaderStage(vertShaderRes.reflectDescSet, mergedSets, vertStageFlag);
-	MergeShaderStage(fragShaderRes.reflectDescSet, mergedSets, fragStageFlag);
+	if (key.stages & VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT)
+	{
+		vertStageFlag := vertShaderRes.reflectModule.shader_stage;
+		MergeShaderStage(vertShaderRes.reflectDescSet, mergedSets, vertStageFlag);
+	}
+	if (key.stages & VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT)
+	{
+		fragStageFlag := fragShaderRes.reflectModule.shader_stage;
+		MergeShaderStage(fragShaderRes.reflectDescSet, mergedSets, fragStageFlag);
+	}
 
 	maxSetIndex := 0;
 
@@ -176,8 +185,14 @@ MergePushConstants(module: SpvReflectShaderModule, pushConstantRanges: Array<VkP
 
 	pushConstantRanges := Array<VkPushConstantRange>();
 	defer delete pushConstantRanges;
-	MergePushConstants(vertShaderRes.reflectModule, pushConstantRanges);
-	MergePushConstants(fragShaderRes.reflectModule, pushConstantRanges);
+	if (key.stages & VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT)
+	{
+		MergePushConstants(vertShaderRes.reflectModule, pushConstantRanges);
+	}
+	if (key.stages & VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT)
+	{
+		MergePushConstants(fragShaderRes.reflectModule, pushConstantRanges);
+	}
 
 	pipelineLayoutInfo := VkPipelineLayoutCreateInfo();
 	pipelineLayoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
