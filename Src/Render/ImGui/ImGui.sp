@@ -327,7 +327,6 @@ extern
 	bool ImGui_BeginTooltip();
 	void ImGui_EndTooltip();
 	void ImGui_SetTooltip(fmt: *byte);
-	void ImGui_SetTooltipUnformatted(text: *byte);
 	void ImGui_SetTooltipV(fmt: *byte, args: any);
 	bool ImGui_BeginItemTooltip();
 	void ImGui_SetItemTooltip(fmt: *byte);

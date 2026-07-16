@@ -290,6 +290,7 @@ VulkanRenderer::CreateSwapchain()
 
 VulkanRenderer::RecreateSwapchain()
 {
+	log "Recreating Swapchain";
 	device := vulkanInstance.device;
 	vkDeviceWaitIdle(device);
 

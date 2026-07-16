@@ -11,7 +11,7 @@ state RegisteredScene
 
 registeredScenes := SparseSet<RegisteredScene>();
 
-RegisterScene(index: uint32, initializer: ::(*Scene), name: string  = "")
+uint32 RegisterScene(index: uint32, initializer: ::(*Scene), name: string  = "")
 {
 	registeredScene := RegisteredScene();
 	registeredScene.init = initializer;
@@ -19,6 +19,7 @@ RegisterScene(index: uint32, initializer: ::(*Scene), name: string  = "")
 
 	registeredScenes.Insert(index, registeredScene);
 	log "Registered scene: ", index, name;
+	return index;
 }
 
 LoadScene(index: uint32)

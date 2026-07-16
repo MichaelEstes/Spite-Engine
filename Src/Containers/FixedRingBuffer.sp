@@ -30,7 +30,7 @@ ref Type FixedRingBuffer::operator::[](index: uint) =>
 
 Iterator FixedRingBuffer::operator::in()
 {
-	return {null, int(this.next) - 1};
+	return {null, (this.next as int) - 1};
 }
 
 bool FixedRingBuffer::next(it: Iterator)

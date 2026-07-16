@@ -117,7 +117,7 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 	type := #typeof Type;
 	assert !this.componentTypeMap.Has(type), "Cannot register a component twice";
 
-	//log "Registering Component: ", type.StateName();
+	// log "Registering Component: ", type.StateName(), (type as *void);
 
 	component := { this.componentCount, componentKind, uint32(#sizeof Type) } as Component;
 	this.componentTypeMap.Insert(type, component);
@@ -221,6 +221,7 @@ Entity ECS::CreateEntity(sceneID: uint16) => this.GetScene(sceneID).CreateEntity
 Component ECS::GetComponent<Type>()
 {
 	type := #typeof Type;
+
 	componentPtr := this.componentTypeMap[type];
 	assert !!componentPtr, "No component found for type, component is not registered";
 	return componentPtr~;
