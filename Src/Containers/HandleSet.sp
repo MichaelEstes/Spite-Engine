@@ -13,13 +13,13 @@ state HandleValue<Value>
 	value: *Value
 }
 
-state HandleSet<Value, InitialCapacity = 16, ResizeFactor = DefaultResizeFactor>
+state HandleSet<Value, StartAt = 1, InitialCapacity = 16, ResizeFactor = DefaultResizeFactor>
 {
-	next: uint32,
-	capacity: uint32,
-
 	handleFlags: BitSet,
-	denseValueArr: Allocator<Value>
+	denseValueArr: Allocator<Value>,
+
+	next: uint32,
+	capacity: uint32
 }
 
 HandleSet::()
@@ -39,7 +39,7 @@ HandleSet::delete
 
 *Value HandleSet::operator::[](handle: uint32)
 {
-	index := handle - 1;
+	index := handle - StartAt;
 	if (index >= this.capacity) return null;
 	return this.denseValueArr[index];
 }
@@ -58,7 +58,7 @@ bool HandleSet::next(it: Iterator)
 
 HandleValue<Value> HandleSet::current(it: Iterator)
 {
-	handle := (it.index - 1) as uint32;
+	handle := (it.index - StartAt) as uint32;
 	return {handle, this[it.index]} as HandleValue<Value>;
 }
 
@@ -79,7 +79,7 @@ HandleValue<Value> HandleSet::GetNext()
 	this.handleFlags.Set(index);
 
 	handleValue := HandleValue<Value>();
-	handleValue.handle = index + 1;
+	handleValue.handle = index + StartAt;
 	handleValue.value = this.denseValueArr[index];
 	
 	this.next += 1;
@@ -87,9 +87,16 @@ HandleValue<Value> HandleSet::GetNext()
 	return handleValue;
 }
 
+uint32 HandleSet::Emplace(val: Value)
+{
+	handleValue := this.GetNext();
+	handleValue.value~ = val;
+	return handleValue.handle;
+}
+
 bool HandleSet::Has(key: uint32)
 {
-	index := key - 1;
+	index := key - StartAt;
 	if (index >= this.capacity) return false;
 	return this.handleFlags[index];
 }
@@ -101,7 +108,7 @@ bool HandleSet::Has(key: uint32)
 
 HandleSet::Remove(key: uint32)
 {
-	index := key - 1;
+	index := key - StartAt;
 	if (index > this.capacity) return;
 	
 	if (key < this.next) this.next = key;

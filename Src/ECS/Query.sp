@@ -2,38 +2,139 @@ package ECS
 
 import BitSet
 
-state QuerySet
+state QueryIterator
 {
-	entitySet: BitSet
+	scene: *Scene,
+	unionOf: Component,
+	with: Array<Component>,
+	without: Array<Component>,
+	withTags: Array<TagComponent>,
+	withoutTags: Array<TagComponent>,
 }
 
-QuerySet::delete
+state QueryIndex
 {
-	delete this.entitySet;
+	entityID: uint,
+	itIndex: int
 }
 
-Iterator QuerySet::operator::in()
+QueryIndex QueryIterator::operator::in()
 {
-	return {null, -1};
+	return QueryIndex:{0, -1};
 }
 
-bool QuerySet::next(it: Iterator)
+bool QueryIterator::next(it: QueryIndex)
 {
-	it.index += 1;
-	while (it.index < this.entitySet.bitCount && !this.entitySet[it.index]) it.index += 1;
-	return it.index < this.entitySet.bitCount;
+	nextEntity := NullEntity;
+
+	while (!nextEntity)
+	{
+		iterator := Iterator(null, it.itIndex);
+		switch (this.unionOf.kind)
+		{
+			case (ComponentKind.Common)
+			{
+				compArr := this.scene.commonComponents.Get(this.unionOf.id);
+				if (!compArr.next(iterator)) return false;
+				it.entityID = iterator.index;
+				it.itIndex = iterator.index;
+			}
+			case (ComponentKind.Sparse)
+			{
+				compMap := this.scene.sparseComponents.Get(this.unionOf.id);
+				if (!compMap.next(iterator)) return false;
+				it.entityID = compMap.entityArr[iterator.index].id;
+				it.itIndex = iterator.index;
+			}
+		}
+
+		nextEntity = Entity(it.entityID);
+
+		for (with in this.with)
+		{
+			if (with.id == this.unionOf.id) continue;
+			if (with.kind == ComponentKind.Common)
+			{
+				compArr := this.scene.commonComponents.Get(with.id);
+				if (!compArr || !compArr.Has(nextEntity))
+				{
+					nextEntity = NullEntity;
+					break;
+				}
+			}
+			else if (with.kind == ComponentKind.Sparse)
+			{
+				compMap := this.scene.sparseComponents.Get(with.id);
+				if (!compMap || !compMap.Has(nextEntity))
+				{
+					nextEntity = NullEntity;
+					break;
+				}
+			}
+		}
+
+		if (!nextEntity) continue;
+
+		for (withTag in this.withTags)
+		{
+			if (!this.scene.HasTagComponent(nextEntity, withTag))
+			{
+				nextEntity = NullEntity;
+				break;
+			}
+		}
+
+		if (!nextEntity) continue;
+
+		for (without in this.without)
+		{
+			if (without.kind == ComponentKind.Common)
+			{
+				compArr := this.scene.commonComponents.Get(without.id);
+				if (compArr && compArr.Has(nextEntity))
+				{
+					nextEntity = NullEntity;
+					break;
+				}
+			}
+			else if (without.kind == ComponentKind.Sparse)
+			{
+				compMap := this.scene.sparseComponents.Get(without.id);
+				if (compMap && compMap.Has(nextEntity))
+				{
+					nextEntity = NullEntity;
+					break;
+				}
+			}
+		}
+
+		if (!nextEntity) continue;
+
+		for (withoutTag in this.withoutTags)
+		{
+			if (this.scene.HasTagComponent(nextEntity, withoutTag))
+			{
+				nextEntity = NullEntity;
+				break;
+			}
+		}
+	}
+
+	return true;
 }
 
-Entity QuerySet::current(it: Iterator)
+Entity QueryIterator::current(it: QueryIndex)
 {
-	return Entity(it.index);	
+	return Entity(it.entityID);	
 }
 
 state Query
 {
 	scene: *Scene,
 	with: Array<Component>,
-	without: Array<Component>
+	without: Array<Component>,
+	withTags: Array<TagComponent>,
+	withoutTags: Array<TagComponent>,
 }
 
 Query::(scene: *Scene)
@@ -45,6 +146,8 @@ Query::delete
 {
 	delete this.with;
 	delete this.without;
+	delete this.withTags;
+	delete this.withoutTags;
 }
 
 ref Query Query::Scene(scene: *Scene)
@@ -62,16 +165,6 @@ ref Query Query::With<Type>()
 	return this;
 }
 
-ref Query Query::WithAll(components: []Component)
-{
-	for (component in components)
-	{
-		this.with.Add(component);
-	}
-
-	return this;
-}
-
 ref Query Query::Without<Type>()
 {
 	component := instance.GetComponent<Type>();
@@ -80,117 +173,66 @@ ref Query Query::Without<Type>()
 	return this;
 }
 
-ref Query Query::WithoutAll(components: []Component)
+ref Query Query::WithTag(tagComponent: TagComponent)
 {
-	for (component in components)
-	{
-		this.without.Add(component);
-	}
-
+	this.withTags.Add(tagComponent);
+	
 	return this;
 }
 
-QuerySet Query::Result()
+ref Query Query::WithoutTag(tagComponent: TagComponent)
 {
-	result := QuerySet();
+	this.withoutTags.Add(tagComponent);
+	
+	return this;
+}
+
+QueryIterator Query::Result()
+{
+	result := QueryIterator();
 	if (!this.with.count) return result;
 
-	first := this.with[0];
-	switch (first.kind)
+	largestComponent := Component();
+	largestEntityCount := 0;
+	for (component in this.with)
 	{
-		case (ComponentKind.Common)
-		{
-			compArr := this.scene.commonComponents.Get(first.id);
-			if (!compArr) return result;
-
-			result.entitySet = compArr.entitySet.Clone();
-		}
-		case (ComponentKind.Sparse)
-		{
-			compMap := this.scene.sparseComponents.Get(first.id);
-			if (!compMap) return result;
-			
-			maxEntity := uint32(0);
-			for (i .. compMap.count)
-			{
-				entity := compMap.entityArr[i]~;
-				if (entity.id > maxEntity) maxEntity = entity.id;
-			}
-
-			result.entitySet = BitSet(maxEntity);
-
-			for (i .. compMap.count)
-			{
-				entity := compMap.entityArr[i]~;
-				result.entitySet.Set(entity.id);
-			}
-		}
-		default
-		{
-			return result;
-		}
-	}
-
-
-	for (i := 1 .. this.with.count)
-	{
-		comp := this.with[i];
-
-		switch (comp.kind)
+		switch (component.kind)
 		{
 			case (ComponentKind.Common)
 			{
-				compArr := this.scene.commonComponents.Get(comp.id);
-				if (!compArr) break;
-
-				for (i .. result.entitySet.bitCount)
+				compArr := this.scene.commonComponents.Get(component.id);
+				if (compArr)
 				{
-					if (result.entitySet[i] && !compArr.Has(Entity(i)))
-						result.entitySet.Clear(i);
+					currCount := compArr.Count();
+					if (currCount > largestEntityCount)
+					{
+						largestEntityCount = currCount;
+						largestComponent = component;
+					}
 				}
 			}
 			case (ComponentKind.Sparse)
 			{
-				compMap := this.scene.sparseComponents.Get(comp.id);
-				if (!compMap) break;
-
-				for (i .. result.entitySet.bitCount)
+				compMap := this.scene.sparseComponents.Get(component.id);
+				if (compMap)
 				{
-					if (result.entitySet[i] && !compMap.Has(Entity(i)))
-						result.entitySet.Clear(i);
+					currCount := compMap.Count() as uint;
+					if (currCount > largestEntityCount)
+					{
+						largestEntityCount = currCount;
+						largestComponent = component;
+					}
 				}
 			}
 		}
 	}
 
-	for (comp in this.without)
-	{
-		switch (comp.kind)
-		{
-			case (ComponentKind.Common)
-			{
-				compArr := this.scene.commonComponents.Get(comp.id);
-				if (!compArr) break;
-
-				for (i .. result.entitySet.bitCount)
-				{
-					if (result.entitySet[i] && compArr.Has(Entity(i)))
-						result.entitySet.Clear(i);
-				}
-			}
-			case (ComponentKind.Sparse)
-			{
-				compMap := this.scene.sparseComponents.Get(comp.id);
-				if (!compMap) break;
-
-				for (i .. result.entitySet.bitCount)
-				{
-					if (result.entitySet[i] && compMap.Has(Entity(i)))
-						result.entitySet.Clear(i);
-				}
-			}
-		}
-	}
+	result.scene = this.scene;
+	result.unionOf = largestComponent;
+	result.with = this.with;
+	result.without = this.without;
+	result.withTags = this.withTags;
+	result.withoutTags = this.withoutTags;
 
 	return result;
 }

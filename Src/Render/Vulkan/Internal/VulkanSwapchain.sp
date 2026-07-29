@@ -145,7 +145,8 @@ VulkanSwapchain::Create(renderer: *VulkanRenderer)
 
 	createInfo.preTransform = surfaceCapabilities.currentTransform;
 	createInfo.compositeAlpha = VkCompositeAlphaFlagBitsKHR.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	createInfo.presentMode = VkPresentModeKHR.VK_PRESENT_MODE_FIFO_KHR;
+	// createInfo.presentMode = VkPresentModeKHR.VK_PRESENT_MODE_FIFO_KHR;
+	createInfo.presentMode = VkPresentModeKHR.VK_PRESENT_MODE_IMMEDIATE_KHR;
 	createInfo.clipped = VkTrue;
 
 	CheckResult(

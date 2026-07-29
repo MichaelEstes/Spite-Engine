@@ -13,39 +13,36 @@ indexKindToByteCount := [
 	4
 ];
 
+state VulkanGeometryAttrSlot
+{
+	index: uint32,
+	stride: uint32
+}
+
 state VulkanGeometry
 {
 	attributes: Array<VulkanAllocHandle>,
-	attributeBuffers: Array<*VkBuffer_T>,
-	strides: Array<uint64>,
+	attributeSlots: BufferHandle,
 
-	variables: Array<VulkanAllocHandle>
-	descriptorSets: Array<*VkDescriptorSet_T>,
+	variables: BufferHandle,
 
-	indexHandle: VulkanAllocHandle,
-	indexBuffer: *VkBuffer_T,
-	
+	bounds: BoundingBox,
+
+	firstIndex: uint32,
 	indexCount: uint32,
-	indexKind: VkIndexType,
 	vertexCount: uint32,
 }
 
-state VulkanTexture
+state VulkanMaterialTextureSlot
 {
-	image: *VkImage_T,
-	imageView: *VkImageView_T,
-	sampler: *VkSampler_T,
-	
-	layout: VkImageLayout,
-	imageAlloc: VulkanAllocHandle
+	textureIndex: uint32,
+	samplerIndex: uint32
 }
 
 state VulkanMaterial
 {
-	textureSet: VulkanAllocHandle,
-
-	variables: Array<VulkanAllocHandle>,
-	descriptorSets: Array<*VkDescriptorSet_T>
+	textureSlots: BufferHandle,
+	variables: BufferHandle
 }
 
 bool AddSceneCallbacks()

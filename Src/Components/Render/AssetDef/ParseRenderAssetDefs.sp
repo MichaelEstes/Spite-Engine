@@ -310,28 +310,11 @@ ParseVariables(obj: *JSONObject, vars: Array<Variable>)
     }
 }
 
-ParseVariableSets(set: *JSONValue, variableSets: VariableSets)
+ParseVariableSet(set: *JSONValue, variableSet: VariableSet)
 {
-    arr := set.Array();
-    if (arr)
-    {
-        for (val in arr.values)
-        {
-            varObj := val.Object();
-            assert varObj, "Expected object in variable set array";
-            varSet := Array<Variable>();
-            ParseVariables(varObj, varSet);
-            variableSets.sets.Add(varSet);
-        }
-    }
-    else 
-    {
-        obj := set.Object();
-        assert obj, "Variable sets needs to be an array or an object";
-        varSet := Array<Variable>();
-        ParseVariables(obj, varSet);
-        variableSets.sets.Add(varSet);
-    }
+    obj := set.Object();
+    assert obj, "Variable sets must be an object";
+    ParseVariables(obj, variableSet.sets);
 }
 
 ParseTextures(obj: *JSONObject, textures: Array<TextureDefinition>)
@@ -433,7 +416,7 @@ ParseRenderAssetDef(assetDef: AssetDef, assetDefObj: *JSONObject)
         variablesValue := vertexObj.GetMember("variables");
         if (variablesValue)
         {
-            ParseVariableSets(variablesValue, assetDef.vertex.variables);
+            ParseVariableSet(variablesValue, assetDef.vertex.variables);
         }
 
         functionsValue := vertexObj.GetMember("functions");
@@ -476,7 +459,7 @@ ParseRenderAssetDef(assetDef: AssetDef, assetDefObj: *JSONObject)
         variablesValue := fragmentObj.GetMember("variables");
         if (variablesValue)
         {
-            ParseVariableSets(variablesValue, assetDef.fragment.variables);
+            ParseVariableSet(variablesValue, assetDef.fragment.variables);
         }
 
         usingValue := fragmentObj.GetMember("using");
@@ -604,7 +587,7 @@ Map<string, AssetDef> ParseRenderAssetDefs()
         for (file in files) delete file
         delete files;
     }
-    // log "Asset Def Files: ", files;
+    log "Asset Def Files: ", files;
 
     for (file in files)
     {

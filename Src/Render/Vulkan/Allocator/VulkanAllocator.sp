@@ -13,6 +13,7 @@ enum VulkanMemoryFlags: uint32
 
 	// Allocator specific flags
 	Mapped = 1 << 16,
+	Addressable = 1 << 17,
 }
 
 state VulkanAllocHandle
@@ -156,7 +157,7 @@ VulkanAllocHandle VulkanAllocator::AllocImage(image: *VkImage_T, memoryFlags: ui
 {
 	for (block in this.blocks)
 	{
-		if (size <= block.AvailableSize() && (memoryFlags & block.memoryFlags) == block.memoryFlags)
+		if (size <= block.AvailableSize() && (block.memoryFlags & memoryFlags) == memoryFlags)
 		{
 			return block@;
 		}
@@ -191,6 +192,14 @@ int32 VulkanAllocator::FindMemoryTypeIndex(memoryFlags: uint16, memoryTypeIndexB
 	allocInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.allocationSize = size;
 	allocInfo.memoryTypeIndex = memoryTypeIndex;
+
+	addressFlagsInfo := VkMemoryAllocateFlagsInfo();
+	if (memoryFlags & VulkanMemoryFlags.Addressable)
+	{
+		addressFlagsInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+		addressFlagsInfo.flags = VkMemoryAllocateFlagBits.VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+		allocInfo.pNext = addressFlagsInfo@;
+	}
 
 	block := VulkanBlock();
 	block.size = size;

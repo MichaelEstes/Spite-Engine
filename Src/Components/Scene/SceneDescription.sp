@@ -7,6 +7,7 @@ import VulkanRenderer
 import ThreadParamAllocator
 import Fiber
 import WindowComponent
+import Array
 
 enum RendererFlags: uint
 {

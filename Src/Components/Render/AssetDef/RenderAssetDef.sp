@@ -215,50 +215,42 @@ ShaderNode ShaderNode::Clone()
     return clone;
 }
 
-state VariableSets
+state VariableSet
 {
-    sets: Array<Array<Variable>>
+    sets: Array<Variable>
 }
 
-VariableSets::delete
+VariableSet::delete
 {
     delete this.sets;
 }
 
-uint32 VariableSets::GetSetsValueSize()
+uint32 VariableSet::GetSetsValueSize()
 {
     size := uint32(0);
-    for (set in this.sets)
+    for (var in this.sets)
     {
-        for (var in set)
-        {
-            size += var.def.ValueSize();
-        }
+        size += var.def.ValueSize();
     }
     return size;
 }
 
-VariableSets VariableSets::Clone()
+VariableSet VariableSet::Clone()
 {
-    clone := VariableSets();
+    clone := VariableSet();
     clone.sets = this.sets.Copy(
-        ::Array<Variable>(val: Array<Variable>)
+        ::Variable(variable: Variable)
         {
-            return val.Copy(
-                ::Variable(variable: Variable)
-                {
-                    return variable.Clone();
-                }
-            );
+            return variable.Clone();
         }
-    )
+    );
     return clone;
 }
 
 state VertexStage
 {
     attributes: Array<Variable>,
-    variables: VariableSets,
+    variables: VariableSet,
     out: Array<Variable>,
     functions: Array<ShaderNode>,
     nodes: Array<ShaderNode>,
@@ -309,7 +301,7 @@ VertexStage VertexStage::Clone()
 
 state FragmentStage
 {
-    variables: VariableSets,
+    variables: VariableSet,
     textures: Array<TextureDefinition>,
     using: Array<string>,
     out: Array<Variable>,
@@ -411,8 +403,7 @@ AssetDef AssetDef::Clone()
     return cloned;
 }
 
-uint32 AssetDef::GetBindlessTextureSetIndex() =>
-    this.vertex.variables.sets.count + this.fragment.variables.sets.count + uint32(1);
+uint32 AssetDef::GetBindlessTextureSetIndex() => uint32(1);
 
 AssetDef::Compile(compiler: ShaderCompiler)
 {
@@ -440,56 +431,14 @@ uint32 FindVariableIndexByName(vars: Array<Variable>, name: string)
     return -1;
 }
 
-state VariableSetIndex
-{
-    [value]
-    setIndex: uint32,
-    varIndex: uint32
-}
-
-VariableSetIndex::(setIndex: uint32, varIndex: uint32)
-{
-    this.setIndex = setIndex;
-    this.varIndex = varIndex;
-}
-
-VariableSetIndex FindVariableSetIndexByName(vars: VariableSets, name: string)
-{
-    index := VariableSetIndex();
-    for (setIndex .. vars.sets.count)
-    {
-        set := vars.sets[setIndex];
-        for (varIndex .. set.count)
-        {
-            var := set[varIndex];
-            if (var.name == name)
-            {
-                return VariableSetIndex(setIndex, varIndex);
-            }
-        }
-    }
-
-    return VariableSetIndex(-1, -1);
-}
-
-uint32 FindVariableSetOffsetAtIndex(vars: VariableSets, index: VariableSetIndex)
+uint32 FindVariableSetOffsetAtIndex(vars: VariableSet, index: uint32)
 {
     offset := uint32(0);
-    for (setIndex .. index.setIndex)
+    for (i .. index)
     {
-        set := vars.sets[setIndex];
-        for (var in set)
-        {
-            offset += var.def.ValueSize();
-        }
+        offset += vars.sets[i].def.ValueSize();
     }
 
-    set := vars.sets[index.setIndex];
-    for (varIndex .. index.varIndex)
-    {
-        offset += set[varIndex].def.ValueSize();
-    }
-    
     return offset;
 }
 

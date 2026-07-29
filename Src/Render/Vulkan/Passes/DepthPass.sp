@@ -57,15 +57,21 @@ depthPass := RegisterRenderPass(
 
 				sceneDescSet := renderer.sceneShared.GetDescSet(frame);
 
-				offsets := uint64:[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+				vkCmdBindIndexBuffer(
+					commandBuffer, resourceManager.sharedIndexBuffer.buffer,
+					0, VkIndexType.VK_INDEX_TYPE_UINT16
+				);
 
 				for (kv in renderer.drawList.pipelineMap)
 				{
+					meshArr := kv.value~;
+					if (!meshArr.count) continue;
+
 					meshState := kv.key~;
 					if (meshState.GetAlphaMode() != VulkanAlphaMode.Opaque) continue;
 
-					meshArr := kv.value~;
-					if (!meshArr.count) continue;
+					drawSet := renderer.assetDefDrawSets.Get(meshState.assetDefHandle.handle);
+					frameData := drawSet.frames[frame]@;
 
 					vulkanPipeline := FindOrCreateDepthPipeline(
 						device,
@@ -83,52 +89,43 @@ depthPass := RegisterRenderPass(
 						uint32(0), uint32(1), sceneDescSet@, uint32(0), null
 					);
 
-					geomDescriptors := resourceManager.GetGeometryDescriptors(meshState.assetDefHandle);
+					push := DrawPushConstants();
+					push.modelBufferAddress = GetBufferDeviceAddress(frameData.modelBuffer.buffer);
+					push.geometryVariablesAddress = GetBufferDeviceAddress(frameData.geometryVariables.buffer);
+					push.geometryAttributeSlotsAddress = GetBufferDeviceAddress(frameData.geometryAttributeSlots.buffer);
+					push.materialVariablesAddress = GetBufferDeviceAddress(frameData.materialVariables.buffer);
+					push.materialTextureSlotsAddress = GetBufferDeviceAddress(frameData.materialTextureSlots.buffer);
+					vkCmdPushConstants(
+						commandBuffer, pipelineLayout,
+						uint32(VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT),
+						0, #sizeof DrawPushConstants, push@
+					);
 
-					for (mesh in meshArr)
+					assetDef := GetAssetDefWithHandle(meshState.assetDefHandle);
+
+					if (assetDef.vertex.attributes.count)
 					{
-						modelUBO := ModelUBO();
-						worldTransform := scene.GetComponentDirect<WorldTransform>(mesh.entity, WorldTransformComponent);
-						if (worldTransform)
-						{
-							modelUBO.model = worldTransform.mat;
-						}
-
-						geometry := resourceManager.geometries.Get(mesh.geometryHandle);
-
-						for (i .. geometry.descriptorSets.count)
-						{
-							vkCmdBindDescriptorSets(
-								commandBuffer, bindPoint, pipelineLayout,
-								geomDescriptors.setLayouts[i].set, uint32(1),
-								geometry.descriptorSets[i]@, uint32(0), null
-							);
-						}
-
-						attrCount := geometry.attributes.count;
-						vkCmdBindVertexBuffers2(
-							commandBuffer, uint32(0), attrCount,
-							geometry.attributeBuffers[0]@, fixed offsets, null, geometry.strides[0]@
+						bindlessSet := assetDef.GetBindlessTextureSetIndex();
+						vkCmdBindDescriptorSets(
+							commandBuffer, bindPoint, pipelineLayout,
+							bindlessSet, uint32(1), resourceManager.bindless.set@, uint32(0), null
 						);
-
-						vkCmdPushConstants(
-							commandBuffer, pipelineLayout,
-							uint32(VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT),
-							0, #sizeof ModelUBO, modelUBO@
-						);
-
-						vkCmdSetCullMode(commandBuffer, mesh.cullMode);
-
-						if (geometry.indexCount)
-						{
-							vkCmdBindIndexBuffer(commandBuffer, geometry.indexBuffer, 0, geometry.indexKind);
-							vkCmdDrawIndexed(commandBuffer, geometry.indexCount, uint32(1), uint32(0), uint32(0), uint32(0));
-						}
-						else
-						{
-							vkCmdDraw(commandBuffer, geometry.vertexCount, uint32(1), uint32(0), uint32(0));
-						}
 					}
+
+					vkCmdSetCullMode(commandBuffer, meshState.GetCullMode());
+
+					vkCmdDrawIndexedIndirectCount(
+						commandBuffer,
+						frameData.indexedDrawCommands.buffer, 0,
+						frameData.counters.buffer, #sizeof uint32,
+						MaxModelCount, #sizeof VkDrawIndexedIndirectCommand
+					);
+					vkCmdDrawIndirectCount(
+						commandBuffer,
+						frameData.drawCommands.buffer, 0,
+						frameData.counters.buffer, #sizeof uint32 * 2,
+						MaxModelCount, #sizeof VkDrawIndirectCommand
+					);
 				}
 			},
 			RenderPassStage.Graphics,

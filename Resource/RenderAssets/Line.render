@@ -8,12 +8,12 @@
                 default: [1.0, 1.0, 1.0, 1.0]
             }
         },
-        variables: [],
+        variables: {},
         nodes: [
             {
                 name: default,
                 code: `
-                    gl_Position = scene.proj * scene.view * model.model * vec4(position, 1.0);
+                    gl_Position = scene.proj * scene.view * model * vec4(position, 1.0);
                 `,
                 after: main
             }

@@ -9,7 +9,7 @@ import Array
 state GeometryVariableUpdate
 {
     geometry: *Geometry,
-    index: VariableSetIndex
+    index: uint32
 }
 
 state GeometryAttributeUpdate
@@ -43,13 +43,14 @@ state Geometry
 {
     attributes: Array<ArrayView<byte>>,
     variables: *void,
-    
+
     indices: ArrayView<uint16>,
 
     defHandle: AssetDefHandle,
 
-    gpuResourceID: uint32 = uint32(0),
+    bounds: BoundingBox,
 
+    gpuResourceID: uint32,
     topologyKind: TopologyKind = TopologyKind.TriangleList,
     indexKind: IndexKind
 }
@@ -89,24 +90,22 @@ ref VariableDefinition Geometry::GetAttributeDef(index: uint32)
     return this.attributes[index]@;
 }
 
-VariableSetIndex Geometry::GetVariableIndex(name: string)
+uint32 Geometry::GetVariableIndex(name: string)
 {
     assetDef := GetAssetDefWithHandle(this.defHandle);
     vertex := assetDef.vertex;
-    index := FindVariableSetIndexByName(vertex.variables, name);
-    return index;
+    return FindVariableIndexByName(vertex.variables.sets, name);
 }
 
-ref VariableDefinition Geometry::GetVariableDef(index: VariableSetIndex)
+ref VariableDefinition Geometry::GetVariableDef(index: uint32)
 {
     assetDef := GetAssetDefWithHandle(this.defHandle);
     vertex := assetDef.vertex;
-    set := vertex.variables.sets[index.setIndex];
-    var := set[index.varIndex];
+    var := vertex.variables.sets[index];
     return var.def;
 }
 
-*T Geometry::GetVariableValue<T>(index: VariableSetIndex)
+*T Geometry::GetVariableValue<T>(index: uint32)
 {
     assetDef := GetAssetDefWithHandle(this.defHandle);
     vertex := assetDef.vertex;
@@ -114,7 +113,7 @@ ref VariableDefinition Geometry::GetVariableDef(index: VariableSetIndex)
     return (this.variables + offset) as *T;
 }
 
-Geometry::UpdatedVariableSet(index: VariableSetIndex)
+Geometry::UpdatedVariableSet(index: uint32)
 {
     event := GeometryVariableUpdate();
     event.geometry = this@;
@@ -130,3 +129,27 @@ Geometry::UpdatedAttribute(index: uint32)
     ECS.instance.events.Emit<GeometryAttributeUpdate>(GeometryAttributeUpdateEvent, event);
 }
 
+Geometry::ComputeBounds()
+{
+    positions := this.attributes[0]~ as ArrayView<Vec3>;
+    positions.count = positions.count / #sizeof Vec3;
+
+    min := positions[0]~;
+    max := positions[0]~;
+
+    for (i := 1 .. positions.count)
+    {
+        point := positions[i];
+        
+        if (point.x < min.x) min.x = point.x;
+        if (point.y < min.y) min.y = point.y;
+        if (point.z < min.z) min.z = point.z;
+
+        if (point.x > max.x) max.x = point.x;
+        if (point.y > max.y) max.y = point.y;
+        if (point.z > max.z) max.z = point.z;
+    }
+
+    this.bounds.min = min;
+    this.bounds.max = max;
+}

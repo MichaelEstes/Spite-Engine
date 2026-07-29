@@ -7,6 +7,7 @@ import SDL
 import Image
 import SparseSet
 import Event
+import Array
 import ArrayView
 import WindowComponent
 
@@ -14,6 +15,7 @@ import ECS
 import RenderComponents
 import RenderAssetDef
 import UniformBufferObject
+import Transform
 
 CheckResult(result: VkResult, errorMsg: string)
 {
@@ -40,14 +42,23 @@ FrameCount := 2;
 state VulkanDrawMesh
 {
 	entity: Entity,
-	geometryHandle: uint32, 
-	materialHandle: uint32,
-	cullMode: VkCullModeFlagBits
+	meshHandle: uint32,
+	geometryHandle: uint32,
+	materialHandle: uint32
 }
 
 state VulkanDrawList
 {
 	pipelineMap := Map<VulkanPipelineMeshState, Array<VulkanDrawMesh>, HashPipelineMeshState>()
+}
+
+state VulkanDrawBatch
+{
+	meshState: VulkanPipelineMeshState,
+	indexedFirst: uint32,
+	indexedCount: uint32,
+	first: uint32,
+	count: uint32
 }
 
 state VulkanMeshCallbacks
@@ -58,6 +69,30 @@ state VulkanMeshCallbacks
 			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {},
 	
 	drawListUpdate: ::(*Scene, *VulkanRenderer) = null
+}
+
+state VulkanDrawListComputeState
+{
+	pipeline: *VulkanComputePipeline,
+}
+
+state VulkanAssetDefDrawFrame
+{
+	modelBuffer: BufferHandle,
+	indexedDrawCommands: BufferHandle,
+	drawCommands: BufferHandle,
+	counters: BufferHandle,
+	geometryVariables: BufferHandle,
+	geometryAttributeSlots: BufferHandle,
+	materialVariables: BufferHandle,
+	materialTextureSlots: BufferHandle,
+	set: *VkDescriptorSet_T
+}
+
+state VulkanAssetDefDrawSet
+{
+	pool: *VkDescriptorPool_T,
+	frames: [FrameCount]VulkanAssetDefDrawFrame
 }
 
 state VulkanRenderer
@@ -71,7 +106,10 @@ state VulkanRenderer
 	transferCommands: VulkanCommands,
 	
 	sceneShared: SharedUBO<SceneUBO>,
-	
+
+	drawListCompute: VulkanDrawListComputeState,
+	assetDefDrawSets: SparseSet<VulkanAssetDefDrawSet>,
+
 	materialPool: *VkDescriptorPool_T,
 
 	frameFences: [FrameCount]*VkFence_T,
@@ -161,6 +199,8 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 	if (config.useSceneUBO)
 	{
 		vulkanRenderer.sceneShared.Init(device, allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
+
+		InitDrawListCompute(vulkanRenderer@);
 	}
 
 	vulkanRenderer.CreateMaterialDescPool(config.materialDescriptorCount, config.maxMaterialSets);
@@ -498,8 +538,6 @@ VulkanRenderer::TransitionSwapchainPresent(image: *VkImage_T, currentLayout: GPU
 
 VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 {
-	if (!this.sceneShared.Valid()) return;
-
 	camera := scene.GetComponent<Camera>(this.self);
 	if (!camera) return;
 
@@ -529,11 +567,34 @@ VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 	this.sceneShared.Update(frame, sceneUBO);
 }
 
-VulkanRenderer::UpdateScene(scene: *Scene)
+Query CreateUpdatedTransformQuery()
 {
-	frame := this.Frame();
+	query := Query().With<Mesh>().WithTag(TransformUpdatedTag);
+	return query;
+}
+
+updatedTransformQuery := CreateUpdatedTransformQuery();
+
+VulkanRenderer::UpdateTransforms(scene: *Scene, frame: uint32)
+{
+	resourceManager := vulkanInstance.resourceManager;
+	stagingBuffer := vulkanInstance.GetStagingBuffer();
+	result := updatedTransformQuery.Scene(scene).Result();
+	for (entity in result)
+	{
+		mesh := scene.GetComponent<Mesh>(entity);
+		transform := scene.GetComponent<WorldTransform>(entity);
+		resourceManager.UploadTransform(mesh.gpuID, transform~);
+	}
+}
+
+VulkanRenderer::UpdateScene(scene: *Scene, frame: uint32)
+{
+	if (!this.sceneShared.Valid()) return;
 
 	this.UpdateSceneUBO(scene, frame);
+	this.UpdateTransforms(scene, frame);
+	ComputeVulkanDrawList(this, scene);
 }
 
 VulkanRenderer::Draw(scene: *Scene)
@@ -576,6 +637,7 @@ VulkanRenderer::Draw(scene: *Scene)
 	graphicsCommandBuffer := this.GetCommandBuffer(CommandBufferKind.Graphics);
 	this.Begin(graphicsCommandBuffer);
 	{
+		this.UpdateScene(scene, frame);
 		renderGraph.Execute();
 
 		currentSwapchainLayout := resourceTables.GetCurrentTextureLayout(swapchainImage);
@@ -636,6 +698,7 @@ VulkanRenderer::UpdateDrawList(scene: *Scene)
 	{
 		entity := ec.entity;
 		mesh := ec.component;
+		meshHandle := mesh.gpuID;
 
 		for (primitive in mesh.primitives)
 		{
@@ -648,12 +711,13 @@ VulkanRenderer::UpdateDrawList(scene: *Scene)
 
 			meshState.SetTopology(primitive.geometry.topologyKind);
 			meshState.alphaMode = assetDef.fragment.alphaMode as uint16;
+			meshState.SetCullMode(primitive.material.cullMode);
 
 			drawMesh := VulkanDrawMesh();
 			drawMesh.entity = entity;
+			drawMesh.meshHandle = meshHandle;
 			drawMesh.geometryHandle = primitive.geometry.gpuResourceID;
 			drawMesh.materialHandle = primitive.material.gpuResourceID;
-			drawMesh.cullMode = primitive.material.cullMode;
 
 			meshArr := this.drawList.pipelineMap.Find(meshState);
 			if (!meshArr)
@@ -688,7 +752,6 @@ vulkanDrawSystem := ECS.RegisterSystem(
 		for (ec in scene.Iterate<VulkanRenderer>())
 		{
 			renderer := ec.component;
-			renderer.UpdateScene(scene@);
 			renderer.Draw(scene@);
 		}
 	},

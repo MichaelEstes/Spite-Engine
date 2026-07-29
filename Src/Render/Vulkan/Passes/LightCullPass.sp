@@ -460,14 +460,13 @@ lightCullPass := RegisterRenderPass(
 				groups := (ClusterCount + (InvocationSize - uint32(1))) / InvocationSize;
 				frame := renderer.Frame();
 
-				resourceManager := vulkanInstance.resourceManager;
 				cullFrame := data.cullFrames.frames[frame];
 
 				clusterBuf := data.clusterBuffer.buffer;
 
 				if (!data.built)
 				{
-					resourceManager.WriteStorageSetBuffer(data.buildSet, 0, clusterBuf);
+					WriteStorageBufferDescriptor(vulkanInstance.device, data.buildSet, 0, clusterBuf);
 
 					vkCmdBindPipeline(cmd, bindPoint, data.buildPipeline.pipeline);
 					vkCmdBindDescriptorSets(
@@ -497,11 +496,11 @@ lightCullPass := RegisterRenderPass(
 				indexBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.lightIndexHandle, frame);
 				counterBuf := UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, data.counterHandle, frame);
 
-				resourceManager.WriteStorageSetBuffer(cullFrame.cullSet, 0, clusterBuf);
-				resourceManager.WriteStorageSetBuffer(cullFrame.cullSet, 1, lightsBuf);
-				resourceManager.WriteStorageSetBuffer(cullFrame.cullSet, 2, gridBuf);
-				resourceManager.WriteStorageSetBuffer(cullFrame.cullSet, 3, indexBuf);
-				resourceManager.WriteStorageSetBuffer(cullFrame.cullSet, 4, counterBuf);
+				WriteStorageBufferDescriptor(vulkanInstance.device, cullFrame.cullSet, 0, clusterBuf);
+				WriteStorageBufferDescriptor(vulkanInstance.device, cullFrame.cullSet, 1, lightsBuf);
+				WriteStorageBufferDescriptor(vulkanInstance.device, cullFrame.cullSet, 2, gridBuf);
+				WriteStorageBufferDescriptor(vulkanInstance.device, cullFrame.cullSet, 3, indexBuf);
+				WriteStorageBufferDescriptor(vulkanInstance.device, cullFrame.cullSet, 4, counterBuf);
 
 				vkCmdFillBuffer(cmd, counterBuf, 0, 4, 0);
 				ComputeBarrier(

@@ -6,12 +6,10 @@
         attributes: {
             uv1: vec2
         },
-        variables: [
-            {
+        variables: {
                 detailStrength: float,
                 detailOffset: vec2
-            }
-        ]
+        }
     },
     fragment: {
         textures: {

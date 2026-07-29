@@ -21,6 +21,7 @@ appInfo := {
 
 validationLayers := ["VK_LAYER_KHRONOS_validation"[0],];
 validationCount := #compile uint32 => (#typeof validationLayers).FixedArrayCount();
+// validationCount := 0;
 
 requiredDeviceExtensions := ["VK_KHR_swapchain"[0],];
 requiredDeviceExtensionCount := #compile uint32 => (#typeof requiredDeviceExtensions).FixedArrayCount();
@@ -122,6 +123,9 @@ VulkanInstance::InitializeCurrentDevice()
 	indexingFeatures.descriptorBindingPartiallyBound = VkTrue;
 	indexingFeatures.descriptorBindingVariableDescriptorCount = VkTrue;
 	indexingFeatures.descriptorBindingSampledImageUpdateAfterBind = VkTrue;
+	indexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = VkTrue;
+	indexingFeatures.bufferDeviceAddress = VkTrue;
+	indexingFeatures.drawIndirectCount = VkTrue;
 
 	deviceFeatures2 := VkPhysicalDeviceFeatures2();
 	deviceFeatures2.sType = VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -306,11 +310,7 @@ InitializeVulkanInstance()
 		{
 			log "Mesh Created Vulkan Instance";
 			resourceManager := vulkanInstance.resourceManager;
-			for (primitive in mesh.primitives)
-			{
-				resourceManager.UploadGeometry(primitive.geometry@);
-				resourceManager.UploadMaterial(primitive.material@);
-			}
+			resourceManager.UploadMesh(mesh);
 		}
 	);
 

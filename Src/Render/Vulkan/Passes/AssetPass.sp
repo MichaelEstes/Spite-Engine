@@ -13,6 +13,15 @@ import Matrix
 import RenderComponents
 import RenderAssetDef
 
+state DrawPushConstants
+{
+	modelBufferAddress: uint64,
+	geometryVariablesAddress: uint64,
+	geometryAttributeSlotsAddress: uint64,
+	materialVariablesAddress: uint64,
+	materialTextureSlotsAddress: uint64
+}
+
 state AssetFrameGlobal
 {
 	set: *VkDescriptorSet_T
@@ -32,7 +41,7 @@ AssetPassState::Init()
 	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[0].descriptorCount = FrameCount;
 	poolSizes[1].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[1].descriptorCount = 4 * FrameCount;
+	poolSizes[1].descriptorCount = 5 * FrameCount;
 
 	poolInfo := VkDescriptorPoolCreateInfo();
 	poolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -53,11 +62,10 @@ AssetPassState::Init()
 									 renderer: *VulkanRenderer, lightCull: *LightCullState, frame: uint32)
 {
 	globalFrame := assetState.frameGlobals.frames[frame];
+	device := vulkanInstance.device;
 
-	resourceManager := vulkanInstance.resourceManager;
 	if (!globalFrame.set)
 	{
-		device := vulkanInstance.device;
 		descSets := vulkanInstance.pipelineLayoutCache.descLayoutSetMap.Find(PipelineLayoutKey(assetDefHandle))~;
 
 		allocInfo := VkDescriptorSetAllocateInfo();
@@ -71,13 +79,16 @@ AssetPassState::Init()
 			"AssetPass Error allocating frame-global descriptor set"
 		);
 
-		resourceManager.WriteUBOSet(globalFrame.set, renderer.sceneShared.buffer);
-	}
+		WriteUniformBufferDescriptor(device, globalFrame.set, 0, renderer.sceneShared.buffer, #sizeof SceneUBO);
 
-	resourceManager.WriteStorageSetBuffer(globalFrame.set, 1, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightsHandle, frame));
-	resourceManager.WriteStorageSetBuffer(globalFrame.set, 2, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightGridHandle, frame));
-	resourceManager.WriteStorageSetBuffer(globalFrame.set, 3, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightIndexHandle, frame));
-	resourceManager.WriteStorageSetBuffer(globalFrame.set, 4, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.clusterInfoHandle, frame));
+		if (lightCull)
+		{
+			WriteStorageBufferDescriptor(device, globalFrame.set, 2, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightsHandle, frame));
+			WriteStorageBufferDescriptor(device, globalFrame.set, 3, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightGridHandle, frame));
+			WriteStorageBufferDescriptor(device, globalFrame.set, 4, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightIndexHandle, frame));
+			WriteStorageBufferDescriptor(device, globalFrame.set, 5, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.clusterInfoHandle, frame));
+		}
+	}
 
 	return globalFrame.set;
 }
@@ -121,8 +132,6 @@ assetPass := RegisterRenderPass(
 				renderPass := renderer.CastDriverRenderPass(context.driverRenderpass);
 				frame := renderer.Frame();
 
-				sceneDescSet := renderer.sceneShared.GetDescSet(frame);
-								
 				commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 
 				resourceManager := vulkanInstance.resourceManager;
@@ -134,13 +143,21 @@ assetPass := RegisterRenderPass(
 				lightCullPass := renderer.GetRenderPassByName(lightCullPassName);
 				if (lightCullPass) lightCull = lightCullPass.data as *LightCullState;
 
-				offsets := uint64:[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+				sceneDescSet := renderer.sceneShared.GetDescSet(frame);
+
+				vkCmdBindIndexBuffer(
+					commandBuffer, resourceManager.sharedIndexBuffer.buffer,
+					0, VkIndexType.VK_INDEX_TYPE_UINT16
+				);
 
 				for (kv in renderer.drawList.pipelineMap)
 				{
-					meshState := kv.key~;
 					meshArr := kv.value~;
 					if (!meshArr.count) continue;
+
+					meshState := kv.key~;
+					drawSet := renderer.assetDefDrawSets.Get(meshState.assetDefHandle.handle);
+					frameData := drawSet.frames[frame]@;
 
 					vulkanPipeline := FindOrCreatePipeline(
 						device,
@@ -171,74 +188,49 @@ assetPass := RegisterRenderPass(
 						);
 					}
 
-					if (assetDef.fragment.textures.count)
+					push := DrawPushConstants();
+					push.modelBufferAddress = GetBufferDeviceAddress(frameData.modelBuffer.buffer);
+					push.geometryVariablesAddress = GetBufferDeviceAddress(frameData.geometryVariables.buffer);
+					push.geometryAttributeSlotsAddress = GetBufferDeviceAddress(frameData.geometryAttributeSlots.buffer);
+					push.materialVariablesAddress = GetBufferDeviceAddress(frameData.materialVariables.buffer);
+					push.materialTextureSlotsAddress = GetBufferDeviceAddress(frameData.materialTextureSlots.buffer);
+
+					pushStages := uint32(VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
+					if (assetDef.fragment.variables.sets.count | assetDef.fragment.textures.count)
 					{
-						bindlessSet := assetDef.GetBindlessTextureSetIndex();
+						pushStages |= uint32(VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT);
+					}
+
+					if (assetDef.vertex.attributes.count | assetDef.fragment.textures.count)
+					{
+						bindlessSetIndex := assetDef.GetBindlessTextureSetIndex();
 						vkCmdBindDescriptorSets(
 							commandBuffer, bindPoint, pipelineLayout,
-							bindlessSet, uint32(1), resourceManager.textures.set@, uint32(0), null
+							bindlessSetIndex, uint32(1), resourceManager.bindless.set@, uint32(0), null
 						);
 					}
 
-					geomDescriptors := resourceManager.GetGeometryDescriptors(meshState.assetDefHandle);
-					matDescriptors := resourceManager.GetMaterialDescriptors(meshState.assetDefHandle);
+					vkCmdPushConstants(
+						commandBuffer, pipelineLayout,
+						pushStages,
+						0, #sizeof DrawPushConstants, push@
+					);
 
-					for (mesh in meshArr)
-					{
-						modelUBO := ModelUBO();
-						worldTransform := scene.GetComponentDirect<WorldTransform>(mesh.entity, WorldTransformComponent);
-						if (worldTransform)
-						{
-							modelUBO.model = worldTransform.mat;
-						}
+					vkCmdSetCullMode(commandBuffer, meshState.GetCullMode());
 
-						geometry := resourceManager.geometries.Get(mesh.geometryHandle);
-						material := resourceManager.materials.Get(mesh.materialHandle);
-
-						for (i .. geometry.descriptorSets.count)
-						{
-							vkCmdBindDescriptorSets(
-								commandBuffer, bindPoint, pipelineLayout,
-								geomDescriptors.setLayouts[i].set, uint32(1),
-								geometry.descriptorSets[i]@, uint32(0), null
-							);
-						}
-
-						for (i .. material.descriptorSets.count)
-						{
-							vkCmdBindDescriptorSets(
-								commandBuffer, bindPoint, pipelineLayout,
-								matDescriptors.setLayouts[i].set, uint32(1),
-								material.descriptorSets[i]@, uint32(0), null
-							);
-						}
-
-						attrCount := geometry.attributes.count;
-						vkCmdBindVertexBuffers2(
-							commandBuffer, uint32(0), attrCount,
-							geometry.attributeBuffers[0]@, fixed offsets, null, geometry.strides[0]@
-						);
-
-						vkCmdPushConstants(
-							commandBuffer, pipelineLayout,
-							uint32(VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT),
-							0, #sizeof ModelUBO, modelUBO@
-						);
-
-						vkCmdSetCullMode(commandBuffer, mesh.cullMode);
-
-						if (geometry.indexCount)
-						{
-							vkCmdBindIndexBuffer(commandBuffer, geometry.indexBuffer, 0, geometry.indexKind);
-							vkCmdDrawIndexed(commandBuffer, geometry.indexCount, uint32(1), uint32(0), uint32(0), uint32(0));
-						}
-						else
-						{
-							vkCmdDraw(commandBuffer, geometry.vertexCount, uint32(1), uint32(0), uint32(0));
-						}
-					}
+					vkCmdDrawIndexedIndirectCount(
+						commandBuffer,
+						frameData.indexedDrawCommands.buffer, 0,
+						frameData.counters.buffer, #sizeof uint32,
+						MaxModelCount, #sizeof VkDrawIndexedIndirectCommand
+					);
+					vkCmdDrawIndirectCount(
+						commandBuffer,
+						frameData.drawCommands.buffer, 0,
+						frameData.counters.buffer, #sizeof uint32 * 2,
+						MaxModelCount, #sizeof VkDrawIndirectCommand
+					);
 				}
-
 			},
 			RenderPassStage.Graphics,
 			scene

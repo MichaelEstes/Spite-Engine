@@ -1,3 +1,7 @@
+param(
+    [switch]$Debug
+)
+
 $ErrorActionPreference = "Stop"
 
 $msvcBin = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64"
@@ -50,7 +54,8 @@ foreach ($dll in $dlls) {
 }
 
 $objPath = Join-Path $PSScriptRoot "Build\a.obj"
-$outPath = Join-Path $PSScriptRoot "Build\output.exe"
+$outPath = Join-Path $PSScriptRoot "Build\SpiteEngine.exe"
+$pdbPath = Join-Path $PSScriptRoot "Build\SpiteEngine.pdb"
 
 $libPathArgs = @(
     "/LIBPATH:$msvcLib"
@@ -71,7 +76,9 @@ $staticLibs = @(
     "User32.lib"
 ) + $libNames
 
-& $linkExe /OUT:$outPath $objPath @libPathArgs @staticLibs
+$debugArgs = if ($Debug) { @("/DEBUG", "/PDB:$pdbPath") } else { @() }
+
+& $linkExe /OUT:$outPath $objPath @libPathArgs @staticLibs @debugArgs
 
 foreach ($dll in $dlls) {
     Copy-Item -Path $dll.FullName -Destination $buildDir -Force

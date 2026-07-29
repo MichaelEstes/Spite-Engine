@@ -18,7 +18,8 @@ state VulkanPipelineMeshState
 {
 	assetDefHandle: AssetDefHandle,
 	topology: uint16,
-	alphaMode: uint16
+	alphaMode: ubyte,
+	cullMode: ubyte,
 }
 
 VkPrimitiveTopology VulkanPipelineMeshState::GetTopology() =>
@@ -39,6 +40,16 @@ VulkanAlphaMode VulkanPipelineMeshState::GetAlphaMode() =>
 VulkanPipelineMeshState::SetAlphaMode(alphaMode: VulkanAlphaMode) =>
 {
 	this.alphaMode = alphaMode as uint16;
+}
+
+VkCullModeFlagBits VulkanPipelineMeshState::GetCullMode() =>
+{
+	return this.cullMode as VkCullModeFlagBits;
+}
+
+VulkanPipelineMeshState::SetCullMode(cullMode: CullModeFlags) =>
+{
+	this.cullMode = cullMode as uint16;
 }
 
 uint HashPipelineMeshState(key: VulkanPipelineMeshState)
@@ -94,32 +105,6 @@ VulkanPipeline FindOrCreatePipeline(device: *VkDevice_T, key: VulkanPipelineKey,
 	return createdPipeline;
 }
 
-VkFormat VariableTypeToVkFormat(kind: VariableType)
-{
-	switch (kind)
-	{
-		case (VariableType.Bool)  return VkFormat.VK_FORMAT_R8_UINT;
-		case (VariableType.Float) return VkFormat.VK_FORMAT_R32_SFLOAT;
-		case (VariableType.Int)   return VkFormat.VK_FORMAT_R32_SINT;
-		case (VariableType.Uint)  return VkFormat.VK_FORMAT_R32_UINT;
-		case (VariableType.BVec2) return VkFormat.VK_FORMAT_R8G8_UINT;
-		case (VariableType.BVec3) return VkFormat.VK_FORMAT_R8G8B8_UINT;
-		case (VariableType.BVec4) return VkFormat.VK_FORMAT_R8G8B8A8_UINT;
-		case (VariableType.FVec2) return VkFormat.VK_FORMAT_R32G32_SFLOAT;
-		case (VariableType.FVec3) return VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
-		case (VariableType.FVec4) return VkFormat.VK_FORMAT_R32G32B32A32_SFLOAT;
-		case (VariableType.IVec2) return VkFormat.VK_FORMAT_R32G32_SINT;
-		case (VariableType.IVec3) return VkFormat.VK_FORMAT_R32G32B32_SINT;
-		case (VariableType.IVec4) return VkFormat.VK_FORMAT_R32G32B32A32_SINT;
-		case (VariableType.UVec2) return VkFormat.VK_FORMAT_R32G32_UINT;
-		case (VariableType.UVec3) return VkFormat.VK_FORMAT_R32G32B32_UINT;
-		case (VariableType.UVec4) return VkFormat.VK_FORMAT_R32G32B32A32_UINT;
-	}
-
-	assert false, "VariableTypeToVkFormat unsupported vertex attribute type";
-	return VkFormat.VK_FORMAT_UNDEFINED;
-}
-
 VkPolygonMode PolygonModeToVk(mode: PolygonMode)
 {
 	switch (mode)
@@ -166,35 +151,8 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 	layoutKey := PipelineLayoutKey(meshState.assetDefHandle);
 	layout := FindOrCreatePipelineLayout(device, layoutKey, layoutCache);
 
-	attributes := assetDef.vertex.attributes;
-	vertexInputBindings := ECS.instance.frameAllocator.AllocArray<VkVertexInputBindingDescription>(attributes.count);
-	vertexInputAttributes := ECS.instance.frameAllocator.AllocArray<VkVertexInputAttributeDescription>(attributes.count);
-
-	perVertex := VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX;
-	for (i .. attributes.count)
-	{
-		attr := attributes[i];
-
-		binding := VkVertexInputBindingDescription();
-		binding.binding = i;
-		binding.stride = attr.def.ValueSize();
-		binding.inputRate = perVertex;
-		vertexInputBindings[i] = binding;
-
-		attribute := VkVertexInputAttributeDescription();
-		attribute.location = i;
-		attribute.binding = i;
-		attribute.format = VariableTypeToVkFormat(attr.def.kind);
-		attribute.offset = 0;
-		vertexInputAttributes[i] = attribute;
-	}
-
 	builder := VulkanPipelineBuilder()
 				.SetShader(shaderHandle)
-				.SetVertexInput(
-					vertexInputBindings,
-					vertexInputAttributes,
-				)
 				.SetInputAssembly(meshState.GetTopology())
 				.SetViewportState(1, 1)
 				.SetRasterizer(
@@ -212,7 +170,6 @@ VulkanPipeline CreatePipelineFromKey(device: *VkDevice_T, key: VulkanPipelineKey
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_SCISSOR)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_CULL_MODE)
-				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE)
 				.SetPipelineLayout(layout);
 
 	return builder.Create(device, key.renderPass, 0);
@@ -229,36 +186,9 @@ VulkanPipeline CreateDepthPipelineFromKey(device: *VkDevice_T, key: VulkanPipeli
 	layoutKey := PipelineLayoutKey(meshState.assetDefHandle, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
 	layout := FindOrCreatePipelineLayout(device, layoutKey, layoutCache);
 
-	attributes := assetDef.vertex.attributes;
-	vertexInputBindings := ECS.instance.frameAllocator.AllocArray<VkVertexInputBindingDescription>(attributes.count);
-	vertexInputAttributes := ECS.instance.frameAllocator.AllocArray<VkVertexInputAttributeDescription>(attributes.count);
-
-	perVertex := VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX;
-	for (i .. attributes.count)
-	{
-		attr := attributes[i];
-
-		binding := VkVertexInputBindingDescription();
-		binding.binding = i;
-		binding.stride = attr.def.ValueSize();
-		binding.inputRate = perVertex;
-		vertexInputBindings[i] = binding;
-
-		attribute := VkVertexInputAttributeDescription();
-		attribute.location = i;
-		attribute.binding = i;
-		attribute.format = VariableTypeToVkFormat(attr.def.kind);
-		attribute.offset = 0;
-		vertexInputAttributes[i] = attribute;
-	}
-
 	builder := VulkanPipelineBuilder()
 				.SetShader(shaderHandle)
 				.SetVertexOnly(true)
-				.SetVertexInput(
-					vertexInputBindings,
-					vertexInputAttributes,
-				)
 				.SetInputAssembly(meshState.GetTopology())
 				.SetViewportState(1, 1)
 				.SetRasterizer(
@@ -273,7 +203,6 @@ VulkanPipeline CreateDepthPipelineFromKey(device: *VkDevice_T, key: VulkanPipeli
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_SCISSOR)
 				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_CULL_MODE)
-				.AddDynamicState(VkDynamicState.VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE)
 				.SetPipelineLayout(layout);
 
 	return builder.Create(device, key.renderPass, 0);

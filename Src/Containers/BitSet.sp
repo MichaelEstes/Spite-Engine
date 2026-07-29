@@ -196,3 +196,20 @@ BitSet::ClearAll()
 	byteCount := this.bitCount / bitsInByte;
 	zero_out_bytes(this.GetIndex(0), byteCount);
 }
+
+uint BitSet::SetBitsCount()
+{
+	count := uint(0);
+	byteCount := this.bitCount / bitsInByte;
+	for (i .. byteCount)
+	{
+		value := this.GetIndex(i)~;
+		while (value != byte(0))
+		{
+			value = value & (value - byte(1));
+			count = count + 1;
+		}
+	}
+
+	return count;
+}

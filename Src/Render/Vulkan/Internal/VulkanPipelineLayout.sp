@@ -126,26 +126,25 @@ MergePushConstants(module: SpvReflectShaderModule, pushConstantRanges: Array<VkP
 
 	maxSetIndex := 0;
 
-	for (kv in mergedSets) maxSetIndex = kv.key;
+	for (kv in mergedSets)
+	{
+		if (kv.key > maxSetIndex) maxSetIndex = kv.key;
+	}
 	descSets := Array<*VkDescriptorSetLayout_T>(maxSetIndex + 1);
 
 	setLayoutBindingArr := Array<VkDescriptorSetLayoutBinding>();
 	defer delete setLayoutBindingArr;
 
-	lastSet := 0;
-	for (kv in mergedSets)
+	for (setIndex .. maxSetIndex + 1)
 	{
-		setIndex := kv.key;
-		layoutBindingSet := kv.value;
-
-		while (lastSet < setIndex)
+		if (!mergedSets.Has(setIndex))
 		{
-			log "Adding empty descriptor set";
 			emptyLayout := CreateEmptyDescriptorSetLayout(device);
 			descSets.Add(emptyLayout);
-			lastSet += 1;
+			continue;
 		}
-		lastSet += 1;
+
+		layoutBindingSet := mergedSets.Get(setIndex);
 
 		for (layoutKV in layoutBindingSet)
 		{
@@ -155,8 +154,7 @@ MergePushConstants(module: SpvReflectShaderModule, pushConstantRanges: Array<VkP
 		isBindless := false;
 		for (binding in setLayoutBindingArr)
 		{
-			if (binding.descriptorType == VkDescriptorType.VK_DESCRIPTOR_TYPE_SAMPLER ||
-				binding.descriptorType == VkDescriptorType.VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+			if (binding.descriptorCount == 0)
 			{
 				isBindless = true;
 				break;
@@ -164,7 +162,7 @@ MergePushConstants(module: SpvReflectShaderModule, pushConstantRanges: Array<VkP
 		}
 		if (isBindless)
 		{
-			descSets.Add(vulkanInstance.resourceManager.textures.layout);
+			descSets.Add(vulkanInstance.resourceManager.bindless.layout);
 			setLayoutBindingArr.Clear();
 			continue;
 		}

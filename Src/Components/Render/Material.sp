@@ -7,7 +7,7 @@ import Common
 state MaterialVariableUpdate
 {
     material: *Material,
-    index: VariableSetIndex
+    index: uint32
 }
 
 state MaterialTextureUpdate
@@ -38,7 +38,7 @@ state Material
 	
     defHandle: AssetDefHandle,
 
-    gpuResourceID: uint32 = uint32(0),
+    gpuResourceID: uint32,
 
     alphaMode: AlphaMode,
     cullMode: CullModeFlags,
@@ -60,24 +60,22 @@ Material::delete
     delete this.textures;
 }
 
-VariableSetIndex Material::GetVariableIndex(name: string)
+uint32 Material::GetVariableIndex(name: string)
 {
     assetDef := GetAssetDefWithHandle(this.defHandle);
     fragment := assetDef.fragment;
-    index := FindVariableSetIndexByName(fragment.variables, name);
-    return index;
+    return FindVariableIndexByName(fragment.variables.sets, name);
 }
 
-ref VariableDefinition Material::GetVariableDef(index: VariableSetIndex)
+ref VariableDefinition Material::GetVariableDef(index: uint32)
 {
     assetDef := GetAssetDefWithHandle(this.defHandle);
     fragment := assetDef.fragment;
-    set := fragment.variables.sets[index.setIndex];
-    var := set[index.varIndex];
+    var := fragment.variables.sets[index];
     return var.def;
 }
 
-*T Material::GetVariableValue<T>(index: VariableSetIndex)
+*T Material::GetVariableValue<T>(index: uint32)
 {
 	assetDef := GetAssetDefWithHandle(this.defHandle);
     fragment := assetDef.fragment;
@@ -88,7 +86,7 @@ ref VariableDefinition Material::GetVariableDef(index: VariableSetIndex)
 bool Material::SetVariable<T>(name: string, value: T, update: bool = true)
 {
 	index := this.GetVariableIndex(name);
-	if (index.setIndex == uint32(-1)) return false;
+	if (index == uint32(-1)) return false;
 
 	this.GetVariableValue<T>(index)~ = value;
 	if (update) this.UpdatedVariableSet(index);
@@ -118,7 +116,7 @@ bool Material::SetTexture(name: string, texture: TextureMap, update: bool = true
 	return true;
 }
 
-Material::UpdatedVariableSet(index: VariableSetIndex)
+Material::UpdatedVariableSet(index: uint32)
 {
     event := MaterialVariableUpdate();
     event.material = this@;

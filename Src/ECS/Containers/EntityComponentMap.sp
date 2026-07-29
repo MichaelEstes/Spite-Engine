@@ -150,6 +150,8 @@ EntityComponentMap::Remove(entity: Entity)
 	this.sparseArr[endEntity.id]~ = index + 1;
 }
 
+uint16 EntityComponentMap::Count() => this.count;
+
 *any EntityComponentMap::GetUntyped(entity: Entity, size: uint32)
 {
 	index := this.GetIndex(entity);

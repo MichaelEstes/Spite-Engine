@@ -1,6 +1,6 @@
 {
     name: Lit,
-    flags: ["useLightCulling"]
+    flags: ["useLightCulling"],
     vertex: {
         attributes: {
             position: vec3,
@@ -21,19 +21,18 @@
                 default: [0.0, 0.0]
             }
         },
-        variables: [],
         nodes: [
             {
                 name: default,
                 code: `
-                    gl_Position = scene.proj * scene.view * model.model * vec4(position, 1.0);
+                    gl_Position = scene.proj * scene.view * model * vec4(position, 1.0);
                 `,
                 after: main
             },
             {
                 name: worldNormal,
                 code: `
-                    mat3 normalMatrix = mat3(model.model);
+                    mat3 normalMatrix = mat3(model);
                     outnormal = normalize(normalMatrix * normal);
                     //outtangents = vec4(normalize(normalMatrix * tangents.xyz), tangents.w);
                 `,
@@ -42,8 +41,7 @@
         ]
     },
     fragment: {
-        variables: [
-            {
+        variables: {
                 baseColor: vec4,
                 emissiveFactor: vec3,
                 normalScale: {
@@ -54,8 +52,7 @@
                 roughnessFactor: float,
                 occlusionStrength: float,
                 alphaCutoff: float
-            }
-        ],
+        },
         textures: {
             colorTexture: {
                 type: sampler2D,

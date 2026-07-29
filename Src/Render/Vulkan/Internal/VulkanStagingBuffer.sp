@@ -38,9 +38,9 @@ VulkanStagingBuffer::Create(device: *VkDevice_T, physicalDevice: *VkPhysicalDevi
     vkBindBufferMemory(device, this.buffer, this.mem, 0);
 }
 
-VulkanStagingBuffer::StagedBufferCopy(device: *VkDevice_T, data: *byte, size: uint, 
+VulkanStagingBuffer::StagedBufferCopy(device: *VkDevice_T, data: *byte, size: uint,
 									  dstBuffer: *VkBuffer_T, commands: VulkanCommands,
-									  queue: *VkQueue_T)
+									  queue: *VkQueue_T, dstOffset: uint = 0)
 {
 	commandBuffer := commands.commandBuffers[0]~;
 	beginInfo := VkCommandBufferBeginInfo();
@@ -63,7 +63,7 @@ VulkanStagingBuffer::StagedBufferCopy(device: *VkDevice_T, data: *byte, size: ui
         
 		copyRegion := VkBufferCopy();
 		copyRegion.size = copySize;
-		copyRegion.dstOffset = offset;
+		copyRegion.dstOffset = dstOffset + offset;
 
 		vkCmdCopyBuffer(commandBuffer, this.buffer, dstBuffer, 1, copyRegion@);
 

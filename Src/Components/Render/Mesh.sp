@@ -14,6 +14,7 @@ MeshEntityRemovedEvent := RegisterEvent<SceneEntity>();
 state Mesh
 {
     primitives: Array<Primitive>,
+	gpuID: uint32
 }
 
 Mesh::delete
@@ -22,7 +23,7 @@ Mesh::delete
 }
 
 MeshComponent := ECS.RegisterComponent<Mesh>(
-	ComponentKind.Sparse,
+	ComponentKind.Common,
 	::(entity: Entity, mesh: *Mesh, scene: Scene)
 	{
 		ECS.instance.events.Emit<SceneEntity>(MeshEntityRemovedEvent, SceneEntity(scene@, entity));

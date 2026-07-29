@@ -39,16 +39,16 @@ FrameAllocator::(blockSize: uint32)
 	return this.Alloc(size) as *Type;
 }
 
-[]Type FrameAllocator::AllocArray<Type>(count: uint32)
+Array<Type, InvalidResizeFunc> FrameAllocator::AllocArray<Type>(count: uint32)
 {
 	itemSize := #sizeof Type;
 	totalSize := itemSize * count;
 	ptr := this.Alloc(totalSize);
 
-	arr := []Type;
-	arr.count = count;
+	arr := Array<Type, InvalidResizeFunc>();
+	arr.count = 0;
 	arr.capacity = count;
-	arr.memory.ptr = ptr;
+	arr.mem.ptr = ptr;
 	return arr;
 }
 

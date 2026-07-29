@@ -103,6 +103,8 @@ EntityComponentArray::Remove(entity: Entity)
 	this.entitySet.Clear(index);
 }
 
+uint EntityComponentArray::Count() => this.entitySet.SetBitsCount();
+
 *any EntityComponentArray::GetUntyped(entity: Entity, size: uint32)
 {
 	if (!this.Has(entity)) return null;

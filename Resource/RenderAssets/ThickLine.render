@@ -16,19 +16,17 @@
                 default: [1.0, 1.0, 1.0, 1.0]
             }
         },
-        variables: [
-            {
-                thickness: {
-                    type: float,
-                    default: 2.0
-                }
+        variables: {
+            thickness: {
+                type: float,
+                default: 2.0
             }
-        ],
+        },
         nodes: [
             {
                 name: default,
                 code: `
-                    mat4 mvp = scene.proj * scene.view * model.model;
+                    mat4 mvp = scene.proj * scene.view * model;
                     vec4 clipThis  = mvp * vec4(position, 1.0);
                     vec4 clipOther = mvp * vec4(otherEnd, 1.0);
 

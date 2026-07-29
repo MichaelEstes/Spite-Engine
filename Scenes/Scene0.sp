@@ -44,7 +44,9 @@ _ := SceneRegistry.RegisterScene(
 				uint32(1000)
 			},
 			{
-				Array<string>(["ClearPass", "LightCullPass", "DepthPass", "AssetPass"]),
+				Array<string>(
+					["ClearPass", "ShadowPass", "LightCullPass", "DepthPass", "AssetPass"]
+				),
 				RendererFlags.Vulkan
 			}
 		});
@@ -76,7 +78,7 @@ _ := SceneRegistry.RegisterScene(
 		directionalLight := DirectionalLight();
 		directionalLight.direction = Vec3(0.0, -1.0, 0.0);
 		directionalLight.color = Color(1.0, 0.85, 0.45, 1.0);
-		directionalLight.intensity = 3.0;
+		directionalLight.intensity = 6.0;
 		directionalLight.castShadow = false;
 		scene.SetComponent<DirectionalLight>(sunEntity, directionalLight);
 

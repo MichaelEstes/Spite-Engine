@@ -1,6 +1,13 @@
 package Array
 
-state Array<Type>
+int32 DefaultResizeFunc(capacity: int32) => (capacity + 1) * 2;
+int32 InvalidResizeFunc(capacity: int32) 
+{
+	assert false, "Array:: Resize called on non resizable array"
+	return 0;
+}
+
+state Array<Type, ResizeFunc = DefaultResizeFunc>
 {
 	mem: Allocator<Type>,
 	count: uint32,
@@ -175,7 +182,7 @@ Array::Expand()
 Array::ExpandAtLeastTo(size: uint32)
 {
 	capacity := this.capacity;
-	while (capacity < size) capacity = (capacity + 1) * 2;
+	while (capacity < size) capacity = ResizeFunc(capacity);
 	this.SizeTo(capacity);
 }
 

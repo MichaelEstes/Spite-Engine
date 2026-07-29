@@ -32,24 +32,65 @@ FindOrCreateDescriptorLayout(device: *VkDevice_T,
 	return out;
 }
 
+WriteUniformBufferDescriptor(device: *VkDevice_T, set: *VkDescriptorSet_T, binding: uint32, allocHandle: VulkanAllocHandle, range: uint32)
+{
+	alloc := vulkanInstance.allocator.GetAllocation(allocHandle);
+
+	bufferInfo := VkDescriptorBufferInfo();
+	bufferInfo.buffer = alloc.data.buffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = range;
+
+	write := VkWriteDescriptorSet();
+	write.sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = set;
+	write.dstBinding = binding;
+	write.dstArrayElement = 0;
+	write.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	write.descriptorCount = 1;
+	write.pBufferInfo = bufferInfo@;
+
+	vkUpdateDescriptorSets(device, 1, write@, 0, null);
+}
+
+WriteStorageBufferDescriptor(device: *VkDevice_T, set: *VkDescriptorSet_T, binding: uint32, buffer: *VkBuffer_T)
+{
+	bufferInfo := VkDescriptorBufferInfo();
+	bufferInfo.buffer = buffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = VK_WHOLE_SIZE;
+
+	write := VkWriteDescriptorSet();
+	write.sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = set;
+	write.dstBinding = binding;
+	write.dstArrayElement = 0;
+	write.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	write.descriptorCount = 1;
+	write.pBufferInfo = bufferInfo@;
+
+	vkUpdateDescriptorSets(device, 1, write@, 0, null);
+}
+
 state SharedUBO<Type>
 {
 	pool: *VkDescriptorPool_T,
 	descLayout: *VkDescriptorSetLayout_T,
 	descSets: [FrameCount]*VkDescriptorSet_T,
 	buffer: VulkanAllocHandle,
-	UBO: *Type,
+	mapptedPtr: *Type,
+	current: Type
 }
 
 SharedUBO::Init(device: *VkDevice_T, allocator: VulkanAllocator, binding: uint32, stageFlags: VkShaderStageFlagBits)
 {
-	poolSizes := [VkDescriptorPoolSize(),];
-	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = FrameCount;
+	poolSize := VkDescriptorPoolSize();
+	poolSize.type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSize.descriptorCount = FrameCount;
 	poolInfo := VkDescriptorPoolCreateInfo();
 	poolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = 1;
-	poolInfo.pPoolSizes = fixed poolSizes;
+	poolInfo.pPoolSizes = poolSize@;
 	poolInfo.maxSets = FrameCount;
 
 	CheckResult(
@@ -62,7 +103,7 @@ SharedUBO::Init(device: *VkDevice_T, allocator: VulkanAllocator, binding: uint32
 	layoutBinding.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	layoutBinding.descriptorCount = 1;
 	layoutBinding.stageFlags = stageFlags;
-	
+
 	layoutInfo := VkDescriptorSetLayoutCreateInfo();
 	layoutInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layoutInfo.bindingCount = 1;
@@ -87,9 +128,10 @@ SharedUBO::Init(device: *VkDevice_T, allocator: VulkanAllocator, binding: uint32
 	);
 	this.buffer = bufHandle;
 
+	this.current = Type();
 	alloc := allocator.GetAllocation(bufHandle);
-	this.UBO = allocator.GetAllocationMappedPtr(bufHandle);
-	this.UBO~ = Type();
+	this.mapptedPtr = allocator.GetAllocationMappedPtr(bufHandle);
+	this.mapptedPtr~ = this.current;
 
 	layouts := [FrameCount]*VkDescriptorSetLayout_T;
 	for (i .. FrameCount) layouts[i] = this.descLayout;
@@ -132,7 +174,8 @@ bool SharedUBO::Valid()
 
 SharedUBO::Update(frame: uint32, value: Type)
 {
-	this.UBO~ = value;
+	this.current = value;
+	this.mapptedPtr~ = value;
 }
 
 *VkDescriptorSet_T SharedUBO::GetDescSet(frame: uint32)

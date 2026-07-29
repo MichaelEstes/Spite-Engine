@@ -116,63 +116,52 @@ layoutSetStart := "\nlayout(set = ";
 variableBinding := ", binding = 0) uniform ";
 variableUniform := ") uniform ";
 
+layoutBufferSetStart := "\nlayout(std430, set = ";
+storageBinding := ", binding = 0) readonly buffer ";
+
 layoutVarStart := "\nlayout(location = ";
 varIn := ") in "
 varOut := ") out "
 
-string WriteVariableSets(shader: string, varSets: VariableSets, setOffset: uint32, writeDefines: bool = true)
+string WriteVariableSet(shader: string, varSet: VariableSet, structName: string,
+                        addressField: string, indexName: string, writeDefines: bool = true)
 {
-    if (!varSets.sets.count) return shader;
+    if (!varSet.sets.count) return shader;
 
-    for (setIndex .. varSets.sets.count)
+    shader.AppendIn("\nlayout(buffer_reference, std430, buffer_reference_align = 4) readonly buffer ");
+    shader.AppendIn(structName);
+    shader.AppendIn("\n{\n");
+
+    for (var in varSet.sets)
     {
-        set := varSets.sets[setIndex];
-        
-        setIndexStr := UIntToString(setIndex + setOffset);
-        defer delete setIndexStr;
+        typeStr := VariableDefToTypeName(var.def);
+        defer delete typeStr;
 
-        setStr := layoutSetStart.Copy();
-        defer delete setStr;
+        shader.AppendIn("\t");
+        shader.AppendIn(typeStr);
+        shader.AppendIn(" ");
+        shader.AppendIn(var.name);
+        shader.AppendIn(";\n");
+    }
 
-        setStr.AppendIn(setIndexStr);
-        setStr.AppendIn(variableBinding);
-        setStr.AppendIn("Set");
-        setStr.AppendIn(setIndexStr);
-        setStr.AppendIn("\n{\n");
-        
-        for (varIndex .. set.count)
+    shader.AppendIn("};\n");
+
+    if (writeDefines)
+    {
+        for (var in varSet.sets)
         {
-            var := set[varIndex];
-
-            typeStr := VariableDefToTypeName(var.def);
-            defer delete typeStr;
-
-            setStr.AppendIn("\t");
-            setStr.AppendIn(typeStr);
-            setStr.AppendIn(" ");
-            setStr.AppendIn(var.name);
-            setStr.AppendIn(";\n");
+            shader.AppendIn("#define ");
+            shader.AppendIn(var.name);
+            shader.AppendIn(" ");
+            shader.AppendIn(structName);
+            shader.AppendIn("(PtrArray(pushConstants.");
+            shader.AppendIn(addressField);
+            shader.AppendIn(").ptrs[");
+            shader.AppendIn(indexName);
+            shader.AppendIn("]).");
+            shader.AppendIn(var.name);
+            shader.AppendIn("\n");
         }
-
-        setStr.AppendIn("} set");
-        setStr.AppendIn(setIndexStr);
-        setStr.AppendIn(";\n");
-
-        if (writeDefines) 
-        {
-            for (var in set)
-            {
-                setStr.AppendIn("#define ");
-                setStr.AppendIn(var.name);
-                setStr.AppendIn(" set");
-                setStr.AppendIn(setIndexStr);
-                setStr.AppendIn(".");
-                setStr.AppendIn(var.name);
-                setStr.AppendIn("\n");
-            }
-        }
-
-        shader.AppendIn(setStr);
     }
 
     shader.AppendIn("\n");
@@ -243,32 +232,15 @@ string WriteInVariables(shader: string, vars: Array<Variable>,
     return shader;
 }
 
-string WriteTextures(shader: string, textures: Array<TextureDefinition>, 
-                     set: uint32, writeDefines: bool = true)
+string WriteTextures(shader: string, textures: Array<TextureDefinition>,
+                     bindlessSet: uint32, writeDefines: bool = true)
 {
     if (!textures.count) return shader;
 
-    textureArraySetStr := UIntToString(set);
-    textureIndexSetStr := UIntToString(set + 1);
-    defer delete textureIndexSetStr;
+    textureArraySetStr := UIntToString(bindlessSet);
     defer delete textureArraySetStr;
 
-    // Sampler array
-    shader.AppendIn(layoutSetStart);
-    shader.AppendIn(textureArraySetStr);
-    shader.AppendIn(", binding = 0) uniform sampler samplers[];\n");
-
-    // Texture array
-    shader.AppendIn(layoutSetStart);
-    shader.AppendIn(textureArraySetStr);
-    shader.AppendIn(", binding = 1) uniform texture2D textures[];\n");
-
-    shader.AppendIn(layoutSetStart);
-    shader.AppendIn(textureIndexSetStr);
-    shader.AppendIn(variableBinding);
-    shader.AppendIn("TextureSet");
-    shader.AppendIn(textureIndexSetStr);
-    shader.AppendIn("\n{\n");
+    shader.AppendIn("\nlayout(buffer_reference, std430, buffer_reference_align = 4) readonly buffer MaterialTextureSlotsData\n{\n");
 
     for (texture in textures)
     {
@@ -280,9 +252,17 @@ string WriteTextures(shader: string, textures: Array<TextureDefinition>,
         shader.AppendIn(texture.name);
         shader.AppendIn("SamplerIndex;\n");
     }
-    shader.AppendIn("} textureSet");
-    shader.AppendIn(textureIndexSetStr);
-    shader.AppendIn(";\n");
+    shader.AppendIn("};\n");
+
+    // Sampler array
+    shader.AppendIn(layoutSetStart);
+    shader.AppendIn(textureArraySetStr);
+    shader.AppendIn(", binding = 0) uniform sampler samplers[];\n");
+
+    // Texture array
+    shader.AppendIn(layoutSetStart);
+    shader.AppendIn(textureArraySetStr);
+    shader.AppendIn(", binding = 1) uniform texture2D textures[];\n");
 
     if (writeDefines)
     {
@@ -290,13 +270,9 @@ string WriteTextures(shader: string, textures: Array<TextureDefinition>,
         {
             shader.AppendIn("#define ");
             shader.AppendIn(texture.name);
-            shader.AppendIn(" sampler2D(textures[nonuniformEXT(textureSet");
-            shader.AppendIn(textureIndexSetStr);
-            shader.AppendIn(".");
+            shader.AppendIn(" sampler2D(textures[nonuniformEXT(MaterialTextureSlotsData(PtrArray(pushConstants.materialTextureSlotsAddress).ptrs[drawIndex]).");
             shader.AppendIn(texture.name);
-            shader.AppendIn("Index)], samplers[nonuniformEXT(textureSet");
-            shader.AppendIn(textureIndexSetStr);
-            shader.AppendIn(".");
+            shader.AppendIn("Index)], samplers[nonuniformEXT(MaterialTextureSlotsData(PtrArray(pushConstants.materialTextureSlotsAddress).ptrs[drawIndex]).");
             shader.AppendIn(texture.name);
             shader.AppendIn("SamplerIndex)])");
             shader.AppendIn("\n");
@@ -306,30 +282,81 @@ string WriteTextures(shader: string, textures: Array<TextureDefinition>,
     return shader;
 }
 
-string WriteVertexAttributes(shader: string, vars: Array<Variable>)
+uint32 VariableTypeComponentCount(kind: VariableType)
 {
-    for (location .. vars.count)
+    switch (kind)
     {
-        var := vars[location];
-        locationStr := UIntToString(location);
-        typeStr := VariableDefToTypeName(var.def);
-
-        varStr := layoutVarStart.Copy();
-        varStr.AppendIn(locationStr);
-        varStr.AppendIn(varIn);
-        varStr.AppendIn(typeStr);
-        varStr.AppendIn(" ");
-        varStr.AppendIn(var.name);
-        varStr.AppendIn(";");
-
-        shader.AppendIn(varStr);
-
-        delete typeStr;
-        delete locationStr;
-        delete varStr;
+        case (VariableType.Float) return 1;
+        case (VariableType.FVec2) return 2;
+        case (VariableType.FVec3) return 3;
+        case (VariableType.FVec4) return 4;
     }
-    
-    shader.AppendIn("\n");
+
+    assert false, "VariableTypeComponentCount unsupported vertex attribute type";
+    return 0;
+}
+
+string WriteVertexAttributes(shader: string, vars: Array<Variable>, bindlessSet: uint32)
+{
+    if (!vars.count) return shader;
+
+    bindlessSetStr := UIntToString(bindlessSet);
+    defer delete bindlessSetStr;
+
+    shader.AppendIn("\nlayout(buffer_reference, std430, buffer_reference_align = 4) readonly buffer GeometryAttributeSlotsData\n{\n");
+
+    for (var in vars)
+    {
+        shader.AppendIn("\tuint ");
+        shader.AppendIn(var.name);
+        shader.AppendIn("Index;\n");
+
+        shader.AppendIn("\tuint ");
+        shader.AppendIn(var.name);
+        shader.AppendIn("Stride;\n");
+    }
+    shader.AppendIn("};\n");
+
+    // Vertex buffer array
+    shader.AppendIn(layoutBufferSetStart);
+    shader.AppendIn(bindlessSetStr);
+    shader.AppendIn(", binding = 2) readonly buffer VertexBuffers { float data[]; } vertexBuffers[];\n");
+
+    for (var in vars)
+    {
+        componentCount := VariableTypeComponentCount(var.def.kind);
+
+        shader.AppendIn("#define ");
+        shader.AppendIn(var.name);
+        shader.AppendIn(" ");
+
+        if (componentCount > 1)
+        {
+            typeStr := VariableDefToTypeName(var.def);
+            shader.AppendIn(typeStr);
+            shader.AppendIn("(");
+            delete typeStr;
+        }
+
+        for (component .. componentCount)
+        {
+            if (component) shader.AppendIn(", ");
+
+            componentStr := UIntToString(component);
+            shader.AppendIn("vertexBuffers[GeometryAttributeSlotsData(PtrArray(pushConstants.geometryAttributeSlotsAddress).ptrs[gl_InstanceIndex]).");
+            shader.AppendIn(var.name);
+            shader.AppendIn("Index].data[GeometryAttributeSlotsData(PtrArray(pushConstants.geometryAttributeSlotsAddress).ptrs[gl_InstanceIndex]).");
+            shader.AppendIn(var.name);
+            shader.AppendIn("Stride * gl_VertexIndex + ");
+            shader.AppendIn(componentStr);
+            shader.AppendIn("]");
+            delete componentStr;
+        }
+
+        if (componentCount > 1) shader.AppendIn(")");
+        shader.AppendIn("\n");
+    }
+
     return shader;
 }
 
@@ -354,6 +381,9 @@ string WriteVertexShaderOutAssignments(shared: Array<Variable>, outPrefix: strin
 vertexShaderStart := `
 #version 460
 #pragma shader_stage(vertex)
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 layout(set = 0, binding = 0) uniform SceneUBO
 {
@@ -362,10 +392,26 @@ layout(set = 0, binding = 0) uniform SceneUBO
     vec2 screenSize;
 } scene;
 
-layout(push_constant) uniform Model 
+layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer ModelBuffer
 {
-    mat4 model;
-} model;
+    mat4 models[];
+};
+
+layout(buffer_reference, std430, buffer_reference_align = 8) readonly buffer PtrArray
+{
+    uint64_t ptrs[];
+};
+
+layout(push_constant) uniform DrawPushConstants
+{
+    uint64_t modelBufferAddress;
+    uint64_t geometryVariablesAddress;
+    uint64_t geometryAttributeSlotsAddress;
+    uint64_t materialVariablesAddress;
+    uint64_t materialTextureSlotsAddress;
+} pushConstants;
+
+#define model ModelBuffer(pushConstants.modelBufferAddress).models[gl_InstanceIndex]
 `;
 
 shaderMainStart := `
@@ -378,8 +424,15 @@ string WriteVertexShader(assetDef: AssetDef)
     vertexStage := assetDef.vertex;
     vertexShader := vertexShaderStart.Copy();
 
-    vertexShader = WriteVertexAttributes(vertexShader, vertexStage.attributes);
-    vertexShader = WriteVariableSets(vertexShader, vertexStage.variables, 1);
+    vertexShader = WriteVariableSet(
+        vertexShader, vertexStage.variables,
+        "GeometryVariablesData", "geometryVariablesAddress", "gl_InstanceIndex"
+    );
+    vertexShader = WriteVertexAttributes(
+        vertexShader,
+        vertexStage.attributes,
+        assetDef.GetBindlessTextureSetIndex()
+    );
     vertexShader = WriteOutVariables(vertexShader, vertexStage.out);
 
     outPrefix := "out";
@@ -395,6 +448,12 @@ string WriteVertexShader(assetDef: AssetDef)
 
     vertexShader = WriteOutVariables(vertexShader, sharedVars, outPrefix, vertexStage.out.count);
 
+    drawIndexLocationStr := UIntToString(vertexStage.out.count + sharedVars.count);
+    defer delete drawIndexLocationStr;
+    vertexShader.AppendIn(layoutVarStart);
+    vertexShader.AppendIn(drawIndexLocationStr);
+    vertexShader.AppendIn(") flat out uint outDrawIndex;\n");
+
     functions := WriteShaderNodes(vertexStage.functions);
     defer delete functions;
     vertexShader.AppendIn(functions);
@@ -406,6 +465,7 @@ string WriteVertexShader(assetDef: AssetDef)
     defer delete outAssignments;
 
     vertexShader.AppendIn(shaderMainStart);
+    vertexShader.AppendIn("\toutDrawIndex = gl_InstanceIndex;\n");
     vertexShader.AppendIn(outAssignments);
     vertexShader.AppendIn(code);
     vertexShader.AppendIn("}");
@@ -417,6 +477,22 @@ fragmentShaderStart := `
 #version 460
 #pragma shader_stage(fragment)
 #extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(buffer_reference, std430, buffer_reference_align = 8) readonly buffer PtrArray
+{
+    uint64_t ptrs[];
+};
+
+layout(push_constant) uniform DrawPushConstants
+{
+    uint64_t modelBufferAddress;
+    uint64_t geometryVariablesAddress;
+    uint64_t geometryAttributeSlotsAddress;
+    uint64_t materialVariablesAddress;
+    uint64_t materialTextureSlotsAddress;
+} pushConstants;
 `
 
 fragmentLightCullDecls := `
@@ -426,19 +502,19 @@ struct ClusterLight {
     uint kind;   // 0 = directional, 1 = point
 };
 
-layout(std430, set = 0, binding = 1) readonly buffer ClusterLights {
+layout(std430, set = 0, binding = 2) readonly buffer ClusterLights {
     ClusterLight clusterLights[];
 };
 
-layout(std430, set = 0, binding = 2) readonly buffer ClusterLightGrid {
+layout(std430, set = 0, binding = 3) readonly buffer ClusterLightGrid {
     uvec2 lightGrid[];
 };
 
-layout(std430, set = 0, binding = 3) readonly buffer ClusterLightIndices {
+layout(std430, set = 0, binding = 4) readonly buffer ClusterLightIndices {
     uint lightIndices[];
 };
 
-layout(std430, set = 0, binding = 4) readonly buffer ClusterInfo {
+layout(std430, set = 0, binding = 5) readonly buffer ClusterInfo {
     mat4 invProj;
     mat4 invView;
     vec4 screenAndTile;   // xy = screen px, zw = tile px
@@ -457,7 +533,10 @@ string WriteFragmentShader(assetDef: AssetDef)
         fragmentShader.AppendIn(fragmentLightCullDecls);
     }
     
-    fragmentShader = WriteVariableSets(fragmentShader, fragmentStage.variables, assetDef.vertex.variables.sets.count + 1);
+    fragmentShader = WriteVariableSet(
+        fragmentShader, fragmentStage.variables,
+        "MaterialVariablesData", "materialVariablesAddress", "drawIndex"
+    );
     fragmentShader = WriteTextures(
         fragmentShader,
         fragmentStage.textures,
@@ -475,6 +554,13 @@ string WriteFragmentShader(assetDef: AssetDef)
     }
 
     fragmentShader = WriteInVariables(fragmentShader, inVars);
+
+    drawIndexLocationStr := UIntToString(inVars.count);
+    defer delete drawIndexLocationStr;
+    fragmentShader.AppendIn(layoutVarStart);
+    fragmentShader.AppendIn(drawIndexLocationStr);
+    fragmentShader.AppendIn(") flat in uint drawIndex;\n");
+
     fragmentShader = WriteOutVariables(fragmentShader, fragmentStage.out);
 
     functions := WriteShaderNodes(fragmentStage.functions);
