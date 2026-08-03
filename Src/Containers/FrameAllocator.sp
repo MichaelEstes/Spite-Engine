@@ -1,35 +1,56 @@
 package FrameAllocator
 
 import Array
+import Math
+
+DefaultBlockSize: uint32 = 4096 * 4;
+
+state FrameBlock
+{
+	mem: *byte,
+
+	curr: uint32,
+	size: uint32
+}
+
+FrameBlock::(size: uint32)
+{
+	this.mem = Allocator<byte>().Alloc(size)[0];
+	this.curr = 0;
+	this.size = size;
+}
 
 state FrameAllocator
 {
-	blocks: Array<*byte>,
-
-	blockSize: uint32 = 0x1000,
-
-	currBlock: uint32,
-	currIndex: uint32
+	blocks: Array<FrameBlock>
 }
 
 FrameAllocator::()
 {
-	this.Expand();
+	this.Expand(DefaultBlockSize);
 }
 
 FrameAllocator::(blockSize: uint32)
 {
-	this.blockSize = blockSize;
-	this.Expand();
+	this.Expand(blockSize);
 }
 
 *void FrameAllocator::Alloc(size: uint32)
 {
-	if (this.currIndex + size > this.blockSize) this.NextOrExpand();
-	
-	block := this.blocks[this.currBlock];
-	ptr := block + this.currIndex;
-	this.currIndex += size;
+	for (i .. this.blocks.count)
+	{
+		block := this.blocks[i]@;
+		if (block.curr + size <= block.size)
+		{
+			ptr := block.mem + block.curr;
+			block.curr += size;
+			return ptr;
+		}
+	}
+
+	block := this.Expand(Math.Max(size, DefaultBlockSize));
+	ptr := block.mem;
+	block.curr = size;
 	return ptr;
 }
 
@@ -52,29 +73,17 @@ Array<Type, InvalidResizeFunc> FrameAllocator::AllocArray<Type>(count: uint32)
 	return arr;
 }
 
-FrameAllocator::NextOrExpand()
+*FrameBlock FrameAllocator::Expand(size: uint32)
 {
-	if (this.currBlock < this.blocks.count - 1)
-	{
-		this.currBlock += 1;
-		this.currIndex = 0;
-	}
-	else
-	{
-		this.Expand();
-	}
-}
-
-FrameAllocator::Expand()
-{
-	blockPtr := Allocator<byte>().Alloc(this.blockSize)[0];
-
-	this.currBlock = this.blocks.Add(blockPtr);
-	this.currIndex = 0;
+	index := this.blocks.Add(FrameBlock(size));
+	return this.blocks[index]@;
 }
 
 FrameAllocator::Clear()
 {
-	this.currBlock = 0;
-	this.currIndex = 0;
+	for (i .. this.blocks.count)
+	{
+		block := this.blocks[i]@;
+		block.curr = 0;
+	}
 }

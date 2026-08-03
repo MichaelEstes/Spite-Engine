@@ -122,18 +122,32 @@ AssignGLTFNodeToECS(nodeResource: *GLTFNodeResource, scene: *Scene, parent: Enti
 	}
 }
 
-ResourceHandle UseGLTFResource(file: string, scene: *Scene, onLoad: ::(*Scene, Entity) = null)
+state GLTFParamData
 {
+	onLoad: ::(*Scene, Entity, *any),
+	arg: *any
+}
+
+ResourceHandle UseGLTFResource(
+	file: string, scene: *Scene, 
+	onLoad: ::(*Scene, Entity, *any) = null, arg: *any = null
+)
+{
+	data := AllocThreadParam<GLTFParamData>();
+	data.onLoad = onLoad;
+	data.arg = arg;
+
 	gltfParam := GLTFLoadParam();
 	gltfParam.file = file;
 	gltfParam.scene = scene;
-	gltfParam.data = onLoad as *any;
+	gltfParam.data = data as *any;
 	
 	return GLTFResourceManager.LoadResource(
 		gltfParam, 
 		::(resourceHandle: ResourceHandle, params: *GLTFLoadParam)
 		{
-			onLoad := params.data as ::(*Scene, Entity);
+			paramData := params.data as *GLTFParamData;
+			defer DeallocThreadParam<GLTFParamData>(paramData);
 			gltfResource := GLTFResourceManager.TakeResourceRef(resourceHandle);
 			gltfResult := gltfResource.result;
 			gltfData := gltfResource.data;
@@ -141,11 +155,13 @@ ResourceHandle UseGLTFResource(file: string, scene: *Scene, onLoad: ::(*Scene, E
 			scene := params.scene;
 			rootEntity := scene.CreateEntity();
 			scene.SetComponent<Hierarchy>(rootEntity, Hierarchy());
+			scene.SetComponent<Transform>(rootEntity, Transform());
 
 			for (sceneResource in gltfData.scenes)
 			{
 				sceneEntity := scene.CreateEntity();
 				scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
+				scene.SetComponent<Transform>(sceneEntity, Transform());
 				ParentEntity(rootEntity, sceneEntity, scene);
 
 				for (nodeResource in sceneResource.nodes)
@@ -154,9 +170,9 @@ ResourceHandle UseGLTFResource(file: string, scene: *Scene, onLoad: ::(*Scene, E
 				}
 			}
 
-			if (onLoad)
+			if (paramData.onLoad)
 			{
-				onLoad(scene, rootEntity);
+				paramData.onLoad(scene, rootEntity, paramData.arg);
 			}
 		});
 }
@@ -560,7 +576,6 @@ AssignGLTFMesh(gltfData: GLTFResource, meshIndex: uint32, nodeResource: *GLTFNod
 	}
 
 	nodeResource.mesh = mesh;
-	ECS.instance.events.Emit<*Mesh>(MeshCreatedEvent, nodeResource.mesh@);
 }
 
 NodeToNodeResource(gltfData: GLTFResource, nodeIndex: uint32, nodeResource: *GLTFNodeResource)

@@ -98,7 +98,8 @@ VkBufferCreateInfo IndirectBufferCreateInfo(size: uint32)
 	createInfo := VkBufferCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	createInfo.usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |
-						VkBufferUsageFlagBits.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+						VkBufferUsageFlagBits.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+						VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	createInfo.size = size;
 	createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
 
@@ -150,6 +151,24 @@ BufferHandle CreateAddressableStorageBuffer(size: uint32)
 
 	buffer := CreateVkBuffer(device, AddressableStorageBufferCreateInfo(size));
 	handle := allocator.AllocBuffer(buffer, VulkanMemoryFlags.GPU | VulkanMemoryFlags.Addressable);
+
+	bufferHandle := BufferHandle();
+	bufferHandle.buffer = buffer;
+	bufferHandle.handle = handle;
+	return bufferHandle;
+}
+
+BufferHandle CreateMappedAddressableStorageBuffer(size: uint32)
+{
+	device := vulkanInstance.device;
+	allocator := vulkanInstance.allocator;
+
+	buffer := CreateVkBuffer(device, AddressableStorageBufferCreateInfo(size));
+	handle := allocator.AllocBuffer(
+		buffer,
+		VulkanMemoryFlags.GPU | VulkanMemoryFlags.Shared | VulkanMemoryFlags.Coherent |
+		VulkanMemoryFlags.Addressable | VulkanMemoryFlags.Mapped
+	);
 
 	bufferHandle := BufferHandle();
 	bufferHandle.buffer = buffer;

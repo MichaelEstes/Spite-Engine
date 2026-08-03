@@ -304,32 +304,18 @@ InitializeVulkanInstance()
 	vulkanInstance.SelectDefaultDevice();
 	vulkanInstance.InitializeCurrentDevice();
 
-	ECS.instance.events.On(
-		MeshCreatedEvent,
-		::(mesh: *Mesh, data: *void)
-		{
-			log "Mesh Created Vulkan Instance";
-			resourceManager := vulkanInstance.resourceManager;
-			resourceManager.UploadMesh(mesh);
-		}
-	);
 
 	ECS.instance.events.On(
-		MeshRemovedEvent,
-		::(mesh: *Mesh, data: *void)
-		{
-			log "Mesh Removed Vulkan Instance";
-		}
-	);
-
-	ECS.instance.events.On(
-		MeshEntityAddedEvent,
+		MeshEntitySetEvent,
 		::(sceneEntity: SceneEntity, data: *void)
 		{
 			log "Mesh Entity Added Vulkan Instance";
 			scene := sceneEntity.scene;
 			entity := sceneEntity.entity;
 			mesh := scene.GetComponent<Mesh>(entity);
+
+			resourceManager := vulkanInstance.resourceManager;
+			resourceManager.UploadMesh(mesh);
 
 			for (ec in scene.Iterate<VulkanRenderer>())
 			{

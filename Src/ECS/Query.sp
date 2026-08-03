@@ -192,8 +192,8 @@ QueryIterator Query::Result()
 	result := QueryIterator();
 	if (!this.with.count) return result;
 
-	largestComponent := Component();
-	largestEntityCount := 0;
+	leastComponent := Component();
+	leastComponentCount := uint(-1);
 	for (component in this.with)
 	{
 		switch (component.kind)
@@ -204,10 +204,10 @@ QueryIterator Query::Result()
 				if (compArr)
 				{
 					currCount := compArr.Count();
-					if (currCount > largestEntityCount)
+					if (currCount < leastComponentCount)
 					{
-						largestEntityCount = currCount;
-						largestComponent = component;
+						leastComponentCount = currCount;
+						leastComponent = component;
 					}
 				}
 			}
@@ -217,10 +217,10 @@ QueryIterator Query::Result()
 				if (compMap)
 				{
 					currCount := compMap.Count() as uint;
-					if (currCount > largestEntityCount)
+					if (currCount < leastComponentCount)
 					{
-						largestEntityCount = currCount;
-						largestComponent = component;
+						leastComponentCount = currCount;
+						leastComponent = component;
 					}
 				}
 			}
@@ -228,7 +228,7 @@ QueryIterator Query::Result()
 	}
 
 	result.scene = this.scene;
-	result.unionOf = largestComponent;
+	result.unionOf = leastComponent;
 	result.with = this.with;
 	result.without = this.without;
 	result.withTags = this.withTags;

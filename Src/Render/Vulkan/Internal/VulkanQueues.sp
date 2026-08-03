@@ -179,7 +179,7 @@ VulkanQueues::GetQueues(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T
 	if (!this.transferQueue)
 	{
 		this.transferQueueIndex = this.transferQueueIndicies[0]~;
-		vkGetDeviceQueue(device, this.transferQueueIndex, 0, this.computeQueue@);
+		vkGetDeviceQueue(device, this.transferQueueIndex, 0, this.transferQueue@);
 	}
 
 	tempWindow := Window.CreateWindow(

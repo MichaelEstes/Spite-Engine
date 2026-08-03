@@ -10,7 +10,7 @@ state BitSet
 	bitCount: uint,
 	mem: ?{
 		alloc: ZeroedAllocator<byte>,
-		bytes: [24]byte
+		bytes: [8]byte
 	}
 }
 
@@ -93,7 +93,9 @@ BitSet::CheckResize(i: uint)
 		}
 		else
 		{
+			bytes := this.mem.bytes~;
 			this.mem.alloc.Alloc(resizedCapacity);
+			copy_bytes(this.mem.alloc[0], fixed bytes, #sizeof this.mem.bytes);
 		}
 		this.bitCount = resizedCapacity * bitsInByte;
 	}

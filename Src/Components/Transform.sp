@@ -13,6 +13,13 @@ state Transform
 	scale: Vec3
 }
 
+Transform::()
+{
+	this.position = Vec3();
+	this.rotation = Quaternion();
+	this.scale = Vec3(1.0, 1.0, 1.0);
+}
+
 Transform::(pos: Vec3, rot: Quaternion = Quaternion(), scale: Vec3 = Vec3(1.0, 1.0, 1.0))
 {
 	this.position = pos;
@@ -45,9 +52,21 @@ TransformUpdatedTag := ECS.RegisterTagComponent(
 	ComponentKind.Common
 );
 
+FillHierarchyDirty(scene: Scene, entity: Entity)
+{
+	hierarchy := scene.GetComponentDirect<Hierarchy>(entity, HierarchyComponent);
+	if (!hierarchy) return;
+	for (child in hierarchy.children)
+	{
+		scene.SetTagComponent(child, TransformDirtyTag);
+		FillHierarchyDirty(scene, child);
+	}
+}
+
 SetTransformDirty(scene: Scene, entity: Entity) =>
 {
 	scene.SetTagComponent(entity, TransformDirtyTag);
+	FillHierarchyDirty(scene, entity);
 }
 
 TransformComponent := ECS.RegisterComponent<Transform>(

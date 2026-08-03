@@ -1,10 +1,23 @@
 package Array
 
 int32 DefaultResizeFunc(capacity: int32) => (capacity + 1) * 2;
-int32 InvalidResizeFunc(capacity: int32) 
+int32 InvalidResizeFunc(capacity: int32)
 {
 	assert false, "Array:: Resize called on non resizable array"
 	return 0;
+}
+
+IntroSortInsertionThreshold := 16;
+
+uint32 Log2Floor(value: uint32)
+{
+	result := uint32(0);
+	while (value > 1)
+	{
+		value = value / 2;
+		result += 1;
+	}
+	return result;
 }
 
 state Array<Type, ResizeFunc = DefaultResizeFunc>
@@ -99,6 +112,12 @@ Array::AddAll(items: []Type)
 Array::Insert(item: Type, index: uint32)
 {
 	this[index] = item;
+}
+
+*Type Array::Last()
+{
+	if (!this.count) return null;
+	return this[this.count - 1]@;
 }
 
 Array::Shift(index: uint32)
@@ -206,4 +225,126 @@ Array<Type> Array::Copy(valCopy: ::Type(Type) = ::Type(val: Type) => val)
 		arr.Add(valCopy(val));
 	}
 	return arr;
+}
+
+Array::Sort(compare: ::byte(Type, Type))
+{
+	depthLimit := Log2Floor(this.count) * 2;
+	this.IntroSort(0, this.count, depthLimit, compare);
+}
+
+Array::QuickSort(low: uint32, high: uint32, compare: ::byte(Type, Type))
+{
+	if (high - low < 2) return;
+
+	pivot := this[high - 1];
+	i := low;
+
+	for (j := low .. high - 1)
+	{
+		if (compare(this[j], pivot) < 0)
+		{
+			this.Swap(i, j);
+			i += 1;
+		}
+	}
+	this.Swap(i, high - 1);
+
+	this.QuickSort(low, i, compare);
+	this.QuickSort(i + 1, high, compare);
+}
+
+Array::IntroSort(low: uint32, high: uint32, depthLimit: uint32, compare: ::byte(Type, Type))
+{
+	if (high - low < 2) return;
+
+	if (high - low <= IntroSortInsertionThreshold)
+	{
+		this.InsertionSort(low, high, compare);
+		return;
+	}
+
+	if (depthLimit == 0)
+	{
+		this.HeapSort(low, high, compare);
+		return;
+	}
+
+	pivot := this[high - 1];
+	i := low;
+
+	for (j := low .. high - 1)
+	{
+		if (compare(this[j], pivot) < 0)
+		{
+			this.Swap(i, j);
+			i += 1;
+		}
+	}
+	this.Swap(i, high - 1);
+
+	this.IntroSort(low, i, depthLimit - 1, compare);
+	this.IntroSort(i + 1, high, depthLimit - 1, compare);
+}
+
+Array::InsertionSort(low: uint32, high: uint32, compare: ::byte(Type, Type))
+{
+	for (i := low + 1 .. high)
+	{
+		val := this[i];
+		j := i;
+		while (j > low && compare(this[j - 1], val) > 0)
+		{
+			this[j] = this[j - 1];
+			j -= 1;
+		}
+		this[j] = val;
+	}
+}
+
+Array::HeapSort(low: uint32, high: uint32, compare: ::byte(Type, Type))
+{
+	n := high - low;
+
+	i := n / 2;
+	while (i > 0)
+	{
+		i -= 1;
+		this.SiftDown(low, i, n, compare);
+	}
+
+	end := n;
+	while (end > 1)
+	{
+		end -= 1;
+		this.Swap(low, low + end);
+		this.SiftDown(low, 0, end, compare);
+	}
+}
+
+Array::SiftDown(low: uint32, start: uint32, n: uint32, compare: ::byte(Type, Type))
+{
+	root := start;
+	while (root * 2 + 1 < n)
+	{
+		child := root * 2 + 1;
+		if (child + 1 < n && compare(this[low + child], this[low + child + 1]) < 0) child += 1;
+
+		if (compare(this[low + root], this[low + child]) < 0)
+		{
+			this.Swap(low + root, low + child);
+			root = child;
+		}
+		else
+		{
+			return;
+		}
+	}
+}
+
+Array::Swap(left: uint32, right: uint32)
+{
+	temp := this[left]~;
+	this[left] = this[right];
+	this[right] = temp;
 }

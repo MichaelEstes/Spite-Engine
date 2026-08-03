@@ -83,7 +83,7 @@ HandleValue<Value> HandleSet::GetNext()
 	handleValue.value = this.denseValueArr[index];
 	
 	this.next += 1;
-	while (this.handleFlags[this.next] && this.next < this.capacity) this.next += 1;
+	while (this.next < this.capacity && this.handleFlags[this.next]) this.next += 1;
 	return handleValue;
 }
 

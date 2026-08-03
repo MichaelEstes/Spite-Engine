@@ -71,27 +71,21 @@ state VulkanMeshCallbacks
 	drawListUpdate: ::(*Scene, *VulkanRenderer) = null
 }
 
-state VulkanDrawListComputeState
-{
-	pipeline: *VulkanComputePipeline,
-}
-
 state VulkanAssetDefDrawFrame
 {
 	modelBuffer: BufferHandle,
 	indexedDrawCommands: BufferHandle,
 	drawCommands: BufferHandle,
-	counters: BufferHandle,
 	geometryVariables: BufferHandle,
 	geometryAttributeSlots: BufferHandle,
 	materialVariables: BufferHandle,
 	materialTextureSlots: BufferHandle,
-	set: *VkDescriptorSet_T
+	indexedCount: uint32,
+	nonIndexedCount: uint32
 }
 
 state VulkanAssetDefDrawSet
 {
-	pool: *VkDescriptorPool_T,
 	frames: [FrameCount]VulkanAssetDefDrawFrame
 }
 
@@ -107,7 +101,6 @@ state VulkanRenderer
 	
 	sceneShared: SharedUBO<SceneUBO>,
 
-	drawListCompute: VulkanDrawListComputeState,
 	assetDefDrawSets: SparseSet<VulkanAssetDefDrawSet>,
 
 	materialPool: *VkDescriptorPool_T,
@@ -200,7 +193,7 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 	{
 		vulkanRenderer.sceneShared.Init(device, allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
 
-		InitDrawListCompute(vulkanRenderer@);
+		InitDrawList(vulkanRenderer@);
 	}
 
 	vulkanRenderer.CreateMaterialDescPool(config.materialDescriptorCount, config.maxMaterialSets);
@@ -578,8 +571,8 @@ updatedTransformQuery := CreateUpdatedTransformQuery();
 VulkanRenderer::UpdateTransforms(scene: *Scene, frame: uint32)
 {
 	resourceManager := vulkanInstance.resourceManager;
-	stagingBuffer := vulkanInstance.GetStagingBuffer();
 	result := updatedTransformQuery.Scene(scene).Result();
+
 	for (entity in result)
 	{
 		mesh := scene.GetComponent<Mesh>(entity);
@@ -708,7 +701,6 @@ VulkanRenderer::UpdateDrawList(scene: *Scene)
 
 			meshState := VulkanPipelineMeshState();
 			meshState.assetDefHandle = primitive.defHandle;
-
 			meshState.SetTopology(primitive.geometry.topologyKind);
 			meshState.alphaMode = assetDef.fragment.alphaMode as uint16;
 			meshState.SetCullMode(primitive.material.cullMode);
@@ -728,6 +720,20 @@ VulkanRenderer::UpdateDrawList(scene: *Scene)
 			meshArr.Add(drawMesh);
 		}
 	}
+
+	handle := null as *Fiber.JobHandle;
+	for (kv in this.drawList.pipelineMap)
+	{
+		meshArrPtr := kv.value;
+		Fiber.AddJob(::(meshArr: *Array<VulkanDrawMesh>) {
+			meshArr.Sort(::byte(left: VulkanDrawMesh, right: VulkanDrawMesh) {
+				if (left.geometryHandle < right.geometryHandle) return -1;
+				if (left.geometryHandle > right.geometryHandle) return 1;
+				return 0;
+			});
+		}, meshArrPtr, handle@);
+	}
+	Fiber.WaitForHandle(handle);
 }
 
 VulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(

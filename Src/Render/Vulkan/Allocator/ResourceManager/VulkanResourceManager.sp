@@ -44,7 +44,7 @@ VulkanResourceManager::()
 	this.sharedIndexBuffer.buffer = indexBuffer;
 	this.sharedIndexBuffer.handle = allocator.AllocBuffer(indexBuffer, VulkanMemoryFlags.GPU);
 
-	this.transformBuffer = CreateAddressableStorageBuffer(MaxSharedIndexCount * #sizeof WorldTransform);
+	this.transformBuffer = CreateAddressableStorageBuffer(MaxModelCount * #sizeof WorldTransform);
 
 	this.UploadTransform(0, WorldTransform());
 }
