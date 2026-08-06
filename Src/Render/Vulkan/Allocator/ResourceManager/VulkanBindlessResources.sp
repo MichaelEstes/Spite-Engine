@@ -136,8 +136,10 @@ uint32 VulkanBindlessResources::UploadTexture(textureMap: TextureMap, textureDef
 {
 	imageHandle := textureMap.texture.imageHandle;
 
-	if (this.imageHandleCache.Has(imageHandle.id)) 
+	if (this.imageHandleCache.Has(imageHandle.id))
+	{
 		return this.imageHandleCache.Get(imageHandle.id)~;
+	}
 
 	image := ImageResourceManager.GetResource(imageHandle).data.image;
 	width := image.w as uint32;
@@ -166,7 +168,10 @@ uint32 VulkanBindlessResources::UploadDefaultTexture(textureDef: TextureDefiniti
 	key.pixel = textureDef.defaultValue;
 	key.colorSpace = textureDef.colorSpace;
 
-	if (this.defaultTextures.Has(key)) return this.defaultTextures.Find(key)~;
+	if (this.defaultTextures.Has(key)) 
+	{
+		return this.defaultTextures.Find(key)~;
+	}
 
 	image := fixed textureDef.defaultValue;
 	width := uint32(1);

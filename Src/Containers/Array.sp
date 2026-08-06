@@ -348,3 +348,33 @@ Array::Swap(left: uint32, right: uint32)
 	this[left] = this[right];
 	this[right] = temp;
 }
+
+uint32 Array::SortedInsert(item: Type, compare: ::byte(Type, Type))
+{
+	if (this.count && compare(this[this.count - 1], item) <= 0)
+	{
+		return this.Add(item);
+	}
+
+	low := uint32(0);
+	high := this.count;
+	while (low < high)
+	{
+		mid := low + (high - low) / 2;
+		if (compare(this[mid], item) > 0) high = mid;
+		else low = mid + 1;
+	}
+
+	if (this.count >= this.capacity) this.Expand();
+
+	i := this.count;
+	while (i > low)
+	{
+		this[i] = this[i - 1];
+		i -= 1;
+	}
+
+	this[low] = item;
+	this.count += 1;
+	return low;
+}

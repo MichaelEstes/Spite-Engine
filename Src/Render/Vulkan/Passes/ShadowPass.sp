@@ -103,16 +103,14 @@ shadowPass := RegisterRenderPass(
 					0, VkIndexType.VK_INDEX_TYPE_UINT16
 				);
 
-				for (kv in renderer.drawList.pipelineMap)
+				for (batch in renderer.drawList.batchMap.Values())
 				{
-					meshArr := kv.value~;
-					if (!meshArr.count) continue;
+					if (!batch.meshes.count) continue;
 
-					meshState := kv.key~;
+					meshState := batch.meshState;
 					if (meshState.GetAlphaMode() != VulkanAlphaMode.Opaque) continue;
 
-					drawSet := renderer.assetDefDrawSets.Get(meshState.assetDefHandle.handle);
-					frameData := drawSet.frames[frame]@;
+					drawBuffers := renderer.assetDefDrawBuffers.Get(meshState.assetDefHandle.handle);
 
 					vulkanPipeline := FindOrCreateDepthPipeline(
 						device,
@@ -144,11 +142,11 @@ shadowPass := RegisterRenderPass(
 					);
 
 					push := DrawPushConstants();
-					push.modelBufferAddress = GetBufferDeviceAddress(frameData.modelBuffer.buffer);
-					push.geometryVariablesAddress = GetBufferDeviceAddress(frameData.geometryVariables.buffer);
-					push.geometryAttributeSlotsAddress = GetBufferDeviceAddress(frameData.geometryAttributeSlots.buffer);
-					push.materialVariablesAddress = GetBufferDeviceAddress(frameData.materialVariables.buffer);
-					push.materialTextureSlotsAddress = GetBufferDeviceAddress(frameData.materialTextureSlots.buffer);
+					push.modelBufferAddress = drawBuffers.modelBufferAddress;
+					push.geometryVariablesAddress = drawBuffers.geometryVariablesAddress;
+					push.geometryAttributeSlotsAddress = drawBuffers.geometryAttributeSlotsAddress;
+					push.materialVariablesAddress = drawBuffers.materialVariablesAddress;
+					push.materialTextureSlotsAddress = drawBuffers.materialTextureSlotsAddress;
 					vkCmdPushConstants(
 						commandBuffer, pipelineLayout,
 						uint32(VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT),
@@ -170,13 +168,13 @@ shadowPass := RegisterRenderPass(
 
 					vkCmdDrawIndexedIndirect(
 						commandBuffer,
-						frameData.indexedDrawCommands.buffer, 0,
-						frameData.indexedCount, #sizeof VkDrawIndexedIndirectCommand
+						drawBuffers.indexedDrawCommands.buffer, 0,
+						batch.indexedCount, #sizeof VkDrawIndexedIndirectCommand
 					);
 					vkCmdDrawIndirect(
 						commandBuffer,
-						frameData.drawCommands.buffer, 0,
-						frameData.nonIndexedCount, #sizeof VkDrawIndirectCommand
+						drawBuffers.drawCommands.buffer, 0,
+						batch.nonIndexedCount, #sizeof VkDrawIndirectCommand
 					);
 				}
 			},

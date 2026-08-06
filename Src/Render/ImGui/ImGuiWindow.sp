@@ -121,6 +121,8 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 		renderConfig.maxMaterialSets = 8;
 		renderConfig.materialDescriptorCount = 8;
 		renderConfig.useSceneUBO = false;
+		renderConfig.meshCallbacks.onMeshAdded = ::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {};
+		renderConfig.meshCallbacks.onMeshRemoved = ::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {};
 		renderConfig.meshCallbacks.drawListUpdate = ::(scene: *Scene, renderer: *VulkanRenderer) {};
 		CreateVulkanRenderer(
 			scene, entity,

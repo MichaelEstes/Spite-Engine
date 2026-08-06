@@ -150,14 +150,12 @@ assetPass := RegisterRenderPass(
 					0, VkIndexType.VK_INDEX_TYPE_UINT16
 				);
 
-				for (kv in renderer.drawList.pipelineMap)
+				for (batch in renderer.drawList.batchMap.Values())
 				{
-					meshArr := kv.value~;
-					if (!meshArr.count) continue;
+					if (!batch.meshes.count) continue;
 
-					meshState := kv.key~;
-					drawSet := renderer.assetDefDrawSets.Get(meshState.assetDefHandle.handle);
-					frameData := drawSet.frames[frame]@;
+					meshState := batch.meshState;
+					drawBuffers := renderer.assetDefDrawBuffers.Get(meshState.assetDefHandle.handle);
 
 					vulkanPipeline := FindOrCreatePipeline(
 						device,
@@ -189,11 +187,11 @@ assetPass := RegisterRenderPass(
 					}
 
 					push := DrawPushConstants();
-					push.modelBufferAddress = GetBufferDeviceAddress(frameData.modelBuffer.buffer);
-					push.geometryVariablesAddress = GetBufferDeviceAddress(frameData.geometryVariables.buffer);
-					push.geometryAttributeSlotsAddress = GetBufferDeviceAddress(frameData.geometryAttributeSlots.buffer);
-					push.materialVariablesAddress = GetBufferDeviceAddress(frameData.materialVariables.buffer);
-					push.materialTextureSlotsAddress = GetBufferDeviceAddress(frameData.materialTextureSlots.buffer);
+					push.modelBufferAddress = drawBuffers.modelBufferAddress;
+					push.geometryVariablesAddress = drawBuffers.geometryVariablesAddress;
+					push.geometryAttributeSlotsAddress = drawBuffers.geometryAttributeSlotsAddress;
+					push.materialVariablesAddress = drawBuffers.materialVariablesAddress;
+					push.materialTextureSlotsAddress = drawBuffers.materialTextureSlotsAddress;
 
 					pushStages := uint32(VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
 					if (assetDef.fragment.variables.sets.count | assetDef.fragment.textures.count)
@@ -220,13 +218,13 @@ assetPass := RegisterRenderPass(
 
 					vkCmdDrawIndexedIndirect(
 						commandBuffer,
-						frameData.indexedDrawCommands.buffer, 0,
-						frameData.indexedCount, #sizeof VkDrawIndexedIndirectCommand
+						drawBuffers.indexedDrawCommands.buffer, 0,
+						batch.indexedCount, #sizeof VkDrawIndexedIndirectCommand
 					);
 					vkCmdDrawIndirect(
 						commandBuffer,
-						frameData.drawCommands.buffer, 0,
-						frameData.nonIndexedCount, #sizeof VkDrawIndirectCommand
+						drawBuffers.drawCommands.buffer, 0,
+						batch.nonIndexedCount, #sizeof VkDrawIndirectCommand
 					);
 				}
 			},

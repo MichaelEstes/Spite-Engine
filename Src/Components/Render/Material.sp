@@ -37,9 +37,7 @@ state Material
 	variables: *void,
 	
     defHandle: AssetDefHandle,
-
-    gpuResourceID: uint32,
-
+    
     alphaMode: AlphaMode,
     cullMode: CullModeFlags,
     polygonMode: PolygonMode

@@ -43,14 +43,11 @@ state Geometry
 {
     attributes: Array<ArrayView<byte>>,
     variables: *void,
-
     indices: ArrayView<uint16>,
-
-    defHandle: AssetDefHandle,
-
     bounds: BoundingBox,
 
-    gpuResourceID: uint32,
+    defHandle: AssetDefHandle,
+        
     topologyKind: TopologyKind = TopologyKind.TriangleList,
     indexKind: IndexKind
 }
@@ -67,6 +64,7 @@ Geometry::(defHandle: AssetDefHandle)
 
 Geometry::delete
 {
+    delete this.attributes;
 }
 
 uint32 Geometry::GetAttributeIndex(name: string)

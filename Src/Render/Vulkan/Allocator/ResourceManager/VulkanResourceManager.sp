@@ -20,12 +20,9 @@ state VulkanResourceManager
 
 	bindless: VulkanBindlessResources,
 
-	geometries := HandleSet<VulkanGeometry>(),
-	materials := HandleSet<VulkanMaterial>(),
+	meshes := HandleSet<VulkanMesh>(),
 
 	defaultBuffers := Map<Value, BufferHandle, HashValue>()
-
-	transformBuffer: BufferHandle,
 
 	sharedIndexBuffer: BufferHandle,
 	sharedIndexCount: uint32,
@@ -43,10 +40,6 @@ VulkanResourceManager::()
 	indexBuffer := CreateVkBuffer(device, IndexBufferCreateInfo(MaxSharedIndexCount * #sizeof uint16));
 	this.sharedIndexBuffer.buffer = indexBuffer;
 	this.sharedIndexBuffer.handle = allocator.AllocBuffer(indexBuffer, VulkanMemoryFlags.GPU);
-
-	this.transformBuffer = CreateAddressableStorageBuffer(MaxModelCount * #sizeof WorldTransform);
-
-	this.UploadTransform(0, WorldTransform());
 }
 
 VulkanResourceManager::CreateDebugTexture()
@@ -105,47 +98,24 @@ BufferHandle VulkanResourceManager::GetDefaultBuffer(value: Value, size: uint32)
 	return bufferHandle;
 }
 
-VulkanResourceManager::UploadTransform(id: uint32, transform: WorldTransform)
+VulkanResourceManager::UploadMesh(mesh: *Mesh)
 {
-	stagingBuffer := vulkanInstance.GetStagingBuffer();
+	if (mesh.gpuResourceID) 
+	{
+		return;
+	}
+	
+	handleValue := this.meshes.GetNext();
+	resourceID := handleValue.handle;
+	vulkanMesh := handleValue.value;
+	mesh.gpuResourceID = resourceID;
 
-	stagingBuffer.StagedBufferCopy(
-		vulkanInstance.device,
-		transform@ as *byte,
-		#sizeof WorldTransform,
-		this.transformBuffer.buffer,
-		vulkanInstance.transferCommands,
-		vulkanInstance.queues.transferQueue,
-		id * #sizeof WorldTransform
-	);
+	this.UploadGeometry(mesh.geometry@, vulkanMesh.geometry@);
+	this.UploadMaterial(mesh.material@, vulkanMesh.material@);
 }
 
-uint32 VulkanResourceManager::UploadMesh(mesh: *Mesh)
+VulkanResourceManager::UploadGeometry(geometry: *Geometry, vulkanGeometry: *VulkanGeometry)
 {
-	if (!mesh.gpuID)
-	{
-		mesh.gpuID = this.currentMeshIndex;
-		this.currentMeshIndex += 1;
-
-		this.UploadTransform(mesh.gpuID, WorldTransform());
-	}
-
-	for (primitive in mesh.primitives)
-	{
-		this.UploadGeometry(primitive.geometry@);
-		this.UploadMaterial(primitive.material@);
-	}
-
-	return mesh.gpuID;
-}
-
-uint32 VulkanResourceManager::UploadGeometry(geometry: *Geometry)
-{
-	if (geometry.gpuResourceID) return geometry.gpuResourceID;
-
-	handleValue := this.geometries.GetNext();
-	geoIndex := handleValue.handle;
-	vulkanGeometry := handleValue.value;
 	vulkanGeometry~ = VulkanGeometry();
 
 	assetDef := GetAssetDefWithHandle(geometry.defHandle);
@@ -215,17 +185,10 @@ uint32 VulkanResourceManager::UploadGeometry(geometry: *Geometry)
 
 	vulkanGeometry.attributeSlots = UploadBindlessSlots<VulkanGeometryAttrSlot>(attributeSlots[0]@, attributeSlots.count);
 	vulkanGeometry.variables = UploadVariableSet(assetDef.vertex.variables, geometry.variables);
-
-	geometry.gpuResourceID = geoIndex;
-	return geoIndex;
 }
 
-uint32 VulkanResourceManager::UploadMaterial(material: *Material)
+VulkanResourceManager::UploadMaterial(material: *Material, vulkanMaterial: *VulkanMaterial)
 {
-	if (material.gpuResourceID) return material.gpuResourceID;
-
-	handleValue := this.materials.GetNext();
-	vulkanMaterial := handleValue.value;
 	vulkanMaterial~ = VulkanMaterial();
 
 	assetDef := GetAssetDefWithHandle(material.defHandle);
@@ -254,7 +217,4 @@ uint32 VulkanResourceManager::UploadMaterial(material: *Material)
 
 	vulkanMaterial.textureSlots = UploadBindlessSlots<VulkanMaterialTextureSlot>(textureSlots[0]@, textureSlots.count);
 	vulkanMaterial.variables = UploadVariableSet(assetDef.fragment.variables, material.variables);
-
-	material.gpuResourceID = handleValue.handle;
-	return handleValue.handle;
 }

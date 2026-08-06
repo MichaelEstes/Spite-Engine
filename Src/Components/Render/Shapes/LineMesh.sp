@@ -4,6 +4,7 @@ import Array
 import ArrayView
 import Vec
 import ECS
+import Transform
 import RenderAssetDef
 import Common
 
@@ -29,21 +30,18 @@ BuildThinLine(entity: Entity, lineMesh: *LineMesh, scene: Scene)
     colors := [lineMesh.color, lineMesh.color];
     indices := uint16:[0, 1];
 
-    primitive := Primitive(AssetDefNameToHandle("Line"));
-    primitive.geometry.topologyKind = TopologyKind.LineList;
-    primitive.geometry.indexKind = IndexKind.I16;
+    mesh := Mesh(AssetDefNameToHandle("Line"));
+    mesh.geometry.topologyKind = TopologyKind.LineList;
+    mesh.geometry.indexKind = IndexKind.I16;
 
-    positionIndex := primitive.geometry.GetAttributeIndex("position");
-    colorIndex := primitive.geometry.GetAttributeIndex("color");
+    positionIndex := mesh.geometry.GetAttributeIndex("position");
+    colorIndex := mesh.geometry.GetAttributeIndex("color");
 
-    primitive.geometry.GetAttributeValue(positionIndex)~ =
-        ArrayView<byte>(positions[0]@ as *byte, #sizeof Vec3 * 2);
-    primitive.geometry.GetAttributeValue(colorIndex)~ =
-        ArrayView<byte>(colors[0]@ as *byte, #sizeof Color * 2);
-    primitive.geometry.indices = ArrayView<uint16>(indices[0]@, 2);
+    mesh.geometry.GetAttributeValue(positionIndex)~ = ArrayView<byte>(positions[0]@ as *byte, #sizeof Vec3 * 2);
+    mesh.geometry.GetAttributeValue(colorIndex)~ = ArrayView<byte>(colors[0]@ as *byte, #sizeof Color * 2);
+    mesh.geometry.indices = ArrayView<uint16>(indices[0]@, 2);
 
-    mesh := Mesh();
-    mesh.primitives.Add(primitive);
+    scene.SetComponent<Transform>(entity, Transform());
     scene.SetComponent<Mesh>(entity, mesh);
 }
 
@@ -55,30 +53,25 @@ BuildThickLine(entity: Entity, lineMesh: *LineMesh, scene: Scene)
     colors := [lineMesh.color, lineMesh.color, lineMesh.color, lineMesh.color];
     indices := uint16:[0, 1, 2, 2, 1, 3];
 
-    primitive := Primitive(AssetDefNameToHandle("ThickLine"));
-    primitive.geometry.topologyKind = TopologyKind.TriangleList;
-    primitive.geometry.indexKind = IndexKind.I16;
+    mesh := Mesh(AssetDefNameToHandle("ThickLine"));
+    mesh.geometry.topologyKind = TopologyKind.TriangleList;
+    mesh.geometry.indexKind = IndexKind.I16;
 
-    positionIndex := primitive.geometry.GetAttributeIndex("position");
-    otherEndIndex := primitive.geometry.GetAttributeIndex("otherEnd");
-    sideIndex := primitive.geometry.GetAttributeIndex("side");
-    colorIndex := primitive.geometry.GetAttributeIndex("color");
+    positionIndex := mesh.geometry.GetAttributeIndex("position");
+    otherEndIndex := mesh.geometry.GetAttributeIndex("otherEnd");
+    sideIndex := mesh.geometry.GetAttributeIndex("side");
+    colorIndex := mesh.geometry.GetAttributeIndex("color");
 
-    primitive.geometry.GetAttributeValue(positionIndex)~ =
-        ArrayView<byte>(positions[0]@ as *byte, #sizeof Vec3 * 4);
-    primitive.geometry.GetAttributeValue(otherEndIndex)~ =
-        ArrayView<byte>(otherEnds[0]@ as *byte, #sizeof Vec3 * 4);
-    primitive.geometry.GetAttributeValue(sideIndex)~ =
-        ArrayView<byte>(sides[0]@ as *byte, #sizeof float32 * 4);
-    primitive.geometry.GetAttributeValue(colorIndex)~ =
-        ArrayView<byte>(colors[0]@ as *byte, #sizeof Color * 4);
-    primitive.geometry.indices = ArrayView<uint16>(indices[0]@, 6);
+    mesh.geometry.GetAttributeValue(positionIndex)~ = ArrayView<byte>(positions[0]@ as *byte, #sizeof Vec3 * 4);
+    mesh.geometry.GetAttributeValue(otherEndIndex)~ = ArrayView<byte>(otherEnds[0]@ as *byte, #sizeof Vec3 * 4);
+    mesh.geometry.GetAttributeValue(sideIndex)~ = ArrayView<byte>(sides[0]@ as *byte, #sizeof float32 * 4);
+    mesh.geometry.GetAttributeValue(colorIndex)~ = ArrayView<byte>(colors[0]@ as *byte, #sizeof Color * 4);
+    mesh.geometry.indices = ArrayView<uint16>(indices[0]@, 6);
 
-    thicknessIndex := primitive.geometry.GetVariableIndex("thickness");
-    primitive.geometry.GetVariableValue<float32>(thicknessIndex)~ = lineMesh.thickness;
+    thicknessIndex := mesh.geometry.GetVariableIndex("thickness");
+    mesh.geometry.GetVariableValue<float32>(thicknessIndex)~ = lineMesh.thickness;
 
-    mesh := Mesh();
-    mesh.primitives.Add(primitive);
+    scene.SetComponent<Transform>(entity, Transform());
     scene.SetComponent<Mesh>(entity, mesh);
 }
 

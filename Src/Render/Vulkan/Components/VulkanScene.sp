@@ -13,6 +13,12 @@ indexKindToByteCount := [
 	4
 ];
 
+state VulkanMesh
+{
+	geometry: VulkanGeometry,
+	material: VulkanMaterial
+}
+
 state VulkanGeometryAttrSlot
 {
 	index: uint32,

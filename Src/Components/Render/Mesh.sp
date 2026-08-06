@@ -10,13 +10,24 @@ MeshEntityRemovedEvent := RegisterEvent<SceneEntity>();
 
 state Mesh
 {
-    primitives: Array<Primitive>,
-	gpuID: uint32
+	geometry: Geometry,
+    material: Material,
+
+    defHandle: AssetDefHandle
+	gpuResourceID: uint32
+}
+
+Mesh::(defHandle: AssetDefHandle)
+{
+    this.defHandle = defHandle;
+    this.geometry = Geometry(defHandle);
+    this.material = Material(defHandle);
 }
 
 Mesh::delete
 {
-	delete this.primitives;
+	delete this.geometry;
+    delete this.material;
 }
 
 MeshComponent := ECS.RegisterComponent<Mesh>(

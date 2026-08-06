@@ -102,24 +102,47 @@ _ := SceneRegistry.RegisterScene(
 		// model := "./Resource/Models/BrainStem/BrainStem.gltf";
 		model := "./Resource/Models/DamagedHelmet/DamagedHelmet.gltf";
 		log "Loading GLTF: ", model;
-		gltfHandle := UseGLTFResource(
-			model, scene,
-			::(scene: *Scene, rootEntity: Entity) 
-			{
-				log "Loaded gltf: ", rootEntity;
+		// gltfHandle := UseGLTFResource(
+		// 	model, scene,
+		// 	::(scene: *Scene, rootEntity: Entity, arg: *void)
+		// 	{
+		// 		log "Loaded gltf: ", rootEntity;
 
-				// IterateHierarchy(
-				// 	rootEntity, scene,
-				// 	::(entity: Entity, scene: *Scene) 
-				// 	{
-				// 		rotate := RotateOverTime();
-				// 		rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
-				// 		rotate.speed = 0.25;
-				// 		scene.SetComponent<RotateOverTime>(entity, rotate);
-				// 	}
-				// );
-			},
-		);
+		// 		// IterateHierarchy(
+		// 		// 	rootEntity, scene,
+		// 		// 	::(entity: Entity, scene: *Scene)
+		// 		// 	{
+		// 		// 		rotate := RotateOverTime();
+		// 		// 		rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
+		// 		// 		rotate.speed = 0.25;
+		// 		// 		scene.SetComponent<RotateOverTime>(entity, rotate);
+		// 		// 	}
+		// 		// );
+
+		// 		// rotate := RotateOverTime();
+		// 		// rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
+		// 		// rotate.speed = 0.25;
+		// 		// scene.SetComponent<RotateOverTime>(rootEntity, rotate);
+		// 	},
+		// );
+
+		for (x .. 12)
+		{
+			for (y .. 12)
+			{
+				pos: {x: int32, y: int32} = {x as int32, y as int32};
+				UseGLTFResource(
+					model, scene,
+					::(scene: *Scene, rootEntity: Entity, arg: *int)
+					{
+						pos := arg as {x: int32, y: int32};
+						log "Loaded gltf instance: ", rootEntity, pos;
+						scene.SetComponent<Transform>(rootEntity, Transform(Vec3(pos.x, pos.y, 0.0)));
+					},
+					pos as *int
+				);
+			}
+		}
 
 		CreateEditorWindow(scene);
 

@@ -25,7 +25,7 @@ CheckResult(result: VkResult, errorMsg: string)
 	}
 }
 
-DestroyAll()
+DestroyAllRenderers()
 {
 	for (scene in ECS.Scenes())
 	{
@@ -39,54 +39,68 @@ DestroyAll()
 
 FrameCount := 2;
 
+state VulkanDrawID
+{
+	index: uint32,
+	drawIndex: uint32
+}
+
+VulkanDrawIDComponent := ECS.RegisterComponent<VulkanDrawID>(
+	ComponentKind.Common
+);
+
 state VulkanDrawMesh
 {
 	entity: Entity,
-	meshHandle: uint32,
-	geometryHandle: uint32,
-	materialHandle: uint32
+	meshHandle: uint32
 }
 
-state VulkanDrawList
+state VulkanAssetDefBuffers
 {
-	pipelineMap := Map<VulkanPipelineMeshState, Array<VulkanDrawMesh>, HashPipelineMeshState>()
+	modelBuffer: BufferHandle,
+	geometryVariables: BufferHandle,
+	geometryAttributeSlots: BufferHandle,
+	materialVariables: BufferHandle,
+	materialTextureSlots: BufferHandle,
+
+	modelBufferAddress: uint64,
+	geometryVariablesAddress: uint64,
+	geometryAttributeSlotsAddress: uint64,
+	materialVariablesAddress: uint64,
+	materialTextureSlotsAddress: uint64,
+
+	indexedDrawCommands: BufferHandle,
+	drawCommands: BufferHandle,
 }
 
 state VulkanDrawBatch
 {
+	meshes: Array<VulkanDrawMesh>,
 	meshState: VulkanPipelineMeshState,
-	indexedFirst: uint32,
 	indexedCount: uint32,
-	first: uint32,
-	count: uint32
+	nonIndexedCount: uint32
+}
+
+state VulkanDrawList
+{
+	batchMap := Map<VulkanPipelineMeshState, VulkanDrawBatch, HashPipelineMeshState>()
 }
 
 state VulkanMeshCallbacks
 {
 	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer) = 
-			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {},
+			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) 
+			{
+				renderer.MeshUpdated(sceneEntity, mesh);
+			},
+
 	onMeshRemoved: ::(SceneEntity, *Mesh, *VulkanRenderer) = 
-			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {},
+			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) 
+			{
+				renderer.MeshRemoved(sceneEntity, mesh);
+			},
 	
 	drawListUpdate: ::(*Scene, *VulkanRenderer) = null
-}
-
-state VulkanAssetDefDrawFrame
-{
-	modelBuffer: BufferHandle,
-	indexedDrawCommands: BufferHandle,
-	drawCommands: BufferHandle,
-	geometryVariables: BufferHandle,
-	geometryAttributeSlots: BufferHandle,
-	materialVariables: BufferHandle,
-	materialTextureSlots: BufferHandle,
-	indexedCount: uint32,
-	nonIndexedCount: uint32
-}
-
-state VulkanAssetDefDrawSet
-{
-	frames: [FrameCount]VulkanAssetDefDrawFrame
 }
 
 state VulkanRenderer
@@ -101,8 +115,6 @@ state VulkanRenderer
 	
 	sceneShared: SharedUBO<SceneUBO>,
 
-	assetDefDrawSets: SparseSet<VulkanAssetDefDrawSet>,
-
 	materialPool: *VkDescriptorPool_T,
 
 	frameFences: [FrameCount]*VkFence_T,
@@ -112,6 +124,7 @@ state VulkanRenderer
 	renderGraph: RenderGraph<VulkanRenderer>,
 
 	drawList: VulkanDrawList,
+	assetDefDrawBuffers := SparseSet<VulkanAssetDefBuffers>(),
 
 	meshCallbacks: VulkanMeshCallbacks,
 
@@ -192,8 +205,6 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 	if (config.useSceneUBO)
 	{
 		vulkanRenderer.sceneShared.Init(device, allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
-
-		InitDrawList(vulkanRenderer@);
 	}
 
 	vulkanRenderer.CreateMaterialDescPool(config.materialDescriptorCount, config.maxMaterialSets);
@@ -562,7 +573,7 @@ VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 
 Query CreateUpdatedTransformQuery()
 {
-	query := Query().With<Mesh>().WithTag(TransformUpdatedTag);
+	query := Query().With<Mesh>().With<VulkanDrawID>().WithTag(TransformUpdatedTag);
 	return query;
 }
 
@@ -570,14 +581,29 @@ updatedTransformQuery := CreateUpdatedTransformQuery();
 
 VulkanRenderer::UpdateTransforms(scene: *Scene, frame: uint32)
 {
-	resourceManager := vulkanInstance.resourceManager;
+	device := vulkanInstance.device;
+	stagingBuffer := vulkanInstance.GetStagingBuffer();
+	queue := vulkanInstance.queues.transferQueue;
+	commands := vulkanInstance.transferCommands;
+
 	result := updatedTransformQuery.Scene(scene).Result();
 
 	for (entity in result)
 	{
 		mesh := scene.GetComponent<Mesh>(entity);
 		transform := scene.GetComponent<WorldTransform>(entity);
-		resourceManager.UploadTransform(mesh.gpuID, transform~);
+		drawID := scene.GetComponent<VulkanDrawID>(entity);
+
+		assetDefHandle := mesh.defHandle.handle;
+		drawBuffers := this.assetDefDrawBuffers.Get(assetDefHandle);
+
+		model := ModelUBO();
+		model.model = transform.mat;
+
+		stagingBuffer.StagedBufferCopy(
+			device, model@ as *byte, #sizeof ModelUBO,
+			drawBuffers.modelBuffer.buffer, commands, queue, drawID.index * #sizeof ModelUBO
+		);
 	}
 }
 
@@ -587,7 +613,7 @@ VulkanRenderer::UpdateScene(scene: *Scene, frame: uint32)
 
 	this.UpdateSceneUBO(scene, frame);
 	this.UpdateTransforms(scene, frame);
-	ComputeVulkanDrawList(this, scene);
+	// ComputeVulkanDrawList(this, scene);
 }
 
 VulkanRenderer::Draw(scene: *Scene)
@@ -674,82 +700,184 @@ VulkanRenderer::Draw(scene: *Scene)
 	this.currentFrame += 1;
 }
 
-VulkanRenderer::UpdateDrawList(scene: *Scene)
+VulkanRenderer::MeshUpdated(sceneEntity: SceneEntity, mesh: *Mesh)
 {
-	if (this.meshCallbacks.drawListUpdate)
+	scene := sceneEntity.scene;
+	entity := sceneEntity.entity;
+	meshHandle := mesh.gpuResourceID;
+	assetDefHandle := mesh.defHandle.handle;
+
+	resourceManager := vulkanInstance.resourceManager;
+	device := vulkanInstance.device;
+	stagingBuffer := vulkanInstance.GetStagingBuffer();
+	queue := vulkanInstance.queues.transferQueue;
+	commands := vulkanInstance.transferCommands;
+
+	if (!meshHandle) return;
+
+	drawBuffers := this.assetDefDrawBuffers.Get(assetDefHandle);
+	if (!drawBuffers)
 	{
-		this.meshCallbacks.drawListUpdate(scene, this@);
-		return;
+		drawBuffers = this.assetDefDrawBuffers.Emplace(assetDefHandle);
+		drawBuffers~ = VulkanAssetDefBuffers();
+
+		pointerArraySize := MaxModelCount * #sizeof uint64;
+
+		drawBuffers.modelBuffer = CreateAddressableStorageBuffer(MaxModelCount * #sizeof ModelUBO);
+		drawBuffers.indexedDrawCommands = CreateDeviceIndirectBuffer(MaxModelCount * #sizeof VkDrawIndexedIndirectCommand);
+		drawBuffers.drawCommands = CreateDeviceIndirectBuffer(MaxModelCount * #sizeof VkDrawIndirectCommand);
+		drawBuffers.geometryVariables = CreateAddressableStorageBuffer(pointerArraySize);
+		drawBuffers.geometryAttributeSlots = CreateAddressableStorageBuffer(pointerArraySize);
+		drawBuffers.materialVariables = CreateAddressableStorageBuffer(pointerArraySize);
+		drawBuffers.materialTextureSlots = CreateAddressableStorageBuffer(pointerArraySize);
+
+		drawBuffers.modelBufferAddress = GetBufferDeviceAddress(drawBuffers.modelBuffer.buffer);
+		drawBuffers.geometryVariablesAddress = GetBufferDeviceAddress(drawBuffers.geometryVariables.buffer);
+		drawBuffers.geometryAttributeSlotsAddress = GetBufferDeviceAddress(drawBuffers.geometryAttributeSlots.buffer);
+		drawBuffers.materialVariablesAddress = GetBufferDeviceAddress(drawBuffers.materialVariables.buffer);
+		drawBuffers.materialTextureSlotsAddress = GetBufferDeviceAddress(drawBuffers.materialTextureSlots.buffer);
 	}
 
-	for (kv in this.drawList.pipelineMap)
+	meshState := VulkanPipelineMeshState();
+	meshState.assetDefHandle = mesh.defHandle;
+	meshState.SetTopology(mesh.geometry.topologyKind);
+	meshState.SetAlphaMode(mesh.material.alphaMode as uint16);
+	meshState.SetCullMode(mesh.material.cullMode);
+
+	drawMesh := VulkanDrawMesh();
+	drawMesh.entity = entity;
+	drawMesh.meshHandle = meshHandle;
+
+	batch := this.drawList.batchMap.Find(meshState);
+	if (!batch)
 	{
-		kv.value~.Clear();
+		this.drawList.batchMap.Insert(meshState, VulkanDrawBatch());
+		batch = this.drawList.batchMap.Find(meshState);
+		batch.meshState = meshState;
 	}
 
-	for (ec in scene.Iterate<Mesh>())
-	{
-		entity := ec.entity;
-		mesh := ec.component;
-		meshHandle := mesh.gpuID;
-
-		for (primitive in mesh.primitives)
+	index := batch.meshes.SortedInsert(
+		drawMesh, 
+		::byte(left: VulkanDrawMesh, right: VulkanDrawMesh) 
 		{
-			if (!primitive.geometry.gpuResourceID || !primitive.material.gpuResourceID) continue;
+			if (left.meshHandle < right.meshHandle) return -1;
+			if (left.meshHandle > right.meshHandle) return 1;
+			return 0;
+		}
+	);
 
-			assetDef := GetAssetDefWithHandle(primitive.defHandle);
+	drawID := VulkanDrawID();
+	drawID.index = index;
+	instanceCount := uint32(0);
+	if (index && batch.meshes[index - 1].meshHandle == drawMesh.meshHandle)
+	{
+		instanceOf := scene.GetComponentDirect<VulkanDrawID>(
+			batch.meshes[index - 1].entity, 
+			VulkanDrawIDComponent
+		);
+		drawID.drawIndex = instanceOf.drawIndex;
 
-			meshState := VulkanPipelineMeshState();
-			meshState.assetDefHandle = primitive.defHandle;
-			meshState.SetTopology(primitive.geometry.topologyKind);
-			meshState.alphaMode = assetDef.fragment.alphaMode as uint16;
-			meshState.SetCullMode(primitive.material.cullMode);
+		instanceCount = uint32(1);
+		while (index - instanceCount && batch.meshes[index - instanceCount].meshHandle == drawMesh.meshHandle)
+		{
+			instanceCount += uint32(1);
+		}
+		instanceCount += uint32(1);
+	}
+	else
+	{
+		drawID.drawIndex = index;
+	}
+	scene.SetComponentDirect<VulkanDrawID>(entity, drawID, VulkanDrawIDComponent);
 
-			drawMesh := VulkanDrawMesh();
-			drawMesh.entity = entity;
-			drawMesh.meshHandle = meshHandle;
-			drawMesh.geometryHandle = primitive.geometry.gpuResourceID;
-			drawMesh.materialHandle = primitive.material.gpuResourceID;
+	vulkanMesh := resourceManager.meshes.Get(drawMesh.meshHandle);
+	geometry := vulkanMesh.geometry;
+	material := vulkanMesh.material;
 
-			meshArr := this.drawList.pipelineMap.Find(meshState);
-			if (!meshArr)
-			{
-				this.drawList.pipelineMap.Insert(meshState, Array<VulkanDrawMesh>());
-				meshArr = this.drawList.pipelineMap.Find(meshState);
-			}
-			meshArr.Add(drawMesh);
+	geometryVariablesAddress := GetBufferDeviceAddress(geometry.variables.buffer);
+	stagingBuffer.StagedBufferCopy(
+		device, geometryVariablesAddress@ as *byte, #sizeof uint64, 
+		drawBuffers.geometryVariables.buffer, commands, queue, index * #sizeof uint64
+	);
+
+	geometryAttributeSlotsAddress := GetBufferDeviceAddress(geometry.attributeSlots.buffer);
+	stagingBuffer.StagedBufferCopy(
+		device, geometryAttributeSlotsAddress@ as *byte, #sizeof uint64, 
+		drawBuffers.geometryAttributeSlots.buffer, commands, queue, index * #sizeof uint64
+	);
+
+	materialVariablesAddress := GetBufferDeviceAddress(material.variables.buffer);
+	stagingBuffer.StagedBufferCopy(
+		device, materialVariablesAddress@ as *byte, #sizeof uint64, 
+		drawBuffers.materialVariables.buffer, commands, queue, index * #sizeof uint64
+	);
+
+	materialTextureSlotsAddress := GetBufferDeviceAddress(material.textureSlots.buffer);
+	stagingBuffer.StagedBufferCopy(
+		device, materialTextureSlotsAddress@ as *byte, #sizeof uint64, 
+		drawBuffers.materialTextureSlots.buffer, commands, queue, index * #sizeof uint64
+	);
+
+	if (instanceCount)
+	{
+		log "ADDING INSTANCE", instanceCount;
+		if (geometry.indexCount > 0)
+		{
+			stagingBuffer.StagedBufferCopy(
+				device, instanceCount@ as *byte, #sizeof uint32,
+				drawBuffers.indexedDrawCommands.buffer, commands, queue,
+				(batch.indexedCount - 1) * #sizeof VkDrawIndexedIndirectCommand + #offsetof(VkDrawIndexedIndirectCommand, instanceCount)
+			);
+		}
+		else
+		{
+			stagingBuffer.StagedBufferCopy(
+				device, instanceCount@ as *byte, #sizeof uint32,
+			 	drawBuffers.drawCommands.buffer, commands, queue,
+				(batch.nonIndexedCount - 1) * #sizeof VkDrawIndirectCommand + #offsetof(VkDrawIndirectCommand, instanceCount)
+			);
+		}
+	}
+	else
+	{
+		if (geometry.indexCount > 0)
+		{
+			currentIndexedCmd := VkDrawIndexedIndirectCommand();
+			currentIndexedCmd.indexCount = geometry.indexCount;
+			currentIndexedCmd.instanceCount = 1;
+			currentIndexedCmd.firstIndex = geometry.firstIndex;
+			currentIndexedCmd.vertexOffset = 0;
+			currentIndexedCmd.firstInstance = index;
+			stagingBuffer.StagedBufferCopy(
+				device, currentIndexedCmd@ as *byte, #sizeof VkDrawIndexedIndirectCommand, 
+				drawBuffers.indexedDrawCommands.buffer, commands, queue, batch.indexedCount * #sizeof VkDrawIndexedIndirectCommand
+			);
+			batch.indexedCount += 1;
+		}
+		else
+		{
+			currentDrawCmd := VkDrawIndirectCommand();
+			currentDrawCmd.vertexCount = geometry.vertexCount;
+			currentDrawCmd.instanceCount = 1;
+			currentDrawCmd.firstVertex = 0;
+			currentDrawCmd.firstInstance = index;
+			stagingBuffer.StagedBufferCopy(
+				device, currentDrawCmd@ as *byte, #sizeof VkDrawIndirectCommand, 
+				drawBuffers.drawCommands.buffer, commands, queue, batch.nonIndexedCount * #sizeof VkDrawIndirectCommand
+			);
+			batch.nonIndexedCount += 1;
 		}
 	}
 
-	handle := null as *Fiber.JobHandle;
-	for (kv in this.drawList.pipelineMap)
-	{
-		meshArrPtr := kv.value;
-		Fiber.AddJob(::(meshArr: *Array<VulkanDrawMesh>) {
-			meshArr.Sort(::byte(left: VulkanDrawMesh, right: VulkanDrawMesh) {
-				if (left.geometryHandle < right.geometryHandle) return -1;
-				if (left.geometryHandle > right.geometryHandle) return 1;
-				return 0;
-			});
-		}, meshArrPtr, handle@);
-	}
-	Fiber.WaitForHandle(handle);
+}
+
+VulkanRenderer::MeshRemoved(sceneEntity: SceneEntity, mesh: *Mesh)
+{
+	
 }
 
 VulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(
 	ComponentKind.Sparse
-);
-
-vulkanPreDrawSystem := ECS.RegisterSystem(
-	::(scene: Scene, dt: float) 
-	{
-		for (ec in scene.Iterate<VulkanRenderer>())
-		{
-			renderer := ec.component;
-			renderer.UpdateDrawList(scene@);
-		}
-	},
-	SystemStep.PreDraw
 );
 
 vulkanDrawSystem := ECS.RegisterSystem(

@@ -41,8 +41,8 @@ state GLTFResources
 
 state GLTFNodeResource
 {
-	mesh: Mesh,
 	transform: Transform,
+	meshes: Array<Mesh>,
 	children: Array<GLTFNodeResource>
 }
 
@@ -111,10 +111,22 @@ AssignGLTFNodeToECS(nodeResource: *GLTFNodeResource, scene: *Scene, parent: Enti
 {
 	nodeEntity := scene.CreateEntity();
 	scene.SetComponent<Hierarchy>(nodeEntity, Hierarchy());
+	scene.SetComponent<Transform>(nodeEntity, nodeResource.transform);
 	ParentEntity(parent, nodeEntity, scene);
 
-	scene.SetComponent<Mesh>(nodeEntity, nodeResource.mesh);
-	scene.SetComponent<Transform>(nodeEntity, nodeResource.transform);
+	for (mesh in nodeResource.meshes)
+	{
+		meshEntity := scene.CreateEntity();
+		scene.SetComponent<Hierarchy>(meshEntity, Hierarchy());
+		scene.SetComponent<Transform>(meshEntity, Transform());
+		ParentEntity(nodeEntity, meshEntity, scene);
+
+		scene.SetComponent<Mesh>(meshEntity, mesh);
+		if (!mesh.gpuResourceID)
+		{
+			mesh.gpuResourceID = scene.GetComponent<Mesh>(meshEntity).gpuResourceID;
+		}
+	}
 
 	for (child in nodeResource.children)
 	{
@@ -271,7 +283,7 @@ string GLTFAttributeToAssetAttribute(attrName: string)
 	return "";
 }
 
-AssignAttributeToPrimitive(gltfData: GLTFResource, attrName: string, accessor: uint32, primitive: Primitive)
+AssignAttributeToPrimitive(gltfData: GLTFResource, attrName: string, accessor: uint32, primitive: Mesh)
 {
 	gltf := gltfData.gltf;
 	assetAttr := GLTFAttributeToAssetAttribute(attrName);
@@ -284,7 +296,7 @@ AssignAttributeToPrimitive(gltfData: GLTFResource, attrName: string, accessor: u
 	primitive.geometry.GetAttributeValue(index)~ = view;
 }
 
-AssignIndiciesToPrimitive(gltfData: GLTFResource, accessor: uint32, primitive: Primitive)
+AssignIndiciesToPrimitive(gltfData: GLTFResource, accessor: uint32, primitive: Mesh)
 {
 	gltf := gltfData.gltf;
 	view := GetAccessorData(gltfData, accessor);
@@ -311,7 +323,7 @@ AssignIndiciesToPrimitive(gltfData: GLTFResource, accessor: uint32, primitive: P
 	primitive.geometry.indices = indices;
 }
 
-GenerateTangentsForPrimitive(gltfData: GLTFResource, primitive: Primitive)
+GenerateTangentsForPrimitive(gltfData: GLTFResource, primitive: Mesh)
 {
 	if (primitive.geometry.topologyKind != TopologyKind.TriangleList) return;
 
@@ -452,7 +464,7 @@ AlphaMode GetAlphaMode(gltfMaterial: GLTFMaterial)
 	else return AlphaMode.Opaque;
 }
 
-AssignMaterialToPrimitive(gltfData: GLTFResource, materialIndex: uint32, primitive: Primitive)
+AssignMaterialToPrimitive(gltfData: GLTFResource, materialIndex: uint32, primitive: Mesh)
 {
 	gltf := gltfData.gltf;
 	gltfMaterial := gltf.materials[materialIndex];
@@ -541,15 +553,14 @@ AssignGLTFMesh(gltfData: GLTFResource, meshIndex: uint32, nodeResource: *GLTFNod
 {
 	gltf := gltfData.gltf;
 	gltfMesh := gltf.meshes[meshIndex];
-	mesh := Mesh()
 
 	// litHandle := AssetDefNameToHandle("Lit");
 	litHandle := AssetDefNameToHandle("LitPBR");
 
-	mesh.primitives.SizeTo(gltfMesh.primitives.count);
+	nodeResource.meshes.SizeTo(gltfMesh.primitives.count);
 	for (gltfPrim in gltfMesh.primitives)
 	{
-		primitive := Primitive(litHandle);
+		primitive := Mesh(litHandle);
 		primitive.geometry.topologyKind = gltfModeToTopologyKindTable[gltfPrim.mode];
 
 		for (attrKV in gltfPrim.attributes)
@@ -572,10 +583,8 @@ AssignGLTFMesh(gltfData: GLTFResource, meshIndex: uint32, nodeResource: *GLTFNod
 			AssignMaterialToPrimitive(gltfData, gltfPrim.material, primitive);
 		}
 
-		mesh.primitives.Add(primitive);
+		nodeResource.meshes.Add(primitive);
 	}
-
-	nodeResource.mesh = mesh;
 }
 
 NodeToNodeResource(gltfData: GLTFResource, nodeIndex: uint32, nodeResource: *GLTFNodeResource)
