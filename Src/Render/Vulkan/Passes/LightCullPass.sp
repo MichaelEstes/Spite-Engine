@@ -308,13 +308,14 @@ LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T)
 		if (count >= MaxLights) break;
 
 		light := ec.component;
+		radiance := light.data.GetRadiance();
 
 		gpuLight := GpuLight();
 		gpuLight.positionRadius = Vec4(
 			light.direction.x, light.direction.y, light.direction.z, 0.0
 		);
 		gpuLight.colorIntensity = Vec4(
-			light.color.r, light.color.g, light.color.b, light.intensity
+			radiance.x, radiance.y, radiance.z, light.data.intensity
 		);
 		gpuLight.kind = LightKind.Directional;
 
@@ -330,13 +331,15 @@ LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T)
 		worldTransform := scene.GetComponentDirect<WorldTransform>(ec.entity, WorldTransformComponent);
 		if (!worldTransform) continue;
 
+		radiance := light.data.GetRadiance();
+
 		gpuLight := GpuLight();
 		gpuLight.positionRadius = Vec4(
 			worldTransform.mat[3][0], worldTransform.mat[3][1], worldTransform.mat[3][2],
 			light.radius
 		);
 		gpuLight.colorIntensity = Vec4(
-			light.color.r, light.color.g, light.color.b, light.intensity
+			radiance.x, radiance.y, radiance.z, light.data.intensity
 		);
 		gpuLight.kind = LightKind.Point;
 

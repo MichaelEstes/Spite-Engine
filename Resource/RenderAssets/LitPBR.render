@@ -143,6 +143,7 @@
                 name: litColor,
                 code: `
                     outColor = color * baseColor * texture(colorTexture, uv0);
+                    if (outColor.a < alphaCutoff) discard;
                 `,
                 after: main
             },
@@ -150,15 +151,6 @@
                 name: litNormal,
                 code: `
                     vec3 N = normalize(normal);
-
-                    vec2 tbnNdc = (gl_FragCoord.xy / clusterInfo.screenAndTile.xy) * 2.0 - 1.0;
-                    vec4 tbnView = clusterInfo.invProj * vec4(tbnNdc, gl_FragCoord.z, 1.0);
-                    vec3 tbnPos = (clusterInfo.invView * vec4(tbnView.xyz / tbnView.w, 1.0)).xyz;
-                    vec3 dp1 = dFdx(tbnPos);
-                    vec3 dp2 = dFdy(tbnPos);
-                    vec2 duv1 = dFdx(uv0);
-                    vec2 duv2 = dFdy(uv0);
-
                     vec3 T = normalize(tangents.xyz);
                     mat3 TBN = mat3(T, cross(N, T) * tangents.w, N);
 

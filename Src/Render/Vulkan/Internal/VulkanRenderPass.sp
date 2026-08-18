@@ -89,11 +89,11 @@ state VulkanRenderPassCache
 {
 	if (cache.renderPassMap.Has(renderPass))
 	{
-		//log "Using cached render pass";
+		// log "Using cached render pass";
 		return cache.renderPassMap.Find(renderPass)~;
 	}
 
-	//log "Creating render pass";
+	// log "Creating render pass";
 	vkRenderPass := CreateVulkanRenderPass(renderPass, device);
 
 	if (vkRenderPass)

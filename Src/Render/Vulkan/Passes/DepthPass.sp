@@ -69,7 +69,7 @@ depthPass := RegisterRenderPass(
 					meshState := batch.meshState;
 					if (meshState.GetAlphaMode() != VulkanAlphaMode.Opaque) continue;
 
-					drawBuffers := renderer.assetDefDrawBuffers.Get(meshState.assetDefHandle.handle);
+					drawBuffers := batch.buffers;
 
 					vulkanPipeline := FindOrCreateDepthPipeline(
 						device,

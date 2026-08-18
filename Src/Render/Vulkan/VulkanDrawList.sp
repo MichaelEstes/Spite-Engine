@@ -4,12 +4,6 @@ import ECS
 import Transform
 import RenderAssetDef
 
-*VulkanAssetDefBuffers GetAssetDefDrawBuffers(renderer: *VulkanRenderer, assetDefHandle: AssetDefHandle)
-{
-	key := assetDefHandle.handle;
-	return renderer.assetDefDrawBuffers.Get(key);
-}
-
 ComputeVulkanDrawList(renderer: VulkanRenderer, scene: *Scene)
 {
 	frame := renderer.Frame();
@@ -25,8 +19,7 @@ ComputeVulkanDrawList(renderer: VulkanRenderer, scene: *Scene)
 		meshes := batch.meshes;
 		if (!meshes.count) continue;
 
-		meshState := batch.meshState;
-		drawBuffers := GetAssetDefDrawBuffers(renderer@, meshState.assetDefHandle);
+		drawBuffers := batch.buffers;
 
 		currentMesh := uint32(0);
 		currentIndexedCmd := VkDrawIndexedIndirectCommand();

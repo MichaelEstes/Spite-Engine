@@ -15,6 +15,9 @@ import GLTFManager
 import Scenes
 
 import ParseHeader
+import Array
+
+import Time
 
 state Test
 {
@@ -81,7 +84,6 @@ queryTestSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 
 testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	//log "Test System called", dt;
-	
 	for (item in scene.Iterate<Test>())
 	{
 		//log item;

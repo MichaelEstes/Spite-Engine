@@ -6,7 +6,7 @@ state Optional<Type>
 	has: bool
 }
 
-ref Type Optional::Get()
+*Type Optional::Get()
 {
 	if (!this.has) return null;
 	return this.value;

@@ -4,6 +4,7 @@ import Resource
 import SDL
 import RenderAssetDef
 import ECS
+import RenderComponents
 
 MaxDynamicStates := 8;
 
@@ -55,6 +56,16 @@ VulkanPipelineMeshState::SetCullMode(cullMode: CullModeFlags) =>
 uint HashPipelineMeshState(key: VulkanPipelineMeshState)
 {
 	return MHash<VulkanPipelineMeshState>(key);
+}
+
+VulkanPipelineMeshState CreatePipelineStateFromMesh(mesh: *Mesh)
+{
+	meshState := VulkanPipelineMeshState();
+	meshState.assetDefHandle = mesh.defHandle;
+	meshState.SetTopology(mesh.geometry.topologyKind);
+	meshState.SetAlphaMode(mesh.material.alphaMode as uint16);
+	meshState.SetCullMode(mesh.material.cullMode);
+	return meshState;
 }
 
 state VulkanPipelineKey

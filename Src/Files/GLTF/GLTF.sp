@@ -732,10 +732,10 @@ ParseGLTFMaterials(gltf: GLTF, root: *JSONObject)
             {
                 baseColorFactorArr := baseColorFactorValue.Array();
                 pbr.baseColorFactor = Color(
-                    baseColorFactorArr.GetValue(0).Number().value.f,
-                    baseColorFactorArr.GetValue(1).Number().value.f,
-                    baseColorFactorArr.GetValue(2).Number().value.f,
-                    baseColorFactorArr.GetValue(3).Number().value.f
+                    baseColorFactorArr.GetValue(0).Number().AsFloat(),
+                    baseColorFactorArr.GetValue(1).Number().AsFloat(),
+                    baseColorFactorArr.GetValue(2).Number().AsFloat(),
+                    baseColorFactorArr.GetValue(3).Number().AsFloat()
                 );
             }
             

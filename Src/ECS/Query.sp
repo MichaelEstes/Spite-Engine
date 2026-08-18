@@ -5,17 +5,27 @@ import BitSet
 state QueryIterator
 {
 	scene: *Scene,
-	unionOf: Component,
+	unionOf: ?{
+		comp: Component,
+		tag: TagComponent
+	},
 	with: Array<Component>,
 	without: Array<Component>,
 	withTags: Array<TagComponent>,
 	withoutTags: Array<TagComponent>,
+	unionOfCount: uint32,
+	isUnionOfTag: bool = false
 }
 
 state QueryIndex
 {
 	entityID: uint,
 	itIndex: int
+}
+
+bool QueryIterator::Empty()
+{
+	return this.unionOfCount == 0;
 }
 
 QueryIndex QueryIterator::operator::in()
@@ -30,29 +40,39 @@ bool QueryIterator::next(it: QueryIndex)
 	while (!nextEntity)
 	{
 		iterator := Iterator(null, it.itIndex);
-		switch (this.unionOf.kind)
+		if (!this.isUnionOfTag)
 		{
-			case (ComponentKind.Common)
+			switch (this.unionOf.comp.kind)
 			{
-				compArr := this.scene.commonComponents.Get(this.unionOf.id);
-				if (!compArr.next(iterator)) return false;
-				it.entityID = iterator.index;
-				it.itIndex = iterator.index;
+				case (ComponentKind.Common)
+				{
+					compArr := this.scene.commonComponents.Get(this.unionOf.comp.id);
+					if (!compArr.next(iterator)) return false;
+					it.entityID = iterator.index;
+					it.itIndex = iterator.index;
+				}
+				case (ComponentKind.Sparse)
+				{
+					compMap := this.scene.sparseComponents.Get(this.unionOf.comp.id);
+					if (!compMap.next(iterator)) return false;
+					it.entityID = compMap.entityArr[iterator.index].id;
+					it.itIndex = iterator.index;
+				}
 			}
-			case (ComponentKind.Sparse)
-			{
-				compMap := this.scene.sparseComponents.Get(this.unionOf.id);
-				if (!compMap.next(iterator)) return false;
-				it.entityID = compMap.entityArr[iterator.index].id;
-				it.itIndex = iterator.index;
-			}
+		}
+		else
+		{
+			tagIterator := this.scene.IterateTagComponent(this.unionOf.tag);
+			if (!tagIterator.next(iterator)) return false;
+			it.entityID = tagIterator.current(iterator).id;
+			it.itIndex = iterator.index;
 		}
 
 		nextEntity = Entity(it.entityID);
 
 		for (with in this.with)
 		{
-			if (with.id == this.unionOf.id) continue;
+			if (!this.isUnionOfTag && with.id == this.unionOf.comp.id) continue;
 			if (with.kind == ComponentKind.Common)
 			{
 				compArr := this.scene.commonComponents.Get(with.id);
@@ -77,6 +97,7 @@ bool QueryIterator::next(it: QueryIndex)
 
 		for (withTag in this.withTags)
 		{
+			if (this.isUnionOfTag && withTag.id == this.unionOf.tag.id) continue;
 			if (!this.scene.HasTagComponent(nextEntity, withTag))
 			{
 				nextEntity = NullEntity;
@@ -192,8 +213,9 @@ QueryIterator Query::Result()
 	result := QueryIterator();
 	if (!this.with.count) return result;
 
-	leastComponent := Component();
+	leastComponent: ?{comp: Component, tag: TagComponent} = Component();
 	leastComponentCount := uint(-1);
+	leastComponentIsTag := false;
 	for (component in this.with)
 	{
 		switch (component.kind)
@@ -203,7 +225,7 @@ QueryIterator Query::Result()
 				compArr := this.scene.commonComponents.Get(component.id);
 				if (compArr)
 				{
-					currCount := compArr.Count();
+					currCount := compArr.Count() as uint;
 					if (currCount < leastComponentCount)
 					{
 						leastComponentCount = currCount;
@@ -227,12 +249,49 @@ QueryIterator Query::Result()
 		}
 	}
 
+	for (tagComponent in this.withTags)
+	{
+		switch (tagComponent.kind)
+		{
+			case (ComponentKind.Common)
+			{
+				compArr := this.scene.commonTagComponents.Get(tagComponent.id);
+				if (compArr)
+				{
+					currCount := compArr.SetBitsCount();
+					if (currCount < leastComponentCount)
+					{
+						leastComponentCount = currCount;
+						leastComponent = tagComponent;
+						leastComponentIsTag = true;
+					}
+				}
+			}
+			case (ComponentKind.Sparse)
+			{
+				compMap := this.scene.sparseTagComponents.Get(tagComponent.id);
+				if (compMap)
+				{
+					currCount := compMap.count as uint;
+					if (currCount < leastComponentCount)
+					{
+						leastComponentCount = currCount;
+						leastComponent = tagComponent;
+						leastComponentIsTag = true;
+					}
+				}
+			}
+		}
+	}
+
 	result.scene = this.scene;
 	result.unionOf = leastComponent;
 	result.with = this.with;
 	result.without = this.without;
 	result.withTags = this.withTags;
 	result.withoutTags = this.withoutTags;
+	result.unionOfCount = leastComponentCount;
+	result.isUnionOfTag = leastComponentIsTag;
 
 	return result;
 }

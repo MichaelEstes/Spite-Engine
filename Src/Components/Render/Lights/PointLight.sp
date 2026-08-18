@@ -6,8 +6,7 @@ import Vec
 
 state PointLight
 {
-	color: Color,
-	intensity: float32,
+	data: LightData,
 	radius: float32
 }
 

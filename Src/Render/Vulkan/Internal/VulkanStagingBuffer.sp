@@ -1,7 +1,27 @@
 package VulkanRenderer
 
 import Math
-import Array
+
+UpdateBufferCopy(commandBuffer: *VkCommandBuffer_T, dstBuffer: *VkBuffer_T, 
+				 data: *byte, size: uint, dstOffset: uint = 0)
+{
+	assert (size % 4) == 0, "size must be a multiple of 4";
+	assert (dstOffset % 4) == 0, "dstOffset must be a multiple of 4";
+	
+	UpdateBufferMaxSize: uint = 65536;
+
+	srcOffset := uint(0);
+	toCopy := size;
+
+	while (toCopy)
+	{
+		copySize := Math.UMin(toCopy, UpdateBufferMaxSize);
+		vkCmdUpdateBuffer(commandBuffer, dstBuffer, dstOffset + srcOffset, copySize, data + srcOffset);
+
+		srcOffset += copySize;
+		toCopy -= copySize;
+	}
+}
 
 state VulkanStagingBuffer
 {
@@ -10,12 +30,12 @@ state VulkanStagingBuffer
 	mem: *VkDeviceMemory_T
 }
 
-state VulkanBufferCopyRequest
+state VulkanStagingBatch
 {
-	data: *byte,
-	size: uint,
-	dstBuffer: *VkBuffer_T,
-	dstOffset: uint
+	commandBuffer: *VkCommandBuffer_T,
+	beginInfo: VkCommandBufferBeginInfo,
+	submitInfo: VkSubmitInfo,
+	stagingOffset: uint
 }
 
 VulkanStagingBuffer::Create(device: *VkDevice_T, physicalDevice: *VkPhysicalDevice_T)
@@ -97,66 +117,70 @@ VulkanStagingBuffer::StagedBufferCopy(device: *VkDevice_T, data: *byte, size: ui
 	}
 }
 
-VulkanStagingBuffer::StagedBufferCopyBatched(device: *VkDevice_T, requests: Array<VulkanBufferCopyRequest>,
-											  commands: VulkanCommands, queue: *VkQueue_T)
+VulkanStagingBuffer::BeginBatch(batch: *VulkanStagingBatch, commands: VulkanCommands)
 {
-	commandBuffer := commands.commandBuffers[0]~;
+	batch.commandBuffer = commands.commandBuffers[0]~;
 
-	beginInfo := VkCommandBufferBeginInfo();
-	beginInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VkCommandBufferUsageFlagBits.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	batch.beginInfo = VkCommandBufferBeginInfo();
+	batch.beginInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	batch.beginInfo.flags = VkCommandBufferUsageFlagBits.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-	submitInfo := VkSubmitInfo();
-	submitInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = commandBuffer@;
+	batch.submitInfo = VkSubmitInfo();
+	batch.submitInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	batch.submitInfo.commandBufferCount = 1;
+	batch.submitInfo.pCommandBuffers = batch.commandBuffer@;
 
-	vkBeginCommandBuffer(commandBuffer, beginInfo@);
-	stagingOffset := uint(0);
+	batch.stagingOffset = 0;
 
-	for (request in requests)
+	vkBeginCommandBuffer(batch.commandBuffer, batch.beginInfo@);
+}
+
+VulkanStagingBuffer::BatchCopy(batch: *VulkanStagingBatch, device: *VkDevice_T, data: *byte, size: uint,
+							   dstBuffer: *VkBuffer_T, queue: *VkQueue_T, dstOffset: uint = 0)
+{
+	srcOffset := uint(0);
+	toCopy := size;
+
+	while (toCopy)
 	{
-		srcOffset := uint(0);
-		toCopy := request.size;
-
-		while (toCopy)
+		if (batch.stagingOffset >= this.size)
 		{
-			if (stagingOffset >= this.size)
-			{
-				vkEndCommandBuffer(commandBuffer);
-				CheckResult(vkQueueSubmit(queue, 1, submitInfo@, null), "Error submitting batched staging copy queue");
-				CheckResult(vkQueueWaitIdle(queue), "Error waiting for batched staging copy queue");
-				vkBeginCommandBuffer(commandBuffer, beginInfo@);
-				stagingOffset = 0;
-			}
-
-			copySize := Math.UMin(toCopy, this.size - stagingOffset);
-
-			mappedMem: *byte = null;
-			vkMapMemory(device, this.mem, stagingOffset, copySize, 0, mappedMem@);
-			copy_bytes(mappedMem, request.data + srcOffset, copySize);
-			vkUnmapMemory(device, this.mem);
-
-			copyRegion := VkBufferCopy();
-			copyRegion.srcOffset = stagingOffset;
-			copyRegion.dstOffset = request.dstOffset + srcOffset;
-			copyRegion.size = copySize;
-
-			vkCmdCopyBuffer(commandBuffer, this.buffer, request.dstBuffer, 1, copyRegion@);
-
-			stagingOffset += copySize;
-			srcOffset += copySize;
-			toCopy -= copySize;
+			vkEndCommandBuffer(batch.commandBuffer);
+			CheckResult(vkQueueSubmit(queue, 1, batch.submitInfo@, null), "Error submitting batched staging copy queue");
+			CheckResult(vkQueueWaitIdle(queue), "Error waiting for batched staging copy queue");
+			vkBeginCommandBuffer(batch.commandBuffer, batch.beginInfo@);
+			batch.stagingOffset = 0;
 		}
+
+		copySize := Math.UMin(toCopy, this.size - batch.stagingOffset);
+
+		mappedMem: *byte = null;
+		vkMapMemory(device, this.mem, batch.stagingOffset, copySize, 0, mappedMem@);
+		copy_bytes(mappedMem, data + srcOffset, copySize);
+		vkUnmapMemory(device, this.mem);
+
+		copyRegion := VkBufferCopy();
+		copyRegion.srcOffset = batch.stagingOffset;
+		copyRegion.dstOffset = dstOffset + srcOffset;
+		copyRegion.size = copySize;
+
+		vkCmdCopyBuffer(batch.commandBuffer, this.buffer, dstBuffer, 1, copyRegion@);
+
+		batch.stagingOffset += copySize;
+		srcOffset += copySize;
+		toCopy -= copySize;
 	}
+}
 
-	vkEndCommandBuffer(commandBuffer);
+VulkanStagingBuffer::EndBatch(batch: *VulkanStagingBatch, queue: *VkQueue_T)
+{
+	vkEndCommandBuffer(batch.commandBuffer);
 
-	CheckResult(vkQueueSubmit(queue, 1, submitInfo@, null), "Error submitting batched staging copy queue");
+	CheckResult(vkQueueSubmit(queue, 1, batch.submitInfo@, null), "Error submitting batched staging copy queue");
 	CheckResult(vkQueueWaitIdle(queue), "Error waiting for batched staging copy queue");
 }
 
-VulkanStagingBuffer::StagedImageCopy(device: *VkDevice_T, data: *byte, size: uint, 
+VulkanStagingBuffer::StagedImageCopy(device: *VkDevice_T, data: *byte, size: uint,
 									 dstImage: *VkImage_T, width: uint32, height: uint32,
 									 commands: VulkanCommands, queue: *VkQueue_T)
 {

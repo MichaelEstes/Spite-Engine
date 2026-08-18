@@ -56,6 +56,7 @@ Material::(defHandle: AssetDefHandle)
 Material::delete
 {
     delete this.textures;
+    delete this.variables;
 }
 
 uint32 Material::GetVariableIndex(name: string)

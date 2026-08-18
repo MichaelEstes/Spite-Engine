@@ -77,8 +77,8 @@ state SharedUBO<Type>
 	pool: *VkDescriptorPool_T,
 	descLayout: *VkDescriptorSetLayout_T,
 	descSets: [FrameCount]*VkDescriptorSet_T,
-	buffer: VulkanAllocHandle,
-	mapptedPtr: *Type,
+	buffers: [FrameCount]VulkanAllocHandle,
+	mapptedPtrs: [FrameCount]*Type,
 	current: Type
 }
 
@@ -115,23 +115,25 @@ SharedUBO::Init(device: *VkDevice_T, allocator: VulkanAllocator, binding: uint32
 	);
 
 	uboSize := #sizeof Type;
-	createInfo := VkBufferCreateInfo();
-	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	createInfo.usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	createInfo.size = uboSize;
-	createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
-
-	buf := CreateVkBuffer(device, createInfo);
-	bufHandle := allocator.AllocBuffer(
-		buf, 
-		VulkanMemoryFlags.Shared | VulkanMemoryFlags.Coherent | VulkanMemoryFlags.Mapped
-	);
-	this.buffer = bufHandle;
-
 	this.current = Type();
-	alloc := allocator.GetAllocation(bufHandle);
-	this.mapptedPtr = allocator.GetAllocationMappedPtr(bufHandle);
-	this.mapptedPtr~ = this.current;
+
+	for (i .. FrameCount)
+	{
+		createInfo := VkBufferCreateInfo();
+		createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		createInfo.usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		createInfo.size = uboSize;
+		createInfo.sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+
+		buf := CreateVkBuffer(device, createInfo);
+		bufHandle := allocator.AllocBuffer(
+			buf,
+			VulkanMemoryFlags.Shared | VulkanMemoryFlags.Coherent | VulkanMemoryFlags.Mapped
+		);
+		this.buffers[i] = bufHandle;
+		this.mapptedPtrs[i] = allocator.GetAllocationMappedPtr(bufHandle);
+		this.mapptedPtrs[i]~ = this.current;
+	}
 
 	layouts := [FrameCount]*VkDescriptorSetLayout_T;
 	for (i .. FrameCount) layouts[i] = this.descLayout;
@@ -147,8 +149,10 @@ SharedUBO::Init(device: *VkDevice_T, allocator: VulkanAllocator, binding: uint32
 		"SharedUBO::Init Error allocating scene Vulkan descriptor sets"
 	);
 
-	for (i .. FrameCount) 
+	for (i .. FrameCount)
 	{
+		alloc := allocator.GetAllocation(this.buffers[i]);
+
 		bufferInfo := VkDescriptorBufferInfo();
 		bufferInfo.buffer = alloc.data.buffer;
 		bufferInfo.offset = 0;
@@ -175,7 +179,7 @@ bool SharedUBO::Valid()
 SharedUBO::Update(frame: uint32, value: Type)
 {
 	this.current = value;
-	this.mapptedPtr~ = value;
+	this.mapptedPtrs[frame]~ = value;
 }
 
 *VkDescriptorSet_T SharedUBO::GetDescSet(frame: uint32)

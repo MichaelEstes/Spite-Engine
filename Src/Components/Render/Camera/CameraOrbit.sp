@@ -26,24 +26,32 @@ CameraOrbitSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 		windowData := scene.GetComponent<WindowData>(entity);
 		if (!windowData) continue;
 		window := windowData.window;
+		cameraForward := camera.Forward();
+		worldUp := Vec3(0.0, 1.0, 0.0);
 
 		mouseDelta := QueryInput(Mouse.device, Mouse.Delta, window).value.axis;
 
 		wheelDelta := QueryInput(Mouse.device, Mouse.Wheel, window).value.axis;
 		if (wheelDelta.y)
 		{
-			forward := camera.Forward();
 			amount := wheelDelta.y * cameraOrbit.scrollDamping * -1.0;
-			delta := forward * amount;
+			delta := cameraForward * amount;
 			camera.position = camera.position + delta;
 		}
 
 		middleMouseDown := QueryInput(Mouse.device, Mouse.Middle, window).value.down;
 		if (middleMouseDown)
 		{
-			delta := Vec3(mouseDelta.x * -1.0, mouseDelta.y, 0.0) * cameraOrbit.panDamping;
-			camera.position = camera.position + delta;
-			cameraOrbit.orbitCenter = cameraOrbit.orbitCenter + delta;
+			right := cameraForward.Cross(worldUp);
+			if (right.SqrLength())
+			{
+				rightNorm := right.Normalize().vec;
+				upNorm := rightNorm.Cross(cameraForward).Normalize().vec;
+
+				delta := ((rightNorm * mouseDelta.x) + (upNorm * mouseDelta.y)) * cameraOrbit.panDamping;
+				camera.position = camera.position + delta;
+				cameraOrbit.orbitCenter = cameraOrbit.orbitCenter + delta;
+			}
 		}
 
 		leftMouseDown := QueryInput(Mouse.device, Mouse.Left, window).value.down;
@@ -54,8 +62,6 @@ CameraOrbitSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 
 			yawAngle := mouseDelta.x * cameraOrbit.rotateDamping;
 			pitchAngle := mouseDelta.y * cameraOrbit.rotateDamping;
-
-			worldUp := Vec3(0.0, 1.0, 0.0);
 
 			if (yawAngle != 0.0)
 			{

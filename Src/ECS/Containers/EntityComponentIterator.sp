@@ -1,36 +1,15 @@
 package ECS
 
-bool _NextArray<Type>(ecIt: EntityComponentIterator<Type>, it: Iterator) => ecIt.container.array.next(it);
-
-bool _NextMap<Type>(ecIt: EntityComponentIterator<Type>, it: Iterator) => ecIt.container.map.next(it);
-
-EntityComponent<Type> _CurrentArray<Type>(ecIt: EntityComponentIterator<Type>, it: Iterator) => ecIt.container.array.current(it);
-
-EntityComponent<Type> _CurrentMap<Type>(ecIt: EntityComponentIterator<Type>, it: Iterator) => ecIt.container.map.current(it);
-
 state EntityComponentIterator<Type>
 {
 	container: ?{array: *EntityComponentArray<Type>, map: *EntityComponentMap<Type>},
-	nextFunc: ::bool(EntityComponentIterator<Type>, Iterator) = :: bool(ecIt: EntityComponentIterator<Type>, it: Iterator) => false,
-	currentFunc: ::EntityComponent<Type>(EntityComponentIterator<Type>, Iterator),
+	kind: ComponentKind
 }
 
 EntityComponentIterator::(componentKind: ComponentKind, container: ?{array: *EntityComponentArray<Type>, map: *EntityComponentMap<Type>})
 {
 	this.container = container;
-	switch (componentKind)
-	{
-		case (ComponentKind.Common)
-		{
-			this.nextFunc = _NextArray<Type>;
-			this.currentFunc = _CurrentArray<Type>;
-		}
-		case (ComponentKind.Sparse)
-		{
-			this.nextFunc = _NextMap<Type>;
-			this.currentFunc = _CurrentMap<Type>;
-		}
-	}
+	this.kind = componentKind;
 }
 
 Iterator EntityComponentIterator::operator::in()
@@ -40,10 +19,34 @@ Iterator EntityComponentIterator::operator::in()
 
 bool EntityComponentIterator::next(it: Iterator)
 {
-	return this.nextFunc(this, it);
+	switch (this.kind)
+	{
+		case (ComponentKind.Common)
+		{
+			return this.container.array.next(it);
+		}
+		case (ComponentKind.Sparse)
+		{
+			return this.container.map.next(it);
+		}
+	}
+
+	return false;
 }
 
 EntityComponent<Type> EntityComponentIterator::current(it: Iterator)
 {
-	return this.currentFunc(this, it);
+	switch (this.kind)
+	{
+		case (ComponentKind.Common)
+		{
+			return this.container.array.current(it);
+		}
+		case (ComponentKind.Sparse)
+		{
+			return this.container.map.current(it);
+		}
+	}
+
+	return EntityComponent<Type>();
 }

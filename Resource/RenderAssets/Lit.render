@@ -34,7 +34,7 @@
                 code: `
                     mat3 normalMatrix = mat3(model);
                     outnormal = normalize(normalMatrix * normal);
-                    //outtangents = vec4(normalize(normalMatrix * tangents.xyz), tangents.w);
+                    outtangents = vec4(normalMatrix * tangents.xyz, tangents.w);
                 `,
                 after: default
             }
@@ -78,7 +78,7 @@
                 default: [0, 0, 0, 255]
             }
         }
-        using: [normal, color, uv0],
+        using: [normal, tangents, color, uv0],
         out: {
             outColor: vec4
         },
@@ -87,13 +87,13 @@
                 name: litColor,
                 code: `
                     outColor = color * baseColor * texture(colorTexture, uv0);
+                    if (outColor.a < alphaCutoff) discard;
                 `,
                 after: main
             },
             {
                 name: litNormal,
                 code: `
-                    vec4 tangents = vec4(1.0, 0.0, 0.0, 1.0);
                     vec3 N = normalize(normal);
                     vec3 T = normalize(tangents.xyz);
                     vec3 B = cross(N, T);

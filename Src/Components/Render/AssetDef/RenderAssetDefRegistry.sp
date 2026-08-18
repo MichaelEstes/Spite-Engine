@@ -12,7 +12,9 @@ state AssetDefHandle
 state RenderAssetVariableAllocator
 {
     vertexAllocator: BlockAllocator,
-    fragmentAllocator: BlockAllocator
+    fragmentAllocator: BlockAllocator,
+    vertexSetSize: uint32,
+    fragmentSetSize: uint32,
 }
 
 state RenderAssetDefRegistry
@@ -38,6 +40,8 @@ RenderAssetVariableAllocator CreateAssetDefAllocator(assetDef: AssetDef)
         fragmentSetSize * itemCount,
         fragmentSetSize
     );
+    allocator.vertexSetSize = vertexSetSize;
+    allocator.fragmentSetSize = fragmentSetSize;
 
     return allocator;
 }
@@ -83,15 +87,17 @@ AssetDefHandle AssetDefNameToHandle(name: string)
 *void AllocateVertexVariableSet(defHandle: AssetDefHandle)
 {
     allocator := assetDefRegistry.assetDefAllocators.Get(defHandle.handle);
-    mem := allocator.vertexAllocator.Alloc();
-    return mem;
+    return alloc(allocator.vertexSetSize);
+    // mem := allocator.vertexAllocator.Alloc();
+    // return mem;
 }
 
 *void AllocateFragmentVariableSet(defHandle: AssetDefHandle)
 {
     allocator := assetDefRegistry.assetDefAllocators.Get(defHandle.handle);
-    mem := allocator.fragmentAllocator.Alloc();
-    return mem;
+    return alloc(allocator.fragmentSetSize);
+    // mem := allocator.fragmentAllocator.Alloc();
+    // return mem;
 }
 
 uint32 GetAssetDefFragmentTextureCount(defHandle: AssetDefHandle)

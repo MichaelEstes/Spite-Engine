@@ -15,13 +15,13 @@ uint16 ResizeFactor(capacity: uint16)
 
 state EntityComponentMap<Type, InitialCapacity = 16, InitialSparseCapacity = 1024>
 {
-	count: uint16,
-	capacity: uint16,
-	sparseCapacity: uint32,
-
 	sparseArr: ZeroedAllocator<uint16>,
 	entityArr: Allocator<Entity>,
-	componentArr: Allocator<Type>
+	componentArr: Allocator<Type>,
+
+	sparseCapacity: uint32,
+	count: uint16,
+	capacity: uint16
 }
 
 EntityComponentMap::()
@@ -97,6 +97,15 @@ EntityComponentMap::ResizeDense()
 {
 	assert !!entity, "Cannot insert null entity";
 
+	index := this.GetIndex(entity);
+	if (index)
+	{
+		index -= 1;
+		componentPtr := this.componentArr[index];
+		componentPtr~ = component;
+		return componentPtr;
+	}
+
 	if (entity.id >= this.sparseCapacity) this.ResizeSparse(entity.id);
 	if (this.count >= this.capacity) this.ResizeDense();
 
@@ -166,12 +175,22 @@ uint16 EntityComponentMap::Count() => this.count;
 {
 	assert !!entity, "Cannot insert null entity";
 
+	index := this.GetIndex(entity);
+	if (index)
+	{
+		index -= 1;
+		byteArr := this.componentArr.ptr as *byte;
+		dst := byteArr[index * size];
+		copy_bytes(dst, data, size);
+		return dst;
+	}
+
 	if (entity.id >= this.sparseCapacity) this.ResizeSparse(entity.id);
 	if (this.count >= this.capacity) this.ResizeDense();
 
 	this.entityArr[this.count]~ = entity;
-
 	byteArr := this.componentArr.ptr as *byte;
+
 	dst := byteArr[this.count * size];
 	copy_bytes(dst, data, size);
 

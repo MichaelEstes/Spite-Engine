@@ -1,25 +1,23 @@
 package ECS
 
-import BitSet
-
 state EntityComponentArray<Type, InitialCapacity = 1024>
 {
-	capacity: uint32,
+	activeArr: ZeroedAllocator<bool>,
+	componentArr: Allocator<Type>,
 
-	entitySet: BitSet,
-	componentArr: Allocator<Type>
+	capacity: uint32,
 }
 
 EntityComponentArray::()
 {
-	this.entitySet = BitSet(InitialCapacity);
+	this.activeArr.Alloc(InitialCapacity);
 	this.componentArr.Alloc(InitialCapacity);
 	this.capacity = InitialCapacity;
 }
 
 EntityComponentArray::delete
 {
-	delete this.entitySet;
+	this.activeArr.Dealloc(this.capacity);
 	this.componentArr.Dealloc(this.capacity);
 }
 
@@ -29,7 +27,7 @@ EntityComponentArray::delete
 
 	for (i .. this.capacity)
 	{
-		if (this.entitySet[i])
+		if (this.activeArr[i]~)
 		{
 			entity := Entity(i);
 			component := this.componentArr[i];
@@ -48,7 +46,6 @@ Iterator EntityComponentArray::operator::in()
 bool EntityComponentArray::next(it: Iterator)
 {
 	it.index += 1;
-	while (it.index < this.capacity && !this.entitySet[it.index]) it.index += 1;
 	return it.index < this.capacity;
 }
 
@@ -62,9 +59,9 @@ EntityComponent<Type> EntityComponentArray::current(it: Iterator)
 
 EntityComponentArray::Resize(amount: uint32)
 {
-	resizedCapacity := (((amount + (InitialCapacity - 1)) / InitialCapacity) * 
-						InitialCapacity) * 2;
+	resizedCapacity := ((amount / InitialCapacity) + 1) * InitialCapacity;
 
+	this.activeArr.Resize(resizedCapacity, this.capacity);
 	this.componentArr.Resize(resizedCapacity, this.capacity);
 	this.capacity = resizedCapacity;
 }
@@ -76,7 +73,9 @@ EntityComponentArray::Resize(amount: uint32)
 	if (entity.id >= this.capacity) this.Resize(entity.id);
 
 	index := entity.id;
-	this.entitySet.Set(index);
+	activePtr := this.activeArr[index];
+	activePtr~ = true;
+
 	componentPtr := this.componentArr[index];
 	componentPtr~ = component;
 	return componentPtr;
@@ -84,7 +83,7 @@ EntityComponentArray::Resize(amount: uint32)
 
 bool EntityComponentArray::Has(entity: Entity)
 {
-	return this.entitySet[entity.id];
+	return entity.id < this.capacity && this.activeArr[entity.id]~;
 }
 
 *Component EntityComponentArray::Get(entity: Entity)
@@ -100,10 +99,10 @@ EntityComponentArray::Remove(entity: Entity)
 	if (!this.Has(entity)) return;
 
 	index := entity.id;
-	this.entitySet.Clear(index);
+	this.activeArr[index]~ = false;
 }
 
-uint EntityComponentArray::Count() => this.entitySet.SetBitsCount();
+uint32 EntityComponentArray::Count() => this.capacity;
 
 *any EntityComponentArray::GetUntyped(entity: Entity, size: uint32)
 {
@@ -121,8 +120,9 @@ uint EntityComponentArray::Count() => this.entitySet.SetBitsCount();
 	if (entity.id >= this.capacity) this.Resize(entity.id);
 
 	index := entity.id;
-	this.entitySet.Set(index);
-
+	activePtr := this.activeArr[index];
+	activePtr~ = true;
+	
 	byteArr := this.componentArr.ptr as *byte;
 	dst := byteArr[index * size];
 	copy_bytes(dst, data, size);

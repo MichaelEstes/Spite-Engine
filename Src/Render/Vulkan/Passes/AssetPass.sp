@@ -79,7 +79,7 @@ AssetPassState::Init()
 			"AssetPass Error allocating frame-global descriptor set"
 		);
 
-		WriteUniformBufferDescriptor(device, globalFrame.set, 0, renderer.sceneShared.buffer, #sizeof SceneUBO);
+		WriteUniformBufferDescriptor(device, globalFrame.set, 0, renderer.sceneShared.buffers[frame], #sizeof SceneUBO);
 
 		if (lightCull)
 		{
@@ -155,7 +155,7 @@ assetPass := RegisterRenderPass(
 					if (!batch.meshes.count) continue;
 
 					meshState := batch.meshState;
-					drawBuffers := renderer.assetDefDrawBuffers.Get(meshState.assetDefHandle.handle);
+					drawBuffers := batch.buffers;
 
 					vulkanPipeline := FindOrCreatePipeline(
 						device,

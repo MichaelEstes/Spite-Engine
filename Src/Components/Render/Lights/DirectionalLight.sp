@@ -6,10 +6,8 @@ import Vec
 
 state DirectionalLight
 {
-	direction: Vec3,
-	color: Color,
-	intensity: float32,
-	castShadow: bool
+	data: LightData,
+	direction: Vec3
 }
 
 DirectionalLightComponent := ECS.RegisterComponent<DirectionalLight>(

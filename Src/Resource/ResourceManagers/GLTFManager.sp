@@ -542,11 +542,13 @@ AssignMaterialToPrimitive(gltfData: GLTFResource, materialIndex: uint32, primiti
 		gltfMaterial.emissiveFactor, 
 		false
 	);
-	primitive.material.SetVariable<float32>(
-		"alphaCutoff", 
-		gltfMaterial.alphaCutoff, 
-		false
-	);
+	
+	primitive.material.alphaMode = GetAlphaMode(gltfMaterial);
+	alphaCutoff := float32(0.0);
+	if (primitive.material.alphaMode == AlphaMode.Mask) alphaCutoff = gltfMaterial.alphaCutoff;
+	primitive.material.SetVariable<float32>("alphaCutoff", alphaCutoff, false);
+
+	if (gltfMaterial.doubleSided) primitive.material.cullMode = CullModeFlags.None;
 }
 
 AssignGLTFMesh(gltfData: GLTFResource, meshIndex: uint32, nodeResource: *GLTFNodeResource)

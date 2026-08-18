@@ -65,6 +65,7 @@ Geometry::(defHandle: AssetDefHandle)
 Geometry::delete
 {
     delete this.attributes;
+    delete this.variables;
 }
 
 uint32 Geometry::GetAttributeIndex(name: string)

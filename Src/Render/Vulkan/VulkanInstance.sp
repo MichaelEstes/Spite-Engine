@@ -309,7 +309,7 @@ InitializeVulkanInstance()
 		MeshEntitySetEvent,
 		::(sceneEntity: SceneEntity, data: *void)
 		{
-			log "Mesh Entity Added Vulkan Instance";
+			// log "Mesh Entity Added Vulkan Instance";
 			scene := sceneEntity.scene;
 			entity := sceneEntity.entity;
 			mesh := scene.GetComponent<Mesh>(entity);

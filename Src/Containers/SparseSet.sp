@@ -6,13 +6,13 @@ int32 DefaultResizeFactor(capacity: int32) => (capacity + 1) * 2;
 
 state SparseSet<Value, InitialCapacity = 16, InitialSparseCapacity = 32, ResizeFactor = DefaultResizeFactor>
 {
-	count: uint32,
-	capacity: uint32,
-	sparseCapacity: uint32,
-
 	sparseArr: ZeroedAllocator<uint32>,
 	denseKeyArr: ZeroedAllocator<uint32>,
-	denseValueArr: Allocator<Value>
+	denseValueArr: Allocator<Value>,
+
+	count: uint32,
+	capacity: uint32,
+	sparseCapacity: uint32
 }
 
 SparseSet::()

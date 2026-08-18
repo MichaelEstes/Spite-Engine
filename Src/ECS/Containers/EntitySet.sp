@@ -2,43 +2,42 @@ package ECS
 
 import BitSet
 
-InvalidIndex := uint32(-1);
+InvalidIndex := uint32(0);
 
-// Similar to a normal set, except we can represent the status with a single bit
-// due to 0 not being a valid entity
 state EntitySet
 {
-	entities: ZeroedAllocator<Entity>,
-	deletedStatus: BitSet,
+	entities: Allocator<Entity>,
+	sparse: ZeroedAllocator<uint32>,
+
 	count: uint32,
-	capacity: uint32
+	capacity: uint32,
+	sparseCapacity: uint32
 }
 
 EntitySet::()
 {
 	initialCapacity := 8;
+	initialSparseCapacity := initialCapacity * 2;
 	this.entities.Alloc(initialCapacity);
-	this.deletedStatus = BitSet(initialCapacity);
-	this.capacity = initialCapacity;
+	this.sparse.Alloc(initialSparseCapacity);
+
 	this.count = 0;
+	this.capacity = initialCapacity;
+	this.sparseCapacity = initialSparseCapacity;
 }
 
 EntitySet::delete
 {
 	this.entities.Dealloc(this.capacity);
-	delete this.deletedStatus;
+	this.sparse.Dealloc(this.sparseCapacity);
 }
 
 []Entity EntitySet::log()
 {
 	values := []Entity;
-	for(i .. this.capacity)
-	{
-		if (this.entities[i].id)
-		{
-			values.Add(this.entities[i]~);
-		}
-	}
+	values.count = this.count;
+	values.capacity = this.capacity;
+	values.memory = this.entities as Allocator<byte>;
 
 	return values;
 }
@@ -50,17 +49,13 @@ Entity EntitySet::operator::[](entity: Entity)
 
 Iterator EntitySet::operator::in()
 {
-	return {null, -1};
+	return {null, 0};
 }
 
 bool EntitySet::next(it: Iterator)
 {
 	it.index += 1;
-	while(it.index < this.capacity && !this.entities[it.index].id)
-	{
-		it.index += 1;
-	}
-	return it.index < this.capacity;
+	return it.index <= this.count;
 }
 
 Entity EntitySet::current(it: Iterator)
@@ -72,130 +67,75 @@ Entity EntitySet::current(it: Iterator)
 Entity EntitySet::Find(entity: Entity)
 {
 	index := this.FindIndex(entity);
+	if (!index) return NullEntity;
 
-	if(index == InvalidIndex) NullEntity;
 	return this.entities[index]~;
 }
 
-bool EntitySet::Empty(index: uint32)
+uint32 EntitySet::FindIndex(entity: Entity) =>
 {
-	return this.entities[index].id == 0 && !this.deletedStatus[index];
-}
+	if (entity.id >= this.sparseCapacity) return uint32(0);
 
-uint32 EntitySet::FindIndex(entity: Entity)
-{
-	index := entity.id % this.capacity;
-	start := index;
-
-	while (!this.Empty(index))
-	{
-		if (this.entities[index].id == entity.id)
-			return index;
-
-		index = (index + 1) % this.capacity;
-		if (index == start) break;
-	}
-
-	return InvalidIndex;
+	return this.sparse[entity.id]~;
 }
 
 bool EntitySet::Has(entity: Entity)
 {
-	return this.FindIndex(entity) != InvalidIndex;
+	return this.FindIndex(entity) != uint32(0);
+}
+
+EntitySet::ResizeDense()
+{
+	resizedCapacity := (this.capacity + 1) * 2;
+
+	this.entities.Resize(resizedCapacity, this.capacity);
+	this.capacity = resizedCapacity;
+}
+
+EntitySet::ResizeSparse(amount: uint32)
+{
+	resizedCapacity := ((amount / this.sparseCapacity) + 1) * this.sparseCapacity;
+
+	this.sparse.Resize(resizedCapacity, this.sparseCapacity);
+	this.sparseCapacity = resizedCapacity;
 }
 
 bool EntitySet::Insert(entity: Entity)
 {
-	if (this.count * 3 >= this.capacity * 2)
+	if (!this.Has(entity))
 	{
-		log this.capacity;
-		this.ResizeTo((this.capacity + 1) * 2);
+		if (this.count + 1 >= this.capacity) this.ResizeDense();
+		if (entity.id >= this.sparseCapacity) this.ResizeSparse(entity.id);
+
+		this.count += 1;
+		this.entities[this.count]~ = entity;
+		this.sparse[entity.id]~ = this.count;
+		return true;
 	}
 
-	this.count += 1;
-	return this.InsertInternal(
-			entity, 
-			this.entities, 
-			this.deletedStatus,
-			this.capacity
-	);
+	return false;
 }
 
 bool EntitySet::Remove(entity: Entity)
 {
 	index := this.FindIndex(entity);
-	if(index == InvalidIndex) return false;
-	this.deletedStatus.Set(index);
-	this.entities[index]~ = Entity();
+	if(index == uint32(0)) return false;
+
+	this.sparse[entity.id]~ = uint32(0);
+
+	if (index != this.count)
+	{
+		endEntity := this.entities[this.count]~;
+		this.entities[index]~ = endEntity;
+		this.sparse[endEntity.id]~ = index;
+	}
+
 	this.count -= 1;
 	return true;
-}
-
-EntitySet::ResizeTo(capacity: int)
-{	
-	newEntities := ZeroedAllocator<Entity>();
-	newDeletedStatus := BitSet();
-	
-	newEntities.Alloc(capacity);
-	newDeletedStatus.Resize(capacity);
-
-	this.InsertAllInternal(newEntities, newDeletedStatus, capacity);
-
-	this.entities.Dealloc(this.capacity);
-	delete this.deletedStatus;
-
-	this.entities = newEntities;
-	this.deletedStatus = newDeletedStatus;
-	this.capacity = capacity;
 }
 
 EntitySet::Clear()
 {
 	this.count = 0;
-	zero_out_bytes(this.entities[0], this.capacity * #sizeof Entity);
-	this.deletedStatus.ClearAll();
-}
-
-bool EntitySet::InsertInternal(entity: Entity, entities: ZeroedAllocator<Entity>, 
-							   deletedStatus: BitSet, capacity: uint)
-{
-	index := entity.id % capacity;
-	start := index;
-	deletedIndex := InvalidIndex;
-
-	while (!this.Empty(index))
-	{
-		if (entities[index].id == entity.id) return false;
-
-		if (deletedStatus[index]) deletedIndex = index;
-		
-		index = (index + 1) % capacity;
-		if (index == start) break;
-	}
-
-	if (deletedIndex != InvalidIndex)
-	{
-		index = deletedIndex;
-	}
-
-	entities[index]~ = entity;
-	deletedStatus.Clear(index);
-	return true;
-}
-
-EntitySet::InsertAllInternal(entities: ZeroedAllocator<Entity>, deletedStatus: BitSet, capacity: uint)
-{
-	for (i .. this.capacity)
-	{
-		if(entities[i].id)
-		{
-			entity := this.entities[i]~;
-			this.InsertInternal(
-				entity, 
-				entities, 
-				deletedStatus,
-				capacity
-			);
-		}
-	}
+	zero_out_bytes(this.sparse[0], this.sparseCapacity * #sizeof uint32);
 }

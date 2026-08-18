@@ -39,9 +39,12 @@ uint HashFrameBufferKey(key: VulkanFrameBufferKey)
 	key.layers = layers;
 
 	cachedFrameBuffer := cache.frameBufferMap.Find(key);
-	if (cachedFrameBuffer) return cachedFrameBuffer~;
+	if (cachedFrameBuffer)
+	{
+		return cachedFrameBuffer~;
+	} 
 
-	//log "Creating framebuffer";
+	// log "Creating framebuffer";
 	createInfo := VkFramebufferCreateInfo();
 	createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	

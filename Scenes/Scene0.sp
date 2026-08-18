@@ -36,6 +36,34 @@ _ := SceneRegistry.RegisterScene(
 		scene.SetComponent<Camera>(sceneEntity, camera);
 		scene.SetComponent<CameraOrbit>(sceneEntity, CameraOrbit());
 
+		lightPositions := [
+			Vec3(0.0, 0.5, 0.0),
+			Vec3(3.0, 0.5, 0.0),
+			Vec3(6.0, 0.5, 0.0)
+		];
+		lightColors := [
+			Color(1.0, 0.0, 0.0, 1.0),
+			Color(0.0, 1.0, 0.0, 1.0),
+			Color(0.0, 0.0, 1.0, 1.0)
+		];
+
+		for (i .. 3)
+		{
+			lightEntity := scene.CreateEntity();
+			scene.SetComponent<Transform>(lightEntity, Transform(lightPositions[i]));
+
+			pointLight := PointLight();
+			pointLight.radius = 3.0;
+			pointLight.data.color = lightColors[i];
+			pointLight.data.intensity = 16.0;
+			scene.SetComponent<PointLight>(lightEntity, pointLight);
+		}
+
+		sunEntity := scene.CreateEntity();
+		directionalLight := DirectionalLight();
+		directionalLight.direction = Vec3(0.4, -1.0, 0.4);
+		scene.SetComponent<DirectionalLight>(sunEntity, directionalLight);
+
 		scene.SetComponent<SceneDesc>(sceneEntity, {
 			{
 				"Main Window",
@@ -50,37 +78,6 @@ _ := SceneRegistry.RegisterScene(
 				RendererFlags.Vulkan
 			}
 		});
-
-		lightPositions := [
-			Vec3(-2.0, 0.0, 0.0),   // left
-			Vec3(2.0, 0.0, 0.0),    // right
-			Vec3(0.0, 0.0, 2.0)     // front
-		];
-		lightColors := [
-			Color(0.0, 0.0, 1.0, 1.0),
-			Color(1.0, 0.0, 0.0, 1.0),
-			Color(0.0, 1.0, 0.0, 1.0)
-		];
-
-		for (i .. 3)
-		{
-			lightEntity := scene.CreateEntity();
-			scene.SetComponent<Transform>(lightEntity, Transform(lightPositions[i]));
-
-			pointLight := PointLight();
-			pointLight.color = lightColors[i];
-			pointLight.intensity = 6.0;
-			pointLight.radius = 2.0;
-			scene.SetComponent<PointLight>(lightEntity, pointLight);
-		}
-
-		sunEntity := scene.CreateEntity();
-		directionalLight := DirectionalLight();
-		directionalLight.direction = Vec3(0.0, -1.0, 0.0);
-		directionalLight.color = Color(1.0, 0.85, 0.45, 1.0);
-		directionalLight.intensity = 6.0;
-		directionalLight.castShadow = false;
-		scene.SetComponent<DirectionalLight>(sunEntity, directionalLight);
 
 		lineEntity := scene.CreateEntity();
 		scene.SetComponent<LineMesh>(lineEntity, LineMesh(
@@ -100,49 +97,50 @@ _ := SceneRegistry.RegisterScene(
 		// model := "./Resource/Models/Box/Box.gltf";
 		// model := "./Resource/Models/BoxTextured/BoxTextured.gltf";
 		// model := "./Resource/Models/BrainStem/BrainStem.gltf";
-		model := "./Resource/Models/DamagedHelmet/DamagedHelmet.gltf";
+		// model := "./Resource/Models/DamagedHelmet/DamagedHelmet.gltf";
+		model := "./Resource/Models/Sponza/Sponza.gltf";
 		log "Loading GLTF: ", model;
-		// gltfHandle := UseGLTFResource(
-		// 	model, scene,
-		// 	::(scene: *Scene, rootEntity: Entity, arg: *void)
-		// 	{
-		// 		log "Loaded gltf: ", rootEntity;
-
-		// 		// IterateHierarchy(
-		// 		// 	rootEntity, scene,
-		// 		// 	::(entity: Entity, scene: *Scene)
-		// 		// 	{
-		// 		// 		rotate := RotateOverTime();
-		// 		// 		rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
-		// 		// 		rotate.speed = 0.25;
-		// 		// 		scene.SetComponent<RotateOverTime>(entity, rotate);
-		// 		// 	}
-		// 		// );
-
-		// 		// rotate := RotateOverTime();
-		// 		// rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
-		// 		// rotate.speed = 0.25;
-		// 		// scene.SetComponent<RotateOverTime>(rootEntity, rotate);
-		// 	},
-		// );
-
-		for (x .. 12)
-		{
-			for (y .. 12)
+		gltfHandle := UseGLTFResource(
+			model, scene,
+			::(scene: *Scene, rootEntity: Entity, arg: *void)
 			{
-				pos: {x: int32, y: int32} = {x as int32, y as int32};
-				UseGLTFResource(
-					model, scene,
-					::(scene: *Scene, rootEntity: Entity, arg: *int)
-					{
-						pos := arg as {x: int32, y: int32};
-						log "Loaded gltf instance: ", rootEntity, pos;
-						scene.SetComponent<Transform>(rootEntity, Transform(Vec3(pos.x, pos.y, 0.0)));
-					},
-					pos as *int
-				);
-			}
-		}
+				log "Loaded gltf: ", rootEntity;
+
+				// IterateHierarchy(
+				// 	rootEntity, scene,
+				// 	::(entity: Entity, scene: *Scene)
+				// 	{
+				// 		rotate := RotateOverTime();
+				// 		rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
+				// 		rotate.speed = 0.25;
+				// 		scene.SetComponent<RotateOverTime>(entity, rotate);
+				// 	}
+				// );
+
+				// rotate := RotateOverTime();
+				// rotate.axis = Vec3(0.0, 1.0, 0.0) as Norm<Vec3>;
+				// rotate.speed = 0.25;
+				// scene.SetComponent<RotateOverTime>(rootEntity, rotate);
+			},
+		);
+
+		// for (x .. 32)
+		// {
+		// 	for (y .. 32)
+		// 	{
+		// 		pos: {x: int32, y: int32} = {x as int32, y as int32};
+		// 		UseGLTFResource(
+		// 			model, scene,
+		// 			::(scene: *Scene, rootEntity: Entity, arg: *int)
+		// 			{
+		// 				pos := arg as {x: int32, y: int32};
+		// 				// log "Loaded gltf instance: ", rootEntity, pos;
+		// 				scene.SetComponent<Transform>(rootEntity, Transform(Vec3(2 * pos.x, 2 * pos.y, 0.0)));
+		// 			},
+		// 			pos as *int
+		// 		);
+		// 	}
+		// }
 
 		CreateEditorWindow(scene);
 

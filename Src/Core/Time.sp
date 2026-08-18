@@ -117,4 +117,21 @@ float64 SecondsSinceStart()
 	return (ticks - StartTime) / Frequency as float64;
 }
 
+state Profiler
+{
+	time: int64
+}
+
+Profiler::()
+{
+	this.time = Ticks();
+}
+
+float64 Profiler::End()
+{
+	ticks := Ticks();
+	elapsed := ticks - this.time;
+	return (elapsed as float64) / (Frequency as float64);
+}
+
 

@@ -69,7 +69,7 @@ EntityComponentIterator<Type> Scene::Iterate<Type>()
 		}
 	}
 
-	return EntityComponentIterator<Type>();
+	return EntityComponentIterator<Type>(ComponentKind.Singleton, null);
 }
 
 *EntityComponentArray<Type> Scene::GetCommon<Type>(componentID: uint32)

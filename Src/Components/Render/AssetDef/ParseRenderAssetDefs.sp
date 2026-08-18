@@ -267,7 +267,7 @@ TextureDefinition ParseTextureDefinition(name: string, value: *JSONValue)
 
         colorSpaceValue := textureObj.GetMember("colorSpace");
         if (colorSpaceValue)
-            textureDef.colorSpace = ParseSamplerFormat(colorSpaceValue.String().value);
+            textureDef.colorSpace = ParseColorSpace(colorSpaceValue.String().value);
 
         multisampleValue := textureObj.GetMember("multisample");
         if (multisampleValue)

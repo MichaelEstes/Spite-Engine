@@ -168,6 +168,19 @@ state JSONString
 state JSONNumber
 {
 	value: ?{i: int, f: float},
+	isFloat: bool
+}
+
+float JSONNumber::AsFloat()
+{
+	if (this.isFloat) return this.value.f;
+	return this.value.i as float;
+}
+
+int JSONNumber::AsInt()
+{
+	if (this.isFloat) return this.value.f as int;
+	return this.value.i;
 }
 
 state JSONBoolean
@@ -554,6 +567,7 @@ bool IsStringDelim(char: byte)
 	copy_bytes(fixed strCopy, start, count);
 	strCopy[count + 1] = 0
 
+	numValue.value.number.isFloat = isFloat;
 	if (isFloat)
 	{
 		numValue.value.number.value.f = atof(fixed strCopy);

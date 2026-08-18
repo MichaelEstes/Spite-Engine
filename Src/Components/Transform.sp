@@ -44,12 +44,12 @@ WorldTransformComponent := ECS.RegisterComponent<WorldTransform>(
 
 TransformDirtyTag := ECS.RegisterTagComponent(
 	"TransformDirtyTag"
-	ComponentKind.Common
+	ComponentKind.Sparse
 );
 
 TransformUpdatedTag := ECS.RegisterTagComponent(
 	"TransformUpdatedTag"
-	ComponentKind.Common
+	ComponentKind.Sparse
 );
 
 FillHierarchyDirty(scene: Scene, entity: Entity)
