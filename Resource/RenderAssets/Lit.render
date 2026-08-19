@@ -96,8 +96,7 @@
                 code: `
                     vec3 N = normalize(normal);
                     vec3 T = normalize(tangents.xyz);
-                    vec3 B = cross(N, T);
-                    mat3 TBN = mat3(T, B, N);
+                    mat3 TBN = mat3(T, cross(N, T) * tangents.w, N);
 
                     vec3 tangentNormal = texture(normalTexture, uv0).xyz * 2.0 - 1.0;
                     tangentNormal.xy *= normalScale;
@@ -207,6 +206,14 @@
                     outColor.rgb += emissive;
                 `,
                 after: litOcclusion
+            },
+            {
+                name: litTone,
+                code: `
+                    vec3 toneColor = outColor.rgb / (outColor.rgb + vec3(1.0));
+                    outColor = vec4(toneColor, outColor.a);
+                `,
+                after: litEmissive
             }
         ],
 
