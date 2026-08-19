@@ -112,15 +112,19 @@ depthPass := RegisterRenderPass(
 
 					vkCmdSetCullMode(commandBuffer, meshState.GetCullMode());
 
-					vkCmdDrawIndexedIndirect(
+					vkCmdDrawIndexedIndirectCount(
 						commandBuffer,
-						drawBuffers.indexedDrawCommands.buffer, 0,
-						batch.indexedCount, #sizeof VkDrawIndexedIndirectCommand
+						drawBuffers.culledIndexedDrawCommands.buffer, 0,
+						drawBuffers.culledIndexedDrawCount.buffer, 0,
+						batch.indexedCount,
+						#sizeof VkDrawIndexedIndirectCommand
 					);
-					vkCmdDrawIndirect(
+					vkCmdDrawIndirectCount(
 						commandBuffer,
-						drawBuffers.drawCommands.buffer, 0,
-						batch.nonIndexedCount, #sizeof VkDrawIndirectCommand
+						drawBuffers.culledDrawCommands.buffer, 0,
+						drawBuffers.culledDrawCount.buffer, 0,
+						batch.nonIndexedCount,
+						#sizeof VkDrawIndirectCommand
 					);
 				}
 			},

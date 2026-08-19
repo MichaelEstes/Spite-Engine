@@ -63,14 +63,27 @@ state VulkanBatchBuffers
 	materialVariables: BufferHandle,
 	materialTextureSlots: BufferHandle,
 
+	indexedDrawCommands: BufferHandle,
+	drawCommands: BufferHandle,
+
+	culledIndexedDrawCommands: BufferHandle,
+	culledDrawCommands: BufferHandle
+	culledIndexedDrawCount: BufferHandle,
+	culledDrawCount: BufferHandle,
+
 	modelBufferAddress: uint64,
 	geometryVariablesAddress: uint64,
 	geometryAttributeSlotsAddress: uint64,
 	materialVariablesAddress: uint64,
 	materialTextureSlotsAddress: uint64,
 
-	indexedDrawCommands: BufferHandle,
-	drawCommands: BufferHandle,
+	indexedDrawCommandsAddress: uint64,
+	drawCommandsAddress: uint64,
+
+	culledIndexedDrawCommandsAddress: uint64,
+	culledDrawCommandsAddress: uint64,
+	culledIndexedDrawCountAddress: uint64,
+	culledDrawCountAddress: uint64,
 }
 
 state VulkanDrawBatch
@@ -78,8 +91,10 @@ state VulkanDrawBatch
 	buffers: VulkanBatchBuffers,
 	meshes: Array<VulkanDrawMesh>,
 	meshState: VulkanPipelineMeshState,
+
 	indexedCount: uint32,
 	nonIndexedCount: uint32,
+
 	dirtyIndex: uint32 = uint32(-1)
 }
 
@@ -100,14 +115,28 @@ VulkanDrawBatch::CreateBatchBuffers()
 	drawBuffers.materialVariables = CreateAddressableStorageBuffer(pointerArraySize);
 	drawBuffers.materialTextureSlots = CreateAddressableStorageBuffer(pointerArraySize);
 
+	drawBuffers.indexedDrawCommands = CreateDeviceIndirectBuffer(MaxModelCount * #sizeof VkDrawIndexedIndirectCommand);
+	drawBuffers.drawCommands = CreateDeviceIndirectBuffer(MaxModelCount * #sizeof VkDrawIndirectCommand);
+
+	drawBuffers.culledIndexedDrawCommands = CreateDeviceIndirectBuffer(MaxModelCount * #sizeof VkDrawIndexedIndirectCommand);
+	drawBuffers.culledDrawCommands = CreateDeviceIndirectBuffer(MaxModelCount * #sizeof VkDrawIndirectCommand);
+	drawBuffers.culledIndexedDrawCount = CreateDeviceIndirectBuffer(#sizeof uint32);
+	drawBuffers.culledDrawCount = CreateDeviceIndirectBuffer(#sizeof uint32);
+
 	drawBuffers.modelBufferAddress = GetBufferDeviceAddress(drawBuffers.modelBuffer.buffer);
 	drawBuffers.geometryVariablesAddress = GetBufferDeviceAddress(drawBuffers.geometryVariables.buffer);
 	drawBuffers.geometryAttributeSlotsAddress = GetBufferDeviceAddress(drawBuffers.geometryAttributeSlots.buffer);
 	drawBuffers.materialVariablesAddress = GetBufferDeviceAddress(drawBuffers.materialVariables.buffer);
 	drawBuffers.materialTextureSlotsAddress = GetBufferDeviceAddress(drawBuffers.materialTextureSlots.buffer);
-	
-	drawBuffers.indexedDrawCommands = CreateDeviceIndirectBuffer(MaxModelCount * #sizeof VkDrawIndexedIndirectCommand);
-	drawBuffers.drawCommands = CreateDeviceIndirectBuffer(MaxModelCount * #sizeof VkDrawIndirectCommand);
+
+	drawBuffers.indexedDrawCommandsAddress = GetBufferDeviceAddress(drawBuffers.indexedDrawCommands.buffer);
+	drawBuffers.drawCommandsAddress = GetBufferDeviceAddress(drawBuffers.drawCommands.buffer);
+
+	drawBuffers.culledIndexedDrawCommandsAddress = GetBufferDeviceAddress(drawBuffers.culledIndexedDrawCommands.buffer);
+	drawBuffers.culledDrawCommandsAddress = GetBufferDeviceAddress(drawBuffers.culledDrawCommands.buffer);
+	drawBuffers.culledIndexedDrawCountAddress = GetBufferDeviceAddress(drawBuffers.culledIndexedDrawCount.buffer);
+	drawBuffers.culledDrawCountAddress = GetBufferDeviceAddress(drawBuffers.culledDrawCount.buffer);
+
 }
 
 state VulkanMeshCallbacks
@@ -779,6 +808,7 @@ VulkanRenderer::UpdateScene(scene: *Scene, frame: uint32)
 	this.UpdateSceneUBO(scene, frame);
 	this.UpdateBatches(scene);
 	this.UpdateTransforms(scene);
+	ComputeVulkanDrawList(this, scene);
 }
 
 VulkanRenderer::Draw(scene: *Scene)
