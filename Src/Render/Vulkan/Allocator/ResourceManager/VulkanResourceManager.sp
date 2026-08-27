@@ -133,7 +133,6 @@ VulkanResourceManager::UploadGeometry(geometry: *Geometry, vulkanGeometry: *Vulk
 		vulkanGeometry.vertexCount = uint32(vertexAttr.count / attrDef.ValueSize());
 
 		geometry.ComputeBounds();
-		vulkanGeometry.bounds = geometry.bounds;
 	}
 
 	for (i .. attributeCount)

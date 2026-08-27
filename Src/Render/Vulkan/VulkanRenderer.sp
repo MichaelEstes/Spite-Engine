@@ -10,6 +10,7 @@ import Event
 import Array
 import ArrayView
 import WindowComponent
+import Common
 
 import ECS
 import RenderComponents
@@ -58,6 +59,7 @@ state VulkanDrawMesh
 state VulkanBatchBuffers
 {
 	modelBuffer: BufferHandle,
+	boundsBuffer: BufferHandle,
 	geometryVariables: BufferHandle,
 	geometryAttributeSlots: BufferHandle,
 	materialVariables: BufferHandle,
@@ -68,10 +70,9 @@ state VulkanBatchBuffers
 
 	culledIndexedDrawCommands: BufferHandle,
 	culledDrawCommands: BufferHandle
-	culledIndexedDrawCount: BufferHandle,
-	culledDrawCount: BufferHandle,
 
 	modelBufferAddress: uint64,
+	boundsBufferAddress: uint64,
 	geometryVariablesAddress: uint64,
 	geometryAttributeSlotsAddress: uint64,
 	materialVariablesAddress: uint64,
@@ -82,8 +83,6 @@ state VulkanBatchBuffers
 
 	culledIndexedDrawCommandsAddress: uint64,
 	culledDrawCommandsAddress: uint64,
-	culledIndexedDrawCountAddress: uint64,
-	culledDrawCountAddress: uint64,
 }
 
 state VulkanDrawBatch
@@ -110,6 +109,7 @@ VulkanDrawBatch::CreateBatchBuffers()
 	pointerArraySize := MaxModelCount * #sizeof uint64;
 
 	drawBuffers.modelBuffer = CreateAddressableStorageBuffer(MaxModelCount * #sizeof ModelUBO);
+	drawBuffers.boundsBuffer = CreateAddressableStorageBuffer(MaxModelCount * #sizeof AABB);
 	drawBuffers.geometryVariables = CreateAddressableStorageBuffer(pointerArraySize);
 	drawBuffers.geometryAttributeSlots = CreateAddressableStorageBuffer(pointerArraySize);
 	drawBuffers.materialVariables = CreateAddressableStorageBuffer(pointerArraySize);
@@ -120,10 +120,9 @@ VulkanDrawBatch::CreateBatchBuffers()
 
 	drawBuffers.culledIndexedDrawCommands = CreateDeviceIndirectBuffer(MaxModelCount * #sizeof VkDrawIndexedIndirectCommand);
 	drawBuffers.culledDrawCommands = CreateDeviceIndirectBuffer(MaxModelCount * #sizeof VkDrawIndirectCommand);
-	drawBuffers.culledIndexedDrawCount = CreateDeviceIndirectBuffer(#sizeof uint32);
-	drawBuffers.culledDrawCount = CreateDeviceIndirectBuffer(#sizeof uint32);
 
 	drawBuffers.modelBufferAddress = GetBufferDeviceAddress(drawBuffers.modelBuffer.buffer);
+	drawBuffers.boundsBufferAddress = GetBufferDeviceAddress(drawBuffers.boundsBuffer.buffer);
 	drawBuffers.geometryVariablesAddress = GetBufferDeviceAddress(drawBuffers.geometryVariables.buffer);
 	drawBuffers.geometryAttributeSlotsAddress = GetBufferDeviceAddress(drawBuffers.geometryAttributeSlots.buffer);
 	drawBuffers.materialVariablesAddress = GetBufferDeviceAddress(drawBuffers.materialVariables.buffer);
@@ -134,26 +133,31 @@ VulkanDrawBatch::CreateBatchBuffers()
 
 	drawBuffers.culledIndexedDrawCommandsAddress = GetBufferDeviceAddress(drawBuffers.culledIndexedDrawCommands.buffer);
 	drawBuffers.culledDrawCommandsAddress = GetBufferDeviceAddress(drawBuffers.culledDrawCommands.buffer);
-	drawBuffers.culledIndexedDrawCountAddress = GetBufferDeviceAddress(drawBuffers.culledIndexedDrawCount.buffer);
-	drawBuffers.culledDrawCountAddress = GetBufferDeviceAddress(drawBuffers.culledDrawCount.buffer);
+}
 
+state VulkanCullData
+{
+	frustumUBO: SharedUBO<Frustum>
+}
+
+VulkanCullData::(device: *VkDevice_T, allocator: VulkanAllocator)
+{
+	this.frustumUBO.Init(device, allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_COMPUTE_BIT);
 }
 
 state VulkanMeshCallbacks
 {
 	onMeshAdded: ::(SceneEntity, *Mesh, *VulkanRenderer) = 
-			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) 
-			{
-				renderer.MeshUpdated(sceneEntity, mesh);
-			},
+		::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) 
+		{
+			renderer.MeshUpdated(sceneEntity, mesh);
+		},
 
 	onMeshRemoved: ::(SceneEntity, *Mesh, *VulkanRenderer) = 
-			::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) 
-			{
-				renderer.MeshRemoved(sceneEntity, mesh);
-			},
-	
-	drawListUpdate: ::(*Scene, *VulkanRenderer) = null
+		::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) 
+		{
+			renderer.MeshRemoved(sceneEntity, mesh);
+		}
 }
 
 state VulkanRendererConfig
@@ -176,6 +180,7 @@ state VulkanRenderer
 	transferCommands: VulkanCommands,
 	
 	sceneShared: SharedUBO<SceneUBO>,
+	cullData: VulkanCullData,
 
 	materialPool: *VkDescriptorPool_T,
 
@@ -257,6 +262,7 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 	if (config.useSceneUBO)
 	{
 		vulkanRenderer.sceneShared.Init(device, allocator, 0, VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT);
+		vulkanRenderer.cullData = VulkanCullData(device, allocator);
 	}
 
 	vulkanRenderer.CreateMaterialDescPool(config.materialDescriptorCount, config.maxMaterialSets);
@@ -655,7 +661,7 @@ VulkanRenderer::UpdateTransforms(scene: *Scene)
 		model := ModelUBO();
 		model.model = transform.mat;
 
-		UpdateBufferCopy(
+		UpdateBuffer(
 			commandBuffer, drawBuffers.modelBuffer.buffer,
 			model@ as *byte, #sizeof ModelUBO, drawID.index * #sizeof ModelUBO
 		);
@@ -709,35 +715,55 @@ VulkanRenderer::UpdateBatches(scene: *Scene)
 				instanceCount = uint32(1);
 			}
 
+			entity := drawMesh.entity;
+
 			drawID := VulkanDrawID();
 			drawID.index = index;
 			drawID.drawIndex = drawIndex;
-			scene.SetComponentDirect<VulkanDrawID>(drawMesh.entity, drawID, VulkanDrawIDComponent);
+			scene.SetComponentDirect<VulkanDrawID>(entity, drawID, VulkanDrawIDComponent);
+
+			transform := scene.GetComponent<WorldTransform>(entity);
+			if (transform)
+			{
+				model := ModelUBO();
+				model.model = transform.mat;
+
+				UpdateBuffer(
+					commandBuffer, drawBuffers.modelBuffer.buffer,
+					model@ as *byte, #sizeof ModelUBO, drawID.index * #sizeof ModelUBO
+				);
+			}
+
+			mesh := scene.GetComponent<Mesh>(entity);
+			UpdateBuffer(
+				commandBuffer, drawBuffers.boundsBuffer.buffer,
+				mesh.geometry.bounds@ as *byte, #sizeof AABB, drawID.index * #sizeof AABB
+			);
 
 			vulkanMesh := resourceManager.meshes.Get(drawMesh.meshHandle);
 			geometry := vulkanMesh.geometry;
 			material := vulkanMesh.material;
 
 			geometryVariablesAddress := GetBufferDeviceAddress(geometry.variables.buffer);
-			UpdateBufferCopy(
+			UpdateBuffer(
 				commandBuffer, drawBuffers.geometryVariables.buffer,
 				geometryVariablesAddress@ as *byte, #sizeof uint64, index * #sizeof uint64
 			);
 
 			geometryAttributeSlotsAddress := GetBufferDeviceAddress(geometry.attributeSlots.buffer);
-			UpdateBufferCopy(
+			UpdateBuffer(
 				commandBuffer, drawBuffers.geometryAttributeSlots.buffer,
 				geometryAttributeSlotsAddress@ as *byte, #sizeof uint64, index * #sizeof uint64
 			);
 
 			materialVariablesAddress := GetBufferDeviceAddress(material.variables.buffer);
-			UpdateBufferCopy(
+			UpdateBuffer(
 				commandBuffer, drawBuffers.materialVariables.buffer,
 				materialVariablesAddress@ as *byte, #sizeof uint64, index * #sizeof uint64
 			);
 
 			materialTextureSlotsAddress := GetBufferDeviceAddress(material.textureSlots.buffer);
-			UpdateBufferCopy(
+			UpdateBuffer(
 				commandBuffer, drawBuffers.materialTextureSlots.buffer,
 				materialTextureSlotsAddress@ as *byte, #sizeof uint64, index * #sizeof uint64
 			);
@@ -746,7 +772,7 @@ VulkanRenderer::UpdateBatches(scene: *Scene)
 			{
 				if (geometry.indexCount > 0)
 				{
-					UpdateBufferCopy(
+					UpdateBuffer(
 						commandBuffer, drawBuffers.indexedDrawCommands.buffer,
 						instanceCount@ as *byte, #sizeof uint32,
 						(indexedCount - 1) * #sizeof VkDrawIndexedIndirectCommand + #offsetof(VkDrawIndexedIndirectCommand, instanceCount)
@@ -754,7 +780,7 @@ VulkanRenderer::UpdateBatches(scene: *Scene)
 				}
 				else
 				{
-					UpdateBufferCopy(
+					UpdateBuffer(
 						commandBuffer, drawBuffers.drawCommands.buffer,
 						instanceCount@ as *byte, #sizeof uint32,
 						(nonIndexedCount - 1) * #sizeof VkDrawIndirectCommand + #offsetof(VkDrawIndirectCommand, instanceCount)
@@ -766,12 +792,12 @@ VulkanRenderer::UpdateBatches(scene: *Scene)
 				if (geometry.indexCount > 0)
 				{
 					currentIndexedCmd := VkDrawIndexedIndirectCommand();
-					currentIndexedCmd.indexCount = geometry.indexCount;
 					currentIndexedCmd.instanceCount = 1;
+					currentIndexedCmd.indexCount = geometry.indexCount;
 					currentIndexedCmd.firstIndex = geometry.firstIndex;
 					currentIndexedCmd.vertexOffset = 0;
 					currentIndexedCmd.firstInstance = index;
-					UpdateBufferCopy(
+					UpdateBuffer(
 						commandBuffer, drawBuffers.indexedDrawCommands.buffer,
 						currentIndexedCmd@ as *byte, #sizeof VkDrawIndexedIndirectCommand,
 						indexedCount * #sizeof VkDrawIndexedIndirectCommand
@@ -785,7 +811,7 @@ VulkanRenderer::UpdateBatches(scene: *Scene)
 					currentDrawCmd.instanceCount = 1;
 					currentDrawCmd.firstVertex = 0;
 					currentDrawCmd.firstInstance = index;
-					UpdateBufferCopy(
+					UpdateBuffer(
 						commandBuffer, drawBuffers.drawCommands.buffer,
 						currentDrawCmd@ as *byte, #sizeof VkDrawIndirectCommand,
 						nonIndexedCount * #sizeof VkDrawIndirectCommand

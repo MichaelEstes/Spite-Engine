@@ -216,17 +216,15 @@ assetPass := RegisterRenderPass(
 
 					vkCmdSetCullMode(commandBuffer, meshState.GetCullMode());
 
-					vkCmdDrawIndexedIndirectCount(
+					vkCmdDrawIndexedIndirect(
 						commandBuffer,
 						drawBuffers.culledIndexedDrawCommands.buffer, 0,
-						drawBuffers.culledIndexedDrawCount.buffer, 0,
 						batch.indexedCount,
 						#sizeof VkDrawIndexedIndirectCommand
 					);
-					vkCmdDrawIndirectCount(
+					vkCmdDrawIndirect(
 						commandBuffer,
 						drawBuffers.culledDrawCommands.buffer, 0,
-						drawBuffers.culledDrawCount.buffer, 0,
 						batch.nonIndexedCount,
 						#sizeof VkDrawIndirectCommand
 					);

@@ -44,7 +44,7 @@ state Geometry
     attributes: Array<ArrayView<byte>>,
     variables: *void,
     indices: ArrayView<uint16>,
-    bounds: BoundingBox,
+    bounds: AABB,
 
     defHandle: AssetDefHandle,
         
@@ -149,6 +149,11 @@ Geometry::ComputeBounds()
         if (point.z > max.z) max.z = point.z;
     }
 
-    this.bounds.min = min;
-    this.bounds.max = max;
+    center := Vec3(
+        (min.x + max.x) * 0.5,
+        (min.y + max.y) * 0.5,
+        (min.z + max.z) * 0.5
+    );
+    this.bounds.center = Vec4(center, 1.0);
+    this.bounds.half = Vec4(max - center, 1.0);
 }

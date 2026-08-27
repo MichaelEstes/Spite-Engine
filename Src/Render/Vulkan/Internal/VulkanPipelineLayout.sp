@@ -12,7 +12,7 @@ state PipelineLayoutKey
 }
 
 PipelineLayoutKey::(assetDefHandle: AssetDefHandle,
-					 stages: VkShaderStageFlagBits = VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT | VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT)
+					stages: VkShaderStageFlagBits = VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT | VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT)
 {
 	this.assetDefHandle = assetDefHandle;
 	this.stages = stages;

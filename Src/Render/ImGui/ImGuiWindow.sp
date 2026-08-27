@@ -123,7 +123,6 @@ ImGuiWindow::InitVulkan(scene: Scene, entity: Entity)
 		renderConfig.useSceneUBO = false;
 		renderConfig.meshCallbacks.onMeshAdded = ::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {};
 		renderConfig.meshCallbacks.onMeshRemoved = ::(sceneEntity: SceneEntity, mesh: *Mesh, renderer: *VulkanRenderer) {};
-		renderConfig.meshCallbacks.drawListUpdate = ::(scene: *Scene, renderer: *VulkanRenderer) {};
 		CreateVulkanRenderer(
 			scene, entity,
 			Array<string>(["ImGuiPass",]),

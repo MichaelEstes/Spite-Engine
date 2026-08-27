@@ -4,12 +4,15 @@ import ECS
 import Transform
 import RenderAssetDef
 
+import Common
+
 drawListComputeSource := `
 #version 460
 #pragma shader_stage(compute)
 
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference : require
+#extension GL_EXT_control_flow_attributes : require
 
 layout(local_size_x = 128) in;
 
@@ -30,6 +33,26 @@ struct DrawIndirectCommand
 	uint firstInstance;
 };
 
+struct AABB
+{
+	vec4 center;
+	vec4 halfLength;
+};
+
+layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer ModelBuffer
+{
+    mat4 models[];
+};
+
+layout(buffer_reference, std430, buffer_reference_align = 16) buffer OutModelBuffer
+{
+    mat4 models[];
+};
+
+layout(buffer_reference, std430) readonly buffer Bounds {
+    AABB aabbs[];
+};
+
 layout(buffer_reference, std430) readonly buffer IndexedDraws {
     DrawIndexedIndirectCommand indexedDraws[];
 };
@@ -39,62 +62,88 @@ layout(buffer_reference, std430) readonly buffer Draws
     DrawIndirectCommand draws[];
 };
 
-layout(buffer_reference, std430) buffer CulledIndexedDraws
+layout(buffer_reference, std430) buffer OutIndexedDraws {
+    DrawIndexedIndirectCommand indexedDraws[];
+};
+
+layout(buffer_reference, std430) buffer OutDraws 
 {
-    DrawIndexedIndirectCommand culledIndexedDraws[];
-};
-
-layout(buffer_reference, std430) buffer CulledDraws
-{
-    DrawIndirectCommand culledDraws[];
-};
-
-layout(buffer_reference, std430) buffer CulledIndexedCountBuffer {
-    uint culledIndexedCount;
-};
-
-layout(buffer_reference, std430) buffer CulledCountBuffer {
-    uint culledCount;
+    DrawIndirectCommand draws[];
 };
 
 layout(push_constant) uniform Params {
 	IndexedDraws indexedDrawCommands;
 	Draws drawCommands;
 
-	CulledIndexedDraws culledIndexedDrawCommands;
-	CulledDraws culledDrawCommands;
-	CulledIndexedCountBuffer culledIndexedDrawCount;
-	CulledCountBuffer culledDrawCount;
+	OutIndexedDraws culledIndexedDrawCommands;
+	OutDraws culledDrawCommands;
+
+	ModelBuffer models;
+	Bounds bounds;
 
 	uint indexedDrawCount;
 	uint drawCount;
 } params;
 
+layout(set = 0, binding = 0) uniform FrustumUBO
+{
+    vec4 planes[6];
+} frustum;
+
+bool IsVisible(vec3 worldCenter, vec3 worldExtent, vec4 planes[6])
+{
+	[[unroll]] for (int i = 0; i < 6; i++)
+    {
+        float extent = dot(worldExtent, abs(planes[i].xyz));
+        if (dot(planes[i].xyz, worldCenter) + planes[i].w + extent < 0.0)
+			return false;
+    }
+    return true;
+}
+
 void main()
 {
 	uint index = gl_GlobalInvocationID.x;
-
-	bool visible = true;
-
+	
 	if (params.indexedDrawCount > 0)
 	{
 		if (index >= params.indexedDrawCount) return;
 
-		if (visible)
+		DrawIndexedIndirectCommand cmd = params.indexedDrawCommands.indexedDraws[index];
+		AABB aabb = params.bounds.aabbs[cmd.firstInstance];
+		mat4 model = params.models.models[cmd.firstInstance];
+		mat3 linear = mat3(model);
+		vec3 worldCenter = (model * aabb.center).xyz;
+		vec3 worldExtent = mat3(abs(linear[0]), abs(linear[1]), abs(linear[2])) * aabb.halfLength.xyz;
+
+		bool visible = IsVisible(worldCenter, worldExtent, frustum.planes);
+
+		if (visible == false)
 		{
-			uint dst = atomicAdd(params.culledIndexedDrawCount.culledIndexedCount, 1);
-			params.culledIndexedDrawCommands.culledIndexedDraws[dst] = params.indexedDrawCommands.indexedDraws[index];
+			cmd.instanceCount = 0;
 		}
+		
+		params.culledIndexedDrawCommands.indexedDraws[index] = cmd;
 	}
 	else
 	{
 		if (index >= params.drawCount) return;
 
-		if (visible)
+		DrawIndirectCommand cmd = params.drawCommands.draws[index];
+		AABB aabb = params.bounds.aabbs[cmd.firstInstance];
+		mat4 model = params.models.models[cmd.firstInstance];
+		mat3 linear = mat3(model);
+		vec3 worldCenter = (model * aabb.center).xyz;
+		vec3 worldExtent = mat3(abs(linear[0]), abs(linear[1]), abs(linear[2])) * aabb.halfLength.xyz;
+
+		bool visible = IsVisible(worldCenter, worldExtent, frustum.planes);
+
+		if (visible == false)
 		{
-			uint dst = atomicAdd(params.culledDrawCount.culledCount, 1);
-			params.culledDrawCommands.culledDraws[dst] = params.drawCommands.draws[index];
+			cmd.instanceCount = 0;
 		}
+
+		params.culledDrawCommands.draws[index] = cmd;
 	}
 }
 `;
@@ -103,10 +152,12 @@ state DrawComputePush
 {
 	indexedDrawCommandsAddress: uint64,
 	drawCommandsAddress: uint64,
+
 	culledIndexedDrawCommandsAddress: uint64,
 	culledDrawCommandsAddress: uint64,
-	culledIndexedDrawCountAddress: uint64,
-	culledDrawCountAddress: uint64,
+
+	modelBufferAddress: uint64,
+	boundsBufferAddress: uint64,
 
 	indexedDrawCount: uint32,
 	drawCount: uint32
@@ -118,40 +169,22 @@ ComputeVulkanDrawList(renderer: VulkanRenderer, scene: *Scene)
 	pipeline := FindOrCreateComputePipeline("VulkanDrawListCompute", drawListComputeSource);
 	commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 	bindPoint := VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_COMPUTE;
+	frame := renderer.Frame();
 
-	for (batch in renderer.drawList.batchMap.Values())
-	{
-		meshes := batch.meshes;
-		if (!meshes.count) continue;
+	view := renderer.sceneShared.current.view;
+	projection := renderer.sceneShared.current.projection;
+	frustum := Frustum().FromViewProjection(view * projection);
 
-		drawBuffers := batch.buffers;
-
-		UpdateBufferCopy(
-			commandBuffer, drawBuffers.culledIndexedDrawCount.buffer,
-			uint32(0)@ as *byte, #sizeof uint32, 0
-		);
-		UpdateBufferCopy(
-			commandBuffer, drawBuffers.culledDrawCount.buffer,
-			uint32(0)@ as *byte, #sizeof uint32, 0
-		);
-	}
-
-	uploadBarrier := VkMemoryBarrier();
-	uploadBarrier.sType = VkStructureType.VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-	uploadBarrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
-	uploadBarrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT |
-								  VkAccessFlagBits.VK_ACCESS_SHADER_WRITE_BIT;
-	vkCmdPipelineBarrier(
-		commandBuffer,
-		VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT,
-		VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		0,
-		1, uploadBarrier@,
-		0, null,
-		0, null
-	);
+	renderer.cullData.frustumUBO.Update(frame, frustum);
+	
+	frustumDescSet := renderer.cullData.frustumUBO.GetDescSet(frame);
 
 	vkCmdBindPipeline(commandBuffer, bindPoint, pipeline.pipeline);
+
+	vkCmdBindDescriptorSets(
+		commandBuffer, bindPoint, pipeline.layout,
+		uint32(0), uint32(1), frustumDescSet@, uint32(0), null
+	);
 
 	for (batch in renderer.drawList.batchMap.Values())
 	{
@@ -163,10 +196,13 @@ ComputeVulkanDrawList(renderer: VulkanRenderer, scene: *Scene)
 		push := DrawComputePush();
 		push.indexedDrawCommandsAddress = drawBuffers.indexedDrawCommandsAddress;
 		push.drawCommandsAddress = drawBuffers.drawCommandsAddress;
+
 		push.culledIndexedDrawCommandsAddress = drawBuffers.culledIndexedDrawCommandsAddress;
 		push.culledDrawCommandsAddress = drawBuffers.culledDrawCommandsAddress;
-		push.culledIndexedDrawCountAddress = drawBuffers.culledIndexedDrawCountAddress;
-		push.culledDrawCountAddress = drawBuffers.culledDrawCountAddress;
+		
+		push.modelBufferAddress = drawBuffers.modelBufferAddress;
+		push.boundsBufferAddress = drawBuffers.boundsBufferAddress;
+		
 		push.indexedDrawCount = batch.indexedCount;
 		push.drawCount = uint32(0);
 

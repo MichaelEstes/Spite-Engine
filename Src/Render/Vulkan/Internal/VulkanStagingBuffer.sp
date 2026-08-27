@@ -2,8 +2,8 @@ package VulkanRenderer
 
 import Math
 
-UpdateBufferCopy(commandBuffer: *VkCommandBuffer_T, dstBuffer: *VkBuffer_T, 
-				 data: *byte, size: uint, dstOffset: uint = 0)
+UpdateBuffer(commandBuffer: *VkCommandBuffer_T, dstBuffer: *VkBuffer_T, 
+			 data: *byte, size: uint, dstOffset: uint = 0)
 {
 	assert (size % 4) == 0, "size must be a multiple of 4";
 	assert (dstOffset % 4) == 0, "dstOffset must be a multiple of 4";

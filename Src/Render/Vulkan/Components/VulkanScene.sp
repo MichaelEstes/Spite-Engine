@@ -32,8 +32,6 @@ state VulkanGeometry
 
 	variables: BufferHandle,
 
-	bounds: BoundingBox,
-
 	firstIndex: uint32,
 	indexCount: uint32,
 	vertexCount: uint32,
