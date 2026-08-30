@@ -39,7 +39,7 @@ ImGuiRenderFunc CreateSceneGraphEditor(panel: EditorPanel, entity: Entity, scene
                 {
                     type := GetTypeForComponent(commonComponent);
                     data := scene.GetComponentUntyped(entity, commonComponent);
-                    if (TypeValueEditor(type.StateName(), { type, data } as TypeValue))
+                    if (TypeValueEditor(type.StateName(), EditorTypedValue:{ type, data }))
                     {
                         scene.SetComponentUntyped(entity, data, commonComponent);
                     }
@@ -49,7 +49,7 @@ ImGuiRenderFunc CreateSceneGraphEditor(panel: EditorPanel, entity: Entity, scene
                 {
                     type := GetTypeForComponent(sparseComponent);
                     data := scene.GetComponentUntyped(entity, sparseComponent);
-                    if (TypeValueEditor(type.StateName(), { type, data } as TypeValue))
+                    if (TypeValueEditor(type.StateName(), EditorTypedValue:{ type, data }))
                     {
                         scene.SetComponentUntyped(entity, data, sparseComponent);
                     }

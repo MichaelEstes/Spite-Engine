@@ -118,13 +118,18 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 	assert !this.componentTypeMap.Has(type), "Cannot register a component twice";
 
 	// log "Registering Component: ", type.StateName(), (type as *void);
+	
+	defaultCallBack := ::(entity: Entity, comp: *Type, scene: Scene) {};
+	if (!onRemove) onRemove = defaultCallBack;
+	if (!onEnter) onEnter = defaultCallBack;
+
 
 	component := { this.componentCount, componentKind, uint32(#sizeof Type) } as Component;
 	this.componentTypeMap.Insert(type, component);
 	this.componentIDSet.Insert(component.id, component);
 	this.componentTypeSet.Insert(component.id, type);
-	if (onRemove) this.componentRemoveCallbacks.Insert(component.id, onRemove);
-	if (onEnter) this.componentEnterCallbacks.Insert(component.id, onEnter);
+	this.componentRemoveCallbacks.Insert(component.id, onRemove);
+	this.componentEnterCallbacks.Insert(component.id, onEnter);
 	this.componentCount += 1;
 	return component;
 }
@@ -136,11 +141,15 @@ TagComponent ECS::RegisterTagComponent(serializeName: string
 {
 	assert !this.tagComponentNameMap.Has(serializeName), "Tag component names must be unique";
 
+	defaultCallBack := ::(entity: Entity, scene: Scene) {};
+	if (!onRemove) onRemove = defaultCallBack;
+	if (!onEnter) onEnter = defaultCallBack;
+
 	tagComponent := { this.tagComponentCount, componentKind } as TagComponent;
 	this.tagComponentNameMap.Insert(serializeName, tagComponent);
 	this.tagComponentSerializeMap.Insert(tagComponent.id, serializeName);
-	if (onRemove) this.tagComponentRemoveCallbacks.Insert(tagComponent.id, onRemove);
-	if (onEnter) this.tagComponentEnterCallbacks.Insert(tagComponent.id, onEnter);
+	this.tagComponentRemoveCallbacks.Insert(tagComponent.id, onRemove);
+	this.tagComponentEnterCallbacks.Insert(tagComponent.id, onEnter);
 	this.tagComponentCount += 1;
 	return tagComponent;
 }
@@ -234,35 +243,24 @@ Component ECS::GetComponentByID(id: uint32)
 
 ECS::OnComponentRemove(id: uint32, entity: Entity, componentData: *any, scene: Scene)
 {
-	if (!this.componentRemoveCallbacks.Has(id)) return;
-
 	callback := this.componentRemoveCallbacks.Get(id)~;
 	callback(entity, componentData, scene);
 }
 
 ECS::OnComponentEnter(id: uint32, entity: Entity, componentData: *any, scene: Scene)
 {
-	if (!this.componentEnterCallbacks.Has(id)) 
-	{
-		return;
-	}
-
 	callback := this.componentEnterCallbacks.Get(id)~;
 	callback(entity, componentData, scene);
 }
 
 ECS::OnTagComponentRemove(id: uint32, entity: Entity, scene: Scene)
 {
-	if (!this.tagComponentRemoveCallbacks.Has(id)) return;
-
 	callback := this.tagComponentRemoveCallbacks.Get(id)~;
 	callback(entity, scene);
 }
 
 ECS::OnTagComponentEnter(id: uint32, entity: Entity, scene: Scene)
 {
-	if (!this.tagComponentEnterCallbacks.Has(id)) return;
-
 	callback := this.tagComponentEnterCallbacks.Get(id)~;
 	callback(entity, scene);
 }

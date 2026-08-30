@@ -73,6 +73,7 @@ shadowPass := RegisterRenderPass(
 				bindPoint := VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS;
 
                 directionalLight := null as *DirectionalLight;
+			
                 for (ec in scene.Iterate<DirectionalLight>())
                 {
                     directionalLight = ec.component;

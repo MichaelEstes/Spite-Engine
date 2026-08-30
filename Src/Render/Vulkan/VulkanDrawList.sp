@@ -6,6 +6,8 @@ import RenderAssetDef
 
 import Common
 
+import Editor
+
 drawListComputeSource := `
 #version 460
 #pragma shader_stage(compute)
@@ -171,11 +173,16 @@ ComputeVulkanDrawList(renderer: VulkanRenderer, scene: *Scene)
 	bindPoint := VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_COMPUTE;
 	frame := renderer.Frame();
 
-	view := renderer.sceneShared.current.view;
-	projection := renderer.sceneShared.current.projection;
-	frustum := Frustum().FromViewProjection(view * projection);
+	updateFrustum := GetEditorOption<bool>(scene, "Update Frustum", true);
 
-	renderer.cullData.frustumUBO.Update(frame, frustum);
+	if (updateFrustum)
+	{
+		view := renderer.sceneShared.current.view;
+		projection := renderer.sceneShared.current.projection;
+		frustum := Frustum().FromViewProjection(view * projection);
+
+		renderer.cullData.frustumUBO.Update(frame, frustum);
+	}
 	
 	frustumDescSet := renderer.cullData.frustumUBO.GetDescSet(frame);
 

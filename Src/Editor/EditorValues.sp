@@ -2,7 +2,7 @@ package Editor
 
 import ImGui
 
-state TypeValue
+state EditorTypedValue
 {
     meta: *_Type,
     val: *any
@@ -63,7 +63,7 @@ bool BoolValueEditor(label: string, val: *bool)
     return ImGui_Checkbox(label[0], val);
 }
 
-bool TypeValueEditor(label: string, val: TypeValue)
+bool TypeValueEditor(label: string, val: EditorTypedValue)
 {
     type := val.meta;
     typeData := type.type;
@@ -111,7 +111,7 @@ bool TypeValueEditor(label: string, val: TypeValue)
                 {
                     memberLabel := member.value.name.ToString();
                     memberPtr := (valuePtr as *byte) + member.offset;
-                    memberChanged := TypeValueEditor(memberLabel, { member.value.type, memberPtr } as TypeValue);
+                    memberChanged := TypeValueEditor(memberLabel, EditorTypedValue:{ member.value.type, memberPtr });
                     changed = changed | memberChanged;
                 }
 

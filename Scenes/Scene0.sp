@@ -94,6 +94,14 @@ _ := SceneRegistry.RegisterScene(
 			8.0
 		));
 
+		boxEntity := scene.CreateEntity();
+		scene.SetComponent<BoxMesh>(lineEntity, BoxMesh(
+			1.0,
+			1.0,
+			1.0,
+			Color(1.0, 0.0, 0.0, 1.0)
+		));
+
 		// model := "./Resource/Models/Box/Box.gltf";
 		// model := "./Resource/Models/BoxTextured/BoxTextured.gltf";
 		// model := "./Resource/Models/BrainStem/BrainStem.gltf";
