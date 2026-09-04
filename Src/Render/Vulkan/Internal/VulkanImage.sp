@@ -100,6 +100,93 @@ VkImageViewCreateInfo DefaultImageView(image: *VkImage_T, imageInfo: VkImageCrea
 	return viewCreateInfo;
 }
 
+VkAccessFlagBits ImageLayoutAccessMask(layout: VkImageLayout)
+{
+	switch (layout)
+	{
+		case (VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+			return VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+				   VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+			return VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+				   VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+			return VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_GENERAL)
+			return VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT |
+				   VkAccessFlagBits.VK_ACCESS_SHADER_WRITE_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+			return VkAccessFlagBits.VK_ACCESS_TRANSFER_READ_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+			return VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
+	}
+
+	return VkAccessFlagBits.VK_ACCESS_NONE;
+}
+
+VkPipelineStageFlagBits ImageLayoutStageMask(layout: VkImageLayout)
+{
+	switch (layout)
+	{
+		case (VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+			return VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+			return VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+				   VkPipelineStageFlagBits.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+			return VkPipelineStageFlagBits.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+				   VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_GENERAL)
+			return VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+			return VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+			return VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT;
+		case (VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+			return VkPipelineStageFlagBits.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	}
+
+	return VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+}
+
+CmdTransitionImageLayout(commandBuffer: *VkCommandBuffer_T, image: *VkImage_T,
+						 oldLayout: VkImageLayout, newLayout: VkImageLayout,
+						 format: VkFormat, mipLevels: uint32, layerCount: uint32)
+{
+	aspectMask := VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+	if (IsDepthFormat(format))
+	{
+		aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT;
+		if (HasStencilComponent(format))
+			aspectMask |= VkImageAspectFlagBits.VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	barrier := VkImageMemoryBarrier();
+	barrier.sType = VkStructureType.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = newLayout;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = image;
+	barrier.srcAccessMask = ImageLayoutAccessMask(oldLayout);
+	barrier.dstAccessMask = ImageLayoutAccessMask(newLayout);
+	barrier.subresourceRange.aspectMask = aspectMask;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = mipLevels;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = layerCount;
+
+	vkCmdPipelineBarrier(
+		commandBuffer,
+		ImageLayoutStageMask(oldLayout),
+		ImageLayoutStageMask(newLayout),
+		0,
+		0, null,
+		0, null,
+		1, barrier@
+	);
+}
+
 TransitionImageLayout(device: *VkDevice_T, commandPool: *VkCommandPool_T,
 					  queue: *VkQueue_T, image: *VkImage_T,  
 					  oldLayout: VkImageLayout, newLayout: VkImageLayout,

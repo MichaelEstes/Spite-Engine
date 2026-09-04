@@ -4,18 +4,19 @@ import ECS
 import Time
 import Window
 import SDL
-import ImGui
 import Event
 import SceneRegistry
 import Input
 import Math
 import RenderAssetDef
+import Tracy
 
 running := false;
 
 Initialize()
 {
 	InitializeTime();
+	Tracy.StartupProfiler();
 	Math.SetRandomSeed(Time.StartTime);
 	Fiber.InitalizeFibers();
 
@@ -60,6 +61,8 @@ MainLoop()
 		ECS.instance.PreDraw();
 		ECS.instance.Draw();
 		ECS.instance.PostFrame();
+
+		Tracy.FrameMark(null);
 	}
 
 	ECS.instance.Stop();

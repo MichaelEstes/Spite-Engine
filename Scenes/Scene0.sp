@@ -15,9 +15,6 @@ import SceneComponents
 import Transform
 import Common
 
-import ImGui
-import Utils
-
 import Editor
 
 _ := SceneRegistry.RegisterScene(

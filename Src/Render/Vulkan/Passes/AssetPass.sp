@@ -58,8 +58,9 @@ AssetPassState::Init()
 }
 
 *VkDescriptorSet_T GetFrameGlobalSet(assetState: *AssetPassState, assetDefHandle: AssetDefHandle,
-									 context: *RenderPassContext<VulkanRenderer>,
-									 renderer: *VulkanRenderer, lightCull: *LightCullState, frame: uint32)
+									 assetDef: *AssetDef, context: *RenderPassContext<VulkanRenderer>,
+									 renderer: *VulkanRenderer, lightCull: *LightCullState,
+									 shadow: *ShadowPassState, frame: uint32)
 {
 	globalFrame := assetState.frameGlobals.frames[frame];
 	device := vulkanInstance.device;
@@ -81,12 +82,24 @@ AssetPassState::Init()
 
 		WriteUniformBufferDescriptor(device, globalFrame.set, 0, renderer.sceneShared.buffers[frame], #sizeof SceneUBO);
 
-		if (lightCull)
+		if (assetDef.flags & AssetDefFlags.UseLighting)
 		{
+			atlasImage := UseRenderPassTexture<VulkanRenderer, VkImage_T>(context, shadow.directionalLightAtlas);
+			atlasTarget := vulkanInstance.resourceManager.renderTargetMap.Find(atlasImage);
+
+			WriteCombinedImageSamplerDescriptor(
+				device, globalFrame.set, 1,
+				atlasTarget.imageView, shadow.atlasSampler,
+				VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+			);
+
+
 			WriteStorageBufferDescriptor(device, globalFrame.set, 2, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightsHandle, frame));
 			WriteStorageBufferDescriptor(device, globalFrame.set, 3, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightGridHandle, frame));
 			WriteStorageBufferDescriptor(device, globalFrame.set, 4, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightIndexHandle, frame));
 			WriteStorageBufferDescriptor(device, globalFrame.set, 5, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.clusterInfoHandle, frame));
+
+			WriteUniformBufferDescriptor(device, globalFrame.set, 6, shadow.shadowData.buffers[frame], #sizeof DirectionalShadowData);
 		}
 	}
 
@@ -121,6 +134,13 @@ assetPass := RegisterRenderPass(
 					builder.Read(lightCull.lightsHandle, ResourceUsageFlags.StorageRead);
 				}
 
+				shadowPass := renderer.GetRenderPassByName(shadowPassName);
+				if (shadowPass)
+				{
+					shadow := shadowPass.data as *ShadowPassState;
+					builder.Read(shadow.directionalLightAtlas, ResourceUsageFlags.Sampled);
+				}
+
 				return true;
 			},
 			::(context: *RenderPassContext<VulkanRenderer>, scene: *Scene) 
@@ -142,6 +162,10 @@ assetPass := RegisterRenderPass(
 				lightCull: *LightCullState = null;
 				lightCullPass := renderer.GetRenderPassByName(lightCullPassName);
 				if (lightCullPass) lightCull = lightCullPass.data as *LightCullState;
+
+				shadow: *ShadowPassState = null;
+				shadowPass := renderer.GetRenderPassByName(shadowPassName);
+				if (shadowPass) shadow = shadowPass.data as *ShadowPassState;
 
 				sceneDescSet := renderer.sceneShared.GetDescSet(frame);
 
@@ -170,9 +194,9 @@ assetPass := RegisterRenderPass(
 
 					assetDef := GetAssetDefWithHandle(meshState.assetDefHandle);
 
-					if (lightCull && (assetDef.flags & AssetDefFlags.UseLightCulling))
+					if (assetDef.flags & AssetDefFlags.UseLighting)
 					{
-						set0 := GetFrameGlobalSet(assetState, meshState.assetDefHandle, context, renderer, lightCull, frame);
+						set0 := GetFrameGlobalSet(assetState, meshState.assetDefHandle, assetDef, context, renderer, lightCull, shadow, frame);
 						vkCmdBindDescriptorSets(
 							commandBuffer, bindPoint, pipelineLayout,
 							uint32(0), uint32(1), set0@, uint32(0), null
@@ -245,5 +269,11 @@ assetPass := RegisterRenderPass(
 		assetState := self.data as *AssetPassState;
 		vkDestroyDescriptorPool(vulkanInstance.device, assetState.frameGlobalPool, null);
 		delete assetState;
+	},
+	::(renderer: VulkanRenderer, self: *VulkanRenderPass)
+	{
+		assetState := self.data as *AssetPassState;
+		vkResetDescriptorPool(vulkanInstance.device, assetState.frameGlobalPool, 0);
+		for (i .. FrameCount) assetState.frameGlobals.frames[i].set = null;
 	}
 );

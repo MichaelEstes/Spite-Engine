@@ -310,6 +310,8 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 			for (i .. pass.resourceCount)
 			{
 				resourceUsage := pass.resources[i];
+				if (!resourceUsage.NeedsAttachment()) continue;
+
 				handle := resourceUsage.handle;
 				imageResource := renderGraph.handles.UseResource(handle, renderer);
 				if (imageResource.kind == ResourceKind.Texture)
@@ -359,6 +361,17 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 		{
 			commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
 			vkCmdEndRenderPass(commandBuffer);
+		},
+		::(image: *VkImage_T, textureDesc: TextureDesc, fromLayout: GPUTextureLayout,
+		   toLayout: GPUTextureLayout, renderer: *VulkanRenderer)
+		{
+			commandBuffer := renderer.GetCommandBuffer(CommandBufferKind.Graphics);
+
+			CmdTransitionImageLayout(
+				commandBuffer, image,
+				GPUTextureLayoutToVkLayout(fromLayout), GPUTextureLayoutToVkLayout(toLayout),
+				textureDesc.format, textureDesc.mipLevels, textureDesc.layerCount
+			);
 		}
 	);
 
@@ -598,16 +611,19 @@ VulkanRenderer::TransitionSwapchainPresent(image: *VkImage_T, currentLayout: GPU
 	);
 }
 
+VulkanRenderer::UpdateCameraAspect(scene: *Scene)
+{
+	camera := scene.GetComponent<Camera>(this.self);
+	if (!camera || !camera.autoAspect) return;
+
+	camera.aspect = this.swapchain.extent.width as float32 /
+					this.swapchain.extent.height as float32;
+}
+
 VulkanRenderer::UpdateSceneUBO(scene: *Scene, frame: uint32)
 {
 	camera := scene.GetComponent<Camera>(this.self);
 	if (!camera) return;
-
-	if (camera.autoAspect)
-	{
-		camera.aspect = this.swapchain.extent.width as float32 /
-						this.swapchain.extent.height as float32;
-	}
 
 	cameraViewMatrix := camera.GetViewMatrix();
 
@@ -866,6 +882,8 @@ VulkanRenderer::Draw(scene: *Scene)
 		swapchainImage,
 		swapchainDesc
 	);
+
+	this.UpdateCameraAspect(scene);
 
 	for (pass in this.passes)
 	{

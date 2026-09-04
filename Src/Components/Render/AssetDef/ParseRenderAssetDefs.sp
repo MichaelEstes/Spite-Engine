@@ -392,9 +392,9 @@ ParseRenderAssetDef(assetDef: AssetDef, assetDefObj: *JSONObject)
             flagStr := val.String();
             assert flagStr, "Values in flags array must be strings";
 
-            if (flagStr.value == "useLightCulling")
+            if (flagStr.value == "useLighting")
             {
-                assetDef.flags |= AssetDefFlags.UseLightCulling;
+                assetDef.flags |= AssetDefFlags.UseLighting;
             }
         }
     }

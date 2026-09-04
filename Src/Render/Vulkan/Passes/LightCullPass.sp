@@ -15,35 +15,17 @@ ClusterGridY := uint32(9);
 ClusterGridZ := uint32(24);
 ClusterCount := ClusterGridX * ClusterGridY * ClusterGridZ;
 
-// vec4 minPoint + vec4 maxPoint per cluster.
 ClusterAABBSize := uint32((#sizeof Vec4) * 2);
 
 MaxLights := uint32(256);
 InvocationSize := uint32(128);
 
-enum LightKind: uint32
-{
-	Directional,
-	Point
-}
-
-state GpuLight
-{
-	positionRadius: Vec4,   // point: xyz = position, w = radius | directional: xyz = direction
-	colorIntensity: Vec4,   // rgb = color, a = intensity
-	kind: LightKind,        // Directional / Point
-	pad0: uint32,
-	pad1: uint32,
-	pad2: uint32
-}
-LightSize := (#sizeof GpuLight) as uint32;
-
 state ClusterBuildParams
 {
 	invProjection: Matrix4,
-	screenAndTile: Vec4,   // x,y = screen px, z,w = tile px
-	clusterParams: Vec4,   // x,y,z = grid dims
-	zParams: Vec4          // x = zNear, y = zFar
+	screenAndTile: Vec4,
+	clusterParams: Vec4,
+	zParams: Vec4
 }
 
 clusterBuildSource := `
@@ -68,7 +50,6 @@ layout(push_constant) uniform Params {
 	vec4 zParams;
 } params;
 
-// Unproject a screen-space pixel coordinate to a view-space ray endpoint.
 vec3 screenToView(vec2 screenPx)
 {
 	vec2 texCoord = screenPx / params.screenAndTile.xy;
@@ -77,7 +58,6 @@ vec3 screenToView(vec2 screenPx)
 	return view.xyz / view.w;
 }
 
-// Intersect the line eye->point with the plane z = zDistance (view space).
 vec3 lineIntersectZ(vec3 a, vec3 b, float zDistance)
 {
 	vec3 ab = b - a;
@@ -129,7 +109,6 @@ void main()
 `;
 
 MaxLightsPerCluster := uint32(64);
-// uvec2 (offset, count) per cluster.
 LightGridSize := uint32(8);
 
 state ClusterCullParams
@@ -140,6 +119,23 @@ state ClusterCullParams
 	maxPerCluster: uint32,
 	pad: uint32
 }
+
+enum LightKind: uint32
+{
+	Directional,
+	Point
+}
+
+state GpuLight
+{
+	positionRadius: Vec4,
+	colorIntensity: Vec4,
+	kind: LightKind,
+	shadowIndex: uint32,
+	pad1: uint32,
+	pad2: uint32
+}
+LightSize := (#sizeof GpuLight) as uint32;
 
 clusterCullSource := `
 #version 460
@@ -159,7 +155,7 @@ struct ClusterAABB {
 struct Light {
 	vec4 positionRadius;
 	vec4 colorIntensity;
-	uint kind;   // 0 = directional, 1 = point
+	uint kind;
 };
 
 layout(std430, set = 0, binding = 0) readonly buffer Clusters {
@@ -171,7 +167,7 @@ layout(std430, set = 0, binding = 1) readonly buffer Lights {
 };
 
 layout(std430, set = 0, binding = 2) buffer LightGrid {
-	uvec2 lightGrid[];   // x = offset into lightIndices, y = count
+	uvec2 lightGrid[]; // x = offset into lightIndices, y = count
 };
 
 layout(std430, set = 0, binding = 3) buffer LightIndices {
@@ -184,7 +180,7 @@ layout(std430, set = 0, binding = 4) buffer Counter {
 
 layout(push_constant) uniform Params {
 	mat4 view;
-	uvec4 counts;   // x = lightCount, y = clusterCount, z = maxLightsPerCluster
+	uvec4 counts; // x = lightCount, y = clusterCount, z = maxLightsPerCluster
 } params;
 
 bool sphereIntersectsAABB(vec3 center, float radius, vec3 mn, vec3 mx)
@@ -217,14 +213,14 @@ void main()
 	{
 		switch (lights[i].kind)
 		{
-		case 0u:   // directional light
+		case 0u:
 			if (localCount < maxPerCluster)
 			{
 				localIndices[localCount] = i;
 				localCount++;
 			}
 			break;
-		case 1u:   // point light
+		case 1u:
 		{
 			vec3 worldPos = lights[i].positionRadius.xyz;
 			float radius = lights[i].positionRadius.w;
@@ -263,7 +259,7 @@ state ClusterInfoData
 	clusterY: uint32,
 	clusterZ: uint32,
 	clusterPad: uint32,
-	zParams: Vec4          // x = near, y = far
+	zParams: Vec4 // x = near, y = far
 }
 ClusterInfoSize := (#sizeof ClusterInfoData) as uint32;
 
@@ -296,7 +292,7 @@ state LightCullState
 	built: bool
 }
 
-LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T)
+LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T, shadow: *ShadowPassState)
 {
 	renderBuffer := vulkanInstance.resourceManager.renderBufferMap.Find(lightsBuffer);
 	lightsPtr := vulkanInstance.allocator.GetAllocationMappedPtr(renderBuffer.handle) as *GpuLight;
@@ -318,6 +314,7 @@ LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T)
 			radiance.x, radiance.y, radiance.z, light.data.intensity
 		);
 		gpuLight.kind = LightKind.Directional;
+		gpuLight.shadowIndex = DirectionalShadowIndex(shadow, ec.entity);
 
 		lightsPtr[count]~ = gpuLight;
 		count += 1;
@@ -342,6 +339,7 @@ LightCullState::GatherLights(scene: *Scene, lightsBuffer: *VkBuffer_T)
 			radiance.x, radiance.y, radiance.z, light.data.intensity
 		);
 		gpuLight.kind = LightKind.Point;
+		gpuLight.shadowIndex = NoShadowIndex;
 
 		lightsPtr[count]~ = gpuLight;
 		count += 1;
@@ -538,8 +536,12 @@ lightCullPass := RegisterRenderPass(
 			lightCull
 		);
 
+		shadow: *ShadowPassState = null;
+		shadowPass := renderer.GetRenderPassByName(shadowPassName);
+		if (shadowPass) shadow = shadowPass.data as *ShadowPassState;
+
 		lightsBuf := graph.handles.UseResource(lightCull.lightsHandle, renderer, frame).resource as *VkBuffer_T;
-		lightCull.GatherLights(scene, lightsBuf);
+		lightCull.GatherLights(scene, lightsBuf, shadow);
 		lightCull.UpdateCullParams(camera);
 
 		clusterInfoBuf := graph.handles.UseResource(lightCull.clusterInfoHandle, renderer, frame).resource as *VkBuffer_T;

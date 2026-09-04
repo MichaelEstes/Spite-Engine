@@ -368,7 +368,7 @@ FragmentStage FragmentStage::Clone()
 
 enum AssetDefFlags: uint32
 {
-    UseLightCulling = 1 << 0,
+    UseLighting = 1 << 0,
 }
 
 state AssetDef

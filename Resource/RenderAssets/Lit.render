@@ -1,6 +1,6 @@
 {
     name: Lit,
-    flags: ["useLightCulling"],
+    flags: ["useLighting"],
     vertex: {
         attributes: {
             position: vec3,
@@ -144,7 +144,7 @@
                         {
                         case 0u:   // directional: constant direction, no attenuation
                             lightDir = normalize(-light.positionRadius.xyz);
-                            attenuation = 1.0;
+                            attenuation = SampleDirectionalShadow(light.shadowIndex, worldPos, -clusterView.z);
                             break;
                         default:   // point: attenuate by distance, skip if outside radius
                         {

@@ -45,6 +45,7 @@ state RenderGraph<Renderer>
 
 	beginRenderPass: ::*any(RenderGraphPass<Renderer>, RenderPass, *Renderer),
 	endRenderPass: ::(*any, *Renderer),
+	transitionTexture: ::(*any, TextureDesc, GPUTextureLayout, GPUTextureLayout, *Renderer),
 }
 
 RenderGraph::SetResourceTables(resourceTables: *ResourceTables<Renderer>)
@@ -52,11 +53,13 @@ RenderGraph::SetResourceTables(resourceTables: *ResourceTables<Renderer>)
 	this.handles.resourceTables = resourceTables;
 }
 
-RenderGraph::SetRenderPassFuncs(begin: ::*any(RenderGraphPass<Renderer>, RenderPass, *Renderer), 
-								end: ::(*any, *Renderer))
+RenderGraph::SetRenderPassFuncs(begin: ::*any(RenderGraphPass<Renderer>, RenderPass, *Renderer),
+								end: ::(*any, *Renderer),
+								transition: ::(*any, TextureDesc, GPUTextureLayout, GPUTextureLayout, *Renderer))
 {
 	this.beginRenderPass = begin;
 	this.endRenderPass = end;
+	this.transitionTexture = transition;
 }
 
 RenderGraph::SetRenderer(renderer: *Renderer)
@@ -355,14 +358,39 @@ RenderPass RenderGraph::CreateRenderPass(pass: RenderGraphPass<Renderer>, passOr
 	return renderPass;
 }
 
+RenderGraph::TransitionSampledTextures(pass: RenderGraphPass<Renderer>)
+{
+	for (i .. pass.resourceCount)
+	{
+		resourceUsage := pass.resources[i];
+		if (resourceUsage.NeedsAttachment()) continue;
+
+		resourceHandle := resourceUsage.handle;
+		resourceDesc := this.handles.GetResourceDesc(resourceHandle);
+		if (resourceDesc.kind != ResourceKind.Texture) continue;
+
+		texture := this.handles.UseResource(resourceHandle, this.renderer).resource;
+
+		fromLayout := this.handles.resourceTables.GetCurrentTextureLayout(texture);
+		toLayout := this.GetTargetTextureLayout(resourceUsage);
+		if (fromLayout == toLayout) continue;
+
+		this.transitionTexture(
+			texture, resourceDesc.desc.texture, fromLayout, toLayout, this.renderer
+		);
+	}
+}
+
 RenderGraph::Execute()
 {
 	context := this.CreateContext();
-	
+
 	for (i .. this.passOrder.count)
 	{
 		passIndex := this.passOrder[i];
 		pass := this.passes[passIndex];
+
+		this.TransitionSampledTextures(pass);
 
 		if (pass.stage == RenderPassStage.Graphics &&
 			!(pass.flags & RenderPassFlags.SelfManagedRenderPass))
