@@ -16,7 +16,7 @@ running := false;
 Initialize()
 {
 	InitializeTime();
-	Tracy.StartupProfiler();
+	// Tracy.StartupProfiler();
 	Math.SetRandomSeed(Time.StartTime);
 	Fiber.InitalizeFibers();
 
@@ -62,7 +62,7 @@ MainLoop()
 		ECS.instance.Draw();
 		ECS.instance.PostFrame();
 
-		Tracy.FrameMark(null);
+		// Tracy.FrameMark(null);
 	}
 
 	ECS.instance.Stop();

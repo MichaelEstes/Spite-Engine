@@ -223,10 +223,11 @@ TextureDesc VulkanSwapchain::GetSwapchainDesc()
 {
 	desc := TextureDesc();
 	desc.format = this.imageFormat;
-	desc.usage = GPUTextureUsageFlags.COLOR_TARGET;
+	desc.usage = GPUTextureUsage.Color;
 	desc.width = this.extent.width;
 	desc.height = this.extent.height;
 	desc.layerCount = 1;
+	desc.mipLevels = 1;
 	desc.layout = GPUTextureLayout.Undefined;
 
 	return desc;

@@ -224,9 +224,7 @@
             {
                 name: litDiffuse,
                 code: `
-                        float NdotL = dot(shadingNormal, lightDir);
-                        if (NdotL <= 0.0) continue;
-
+                        float NdotL = max(dot(shadingNormal, lightDir), 0.0);
                         float NdotH = max(dot(shadingNormal, halfDir), 0.0);
                         float LdotV = dot(lightDir, viewDir);
 
@@ -273,14 +271,6 @@
                     outColor.rgb += emissive;
                 `,
                 after: litLightEnd
-            },
-            {
-                name: litTone,
-                code: `
-                    vec3 toneColor = outColor.rgb / (outColor.rgb + vec3(1.0));
-                    outColor = vec4(toneColor, outColor.a);
-                `,
-                after: litEmissive
             }
         ],
 

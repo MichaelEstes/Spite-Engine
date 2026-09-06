@@ -131,9 +131,10 @@
 
                     vec3 viewDir = normalize(clusterInfo.invView[3].xyz - worldPos);
 
-                    uvec2 clusterGrid = lightGrid[clusterIndex];
                     vec3 diffuse = vec3(0.0);
                     vec3 specular = vec3(0.0);
+                    
+                    uvec2 clusterGrid = lightGrid[clusterIndex];
                     for (uint clusterI = 0u; clusterI < clusterGrid.y; clusterI++)
                     {
                         ClusterLight light = clusterLights[lightIndices[clusterGrid.x + clusterI]];
@@ -206,14 +207,6 @@
                     outColor.rgb += emissive;
                 `,
                 after: litOcclusion
-            },
-            {
-                name: litTone,
-                code: `
-                    vec3 toneColor = outColor.rgb / (outColor.rgb + vec3(1.0));
-                    outColor = vec4(toneColor, outColor.a);
-                `,
-                after: litEmissive
             }
         ],
 

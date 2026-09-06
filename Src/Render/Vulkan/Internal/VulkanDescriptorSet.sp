@@ -93,6 +93,26 @@ WriteCombinedImageSamplerDescriptor(device: *VkDevice_T, set: *VkDescriptorSet_T
 	vkUpdateDescriptorSets(device, 1, write@, 0, null);
 }
 
+WriteStorageImageDescriptor(device: *VkDevice_T, set: *VkDescriptorSet_T, binding: uint32,
+							imageView: *VkImageView_T, layout: VkImageLayout)
+{
+	imageInfo := VkDescriptorImageInfo();
+	imageInfo.imageView = imageView;
+	imageInfo.sampler = null;
+	imageInfo.imageLayout = layout;
+
+	write := VkWriteDescriptorSet();
+	write.sType = VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = set;
+	write.dstBinding = binding;
+	write.dstArrayElement = 0;
+	write.descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	write.descriptorCount = 1;
+	write.pImageInfo = imageInfo@;
+
+	vkUpdateDescriptorSets(device, 1, write@, 0, null);
+}
+
 state SharedUBO<Type>
 {
 	pool: *VkDescriptorPool_T,

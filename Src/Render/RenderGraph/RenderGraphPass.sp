@@ -207,6 +207,20 @@ RenderResourceHandle RenderPassBuilder::CreateBuffer(name: string, buffer: Buffe
 	return this.renderGraph.RegisterResourceToCreate(name, desc);
 }
 
+RenderResourceHandle RenderPassBuilder::Alias(name: string, resource: RenderResourceHandle, frame: uint32 = 0)
+{
+	toAlias := this.renderGraph.handles.GetResourceDesc(resource);
+	toAliasResource := this.renderGraph.handles.resources[frame].Get(resource.handle).resource;
+
+	aliasedResourceHandle := this.renderGraph.handles.AddExternalResource(
+		name,
+		toAliasResource,
+		toAlias~
+	);
+
+	return aliasedResourceHandle;
+}
+
 RenderPassBuilder::SetClearColor(handle: RenderResourceHandle, color: Color)
 {
 	usage := this.FindResourceUsage(handle);

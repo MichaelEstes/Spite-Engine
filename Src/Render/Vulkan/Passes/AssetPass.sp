@@ -30,7 +30,8 @@ state AssetFrameGlobal
 state AssetPassState
 {
 	frameGlobalPool: *VkDescriptorPool_T,
-	frameGlobals: VulkanFrameResource<AssetFrameGlobal>
+	frameGlobals: VulkanFrameResource<AssetFrameGlobal>,
+	assetPassResource: RenderResourceHandle
 }
 
 AssetPassState::Init()
@@ -117,9 +118,22 @@ assetPass := RegisterRenderPass(
 			{
 				renderer := builder.Renderer();
 				
-				// log "Vulkan Asset pass init";
-				builder.Read(renderer.swapchainHandle, ResourceUsageFlags.Sampled | ResourceUsageFlags.LoadUndefined);
-				builder.Write(renderer.swapchainHandle, ResourceUsageFlags.DefaultWrite);
+				assetTextureDesc := TextureDesc();
+				assetTextureDesc.format = GPUFormat.R16G16B16A16_SFLOAT;
+				assetTextureDesc.usage = GPUTextureUsage.Color | 
+										 GPUTextureUsage.GraphicsRead |
+										 GPUTextureUsage.ComputeWrite;
+				assetTextureDesc.flags = GPUTextureFlags.SizeSwapchainRelative;
+				assetTextureDesc.layerCount = 1;
+				assetTextureDesc.mipLevels = 1;
+				assetTextureDesc.depth = 1;
+				assetTextureDesc.layout = GPUTextureLayout.Undefined;
+
+				assetState := renderer.GetRenderPassByName(assetPassName).data as *AssetPassState;
+				assetState.assetPassResource = builder.CreateTexture("asset", assetTextureDesc);
+
+				builder.Write(assetState.assetPassResource, ResourceUsageFlags.DefaultWrite);
+				builder.SetClearColor(assetState.assetPassResource, Color(0.25, 0.117, 0.132, 0.0));
 
 				depthState := renderer.GetRenderPassByName(depthPassName).data as *DepthPassState;
 				builder.Read(depthState.depthHandle);

@@ -58,6 +58,7 @@ _ := SceneRegistry.RegisterScene(
 
 		sunEntity := scene.CreateEntity();
 		directionalLight := DirectionalLight();
+		directionalLight.data.temperature = 5500.0;
 		directionalLight.direction = Vec3(0.4, -1.0, 0.4);
 		scene.SetComponent<DirectionalLight>(sunEntity, directionalLight);
 
@@ -70,7 +71,14 @@ _ := SceneRegistry.RegisterScene(
 			},
 			{
 				Array<string>(
-					["ClearPass", "ShadowPass", "LightCullPass", "DepthPass", "AssetPass"]
+					[
+						"ShadowPass", 
+						"LightCullPass", 
+						"DepthPass",
+						"AssetPass",
+						// "PostProcessPass",
+						"PresentPass"
+					]
 				),
 				RendererFlags.Vulkan
 			}
