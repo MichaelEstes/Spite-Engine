@@ -410,7 +410,7 @@ ComputeBarrier(cmd: *VkCommandBuffer_T,
 	);
 }
 
-lightCullPassName := "LightCullPass";
+lightCullPassName: string = "LightCullPass";
 
 lightCullPass := RegisterRenderPass(
 	lightCullPassName,

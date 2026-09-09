@@ -16,7 +16,7 @@ state DepthPassState
 	depthHandle: RenderResourceHandle
 }
 
-depthPassName := "DepthPass";
+depthPassName: string = "DepthPass";
 depthPass := RegisterRenderPass(
 	depthPassName,
 	::(graph: RenderGraph<VulkanRenderer>, scene: *Scene, self: *VulkanRenderPass)

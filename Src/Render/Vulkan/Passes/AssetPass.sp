@@ -38,15 +38,17 @@ AssetPassState::Init()
 {
 	device := vulkanInstance.device;
 
-	poolSizes := [VkDescriptorPoolSize(), VkDescriptorPoolSize()];
+	poolSizes := [VkDescriptorPoolSize(), VkDescriptorPoolSize(), VkDescriptorPoolSize()];
 	poolSizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = FrameCount;
+	poolSizes[0].descriptorCount = 2 * FrameCount;
 	poolSizes[1].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[1].descriptorCount = 5 * FrameCount;
+	poolSizes[1].descriptorCount = 4 * FrameCount;
+	poolSizes[2].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[2].descriptorCount = FrameCount;
 
 	poolInfo := VkDescriptorPoolCreateInfo();
 	poolInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = 2;
+	poolInfo.poolSizeCount = 3;
 	poolInfo.pPoolSizes = fixed poolSizes;
 	poolInfo.maxSets = FrameCount;
 
@@ -93,7 +95,6 @@ AssetPassState::Init()
 				atlasTarget.imageView, shadow.atlasSampler,
 				VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 			);
-
 
 			WriteStorageBufferDescriptor(device, globalFrame.set, 2, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightsHandle, frame));
 			WriteStorageBufferDescriptor(device, globalFrame.set, 3, UseRenderPassBuffer<VulkanRenderer, VkBuffer_T>(context, lightCull.lightGridHandle, frame));
