@@ -4,9 +4,21 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$msvcBin = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64"
-$msvcLib = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\lib\x64"
-$winSdkLib = "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0"
+$vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+$vsRoot = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+if (-not $vsRoot) { throw "No MSVC toolset was found." }
+
+$msvcVersion = (Get-Content (Join-Path $vsRoot "VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt")).Trim()
+$msvcRoot = Join-Path $vsRoot "VC\Tools\MSVC\$msvcVersion"
+$msvcBin = Join-Path $msvcRoot "bin\Hostx64\x64"
+$msvcLib = Join-Path $msvcRoot "lib\x64"
+
+$winSdkRoot = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows Kits\Installed Roots" -Name KitsRoot10).KitsRoot10
+$winSdkLib = Get-ChildItem (Join-Path $winSdkRoot "Lib") -Directory |
+    Where-Object { Test-Path (Join-Path $_.FullName "ucrt\x64") } |
+    Sort-Object { [version]$_.Name } |
+    Select-Object -Last 1 -ExpandProperty FullName
+if (-not $winSdkLib) { throw "No Windows SDK found under $winSdkRoot." }
 $vulkanSdk = if ($env:VULKAN_SDK) { $env:VULKAN_SDK } else { "C:\VulkanSDK\1.4.304.1" }
 
 $dumpbin = Join-Path $msvcBin "dumpbin.exe"
