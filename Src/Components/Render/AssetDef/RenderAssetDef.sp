@@ -305,14 +305,17 @@ state FragmentStage
     textures: Array<TextureDefinition>,
     using: Array<string>,
     out: Array<Variable>,
+    
     functions: Array<ShaderNode>,
-    nodes: Array<ShaderNode>,
+    init: Array<ShaderNode>,
+    forLight: Array<ShaderNode>,
+    post: Array<ShaderNode>
 
     compiled: string,
 
     alphaMode: AlphaMode,
 	cullMode: CullModeFlags,
-	polygonMode: PolygonMode
+	polygonMode: PolygonMode,
 }
 
 FragmentStage::delete
@@ -321,8 +324,12 @@ FragmentStage::delete
     delete this.textures;
     delete this.using;
     delete this.out;
+
     delete this.functions;
-    delete this.nodes;
+    delete this.init;
+    delete this.forLight;
+    delete this.post;
+    
     delete this.compiled;
 }
 
@@ -354,7 +361,19 @@ FragmentStage FragmentStage::Clone()
             return node.Clone();
         }
     );
-    cloned.nodes = this.nodes.Copy(
+    cloned.init = this.init.Copy(
+        ::ShaderNode(node: ShaderNode)
+        {
+            return node.Clone();
+        }
+    );
+    cloned.forLight = this.forLight.Copy(
+        ::ShaderNode(node: ShaderNode)
+        {
+            return node.Clone();
+        }
+    );
+    cloned.post = this.post.Copy(
         ::ShaderNode(node: ShaderNode)
         {
             return node.Clone();
@@ -365,6 +384,8 @@ FragmentStage FragmentStage::Clone()
     cloned.polygonMode = this.polygonMode;
     return cloned;
 }
+
+bool FragmentStage::IsLit() => this.forLight.count > 0;
 
 enum AssetDefFlags: uint32
 {

@@ -53,13 +53,12 @@
         out: {
             outColor: vec4
         },
-        nodes: [
+        init: [
             {
                 name: lineColor,
                 code: `
                     outColor = color;
-                `,
-                after: main
+                `
             }
         ],
 

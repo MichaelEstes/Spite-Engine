@@ -357,7 +357,8 @@ JSONEatWhitespace(context: JSONParseContext)
 		return ParseJSONBareString(context, json);
 	}
 
-	log "ParseJSONValue Invalid JSON character: ", char;
+	JSONLogParseError(context, "ParseJSONValue Invalid JSON character: ");
+	log char;
 	return null;
 }
 

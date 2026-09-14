@@ -491,10 +491,22 @@ ParseRenderAssetDef(assetDef: AssetDef, assetDefObj: *JSONObject)
             ParseShaderNodes(functionsValue, assetDef.fragment.functions);
         }
 
-        nodesValue := fragmentObj.GetMember("nodes");
-        if (nodesValue)
+        initNodes := fragmentObj.GetMember("init");
+        if (initNodes)
         {
-            ParseShaderNodes(nodesValue, assetDef.fragment.nodes);
+            ParseShaderNodes(initNodes, assetDef.fragment.init);
+        }
+
+        forLightNodes := fragmentObj.GetMember("forLight");
+        if (forLightNodes)
+        {
+            ParseShaderNodes(forLightNodes, assetDef.fragment.forLight);
+        }
+
+        postNodes := fragmentObj.GetMember("post");
+        if (postNodes)
+        {
+            ParseShaderNodes(postNodes, assetDef.fragment.post);
         }
 
         alphaModeValue := fragmentObj.GetMember("alphaMode");

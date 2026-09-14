@@ -76,7 +76,7 @@ _ := SceneRegistry.RegisterScene(
 						"LightCullPass", 
 						"DepthPass",
 						"AssetPass",
-						// "PostProcessPass",
+						"PostProcessPass",
 						"PresentPass"
 					]
 				),

@@ -8,6 +8,9 @@ import Fiber
 import Atomic
 import FrameAllocator
 import Event
+import Math
+
+fixedUpdateRate: float = 1.0 / 50.0;
 
 instance: ECS = ECS();
 
@@ -102,9 +105,12 @@ state ECS
 
 	recycledScenes := Stack<uint16>(),
 	events := Event.Emitter(),
+
 	frameCount: uint,
 	lastFrameTime: float,
 	dt: float,
+	fixedAccum: float,
+
 	componentCount: uint32,
 	tagComponentCount: uint32,
 	sceneCount: uint16
@@ -323,8 +329,15 @@ ECS::Stop()
 ECS::PreFrame()
 {
 	time := Time.SecondsSinceStart();
-	this.dt = time - this.lastFrameTime;
+	this.dt = Math.FMin(time - this.lastFrameTime, 0.3);
 	this.lastFrameTime = time;
+
+	this.fixedAccum = this.fixedAccum + this.dt;
+	while (this.fixedAccum > fixedUpdateRate)
+	{
+		this.RunSystems(this.systems.onFixed);
+		this.fixedAccum = this.fixedAccum - fixedUpdateRate;
+	}
 
 	this.RunFrameSystems(this.systems.frameStart);
 	this.RunSystems(this.systems.onPreFrame);

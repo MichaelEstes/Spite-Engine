@@ -493,38 +493,36 @@ layout(push_constant) uniform DrawPushConstants
     uint64_t materialVariablesAddress;
     uint64_t materialTextureSlotsAddress;
 } pushConstants;
-`
+`;
 
-fragmentLightCullDecls := `
-struct ClusterLight {
+fragmentLightDecls := `
+struct Light {
     vec4 positionRadius;
     vec4 colorIntensity;
     uint kind; // 0 = directional, 1 = point
     uint shadowIndex;
 };
 
-layout(std430, set = 0, binding = 2) readonly buffer ClusterLights {
-    ClusterLight clusterLights[];
+layout(std430, set = 0, binding = 2) readonly buffer Lights {
+    Light lights[];
 };
 
-layout(std430, set = 0, binding = 3) readonly buffer ClusterLightGrid {
+layout(std430, set = 0, binding = 3) readonly buffer LightGrid {
     uvec2 lightGrid[];
 };
 
-layout(std430, set = 0, binding = 4) readonly buffer ClusterLightIndices {
+layout(std430, set = 0, binding = 4) readonly buffer LightIndices {
     uint lightIndices[];
 };
 
-layout(std430, set = 0, binding = 5) readonly buffer ClusterInfo {
+layout(std430, set = 0, binding = 5) readonly buffer LightClusterInfo {
     mat4 invProj;
     mat4 invView;
     vec4 screenAndTile; // xy = screen px, zw = tile px
     uvec4 clusterDims; // xyz = grid dims
     vec4 zParams; // x = near, y = far
-} clusterInfo;
-`
+} lightClusterInfo;
 
-fragmentDirectionalShadowDecls := `
 #define SHADOWED_DIRECTIONAL_LIGHTS 4
 #define SHADOW_CASCADE_COUNT 4
 #define NO_SHADOW_INDEX 0xFFFFFFFFu
@@ -710,17 +708,55 @@ float SampleDirectionalShadow(uint shadowIndex, vec3 worldPos, float viewDepth)
 
     return mix(SHADOW_AMBIENT, 1.0, DirectionalShadowPCF(shadowCoord / shadowCoord.w, shadowCascade.tile));
 }
-`
+`;
+
+fragmentLightVariables := `
+    vec2 clusterNdc = (gl_FragCoord.xy / lightClusterInfo.screenAndTile.xy) * 2.0 - 1.0;
+    vec4 clusterView = lightClusterInfo.invProj * vec4(clusterNdc, gl_FragCoord.z, 1.0);
+    clusterView /= clusterView.w;
+    vec3 worldPos = (lightClusterInfo.invView * vec4(clusterView.xyz, 1.0)).xyz;
+
+    float clusterNear = lightClusterInfo.zParams.x;
+    float clusterFar = lightClusterInfo.zParams.y;
+    uint clusterSlice = uint(max(float(lightClusterInfo.clusterDims.z) * log(-clusterView.z / clusterNear) / log(clusterFar / clusterNear), 0.0));
+    clusterSlice = min(clusterSlice, lightClusterInfo.clusterDims.z - 1u);
+    uvec2 clusterTile = uvec2(gl_FragCoord.xy / lightClusterInfo.screenAndTile.zw);
+    uint clusterIndex = clusterSlice * lightClusterInfo.clusterDims.x * lightClusterInfo.clusterDims.y
+                      + clusterTile.y * lightClusterInfo.clusterDims.x + clusterTile.x;
+
+    vec3 viewDir = normalize(lightClusterInfo.invView[3].xyz - worldPos);
+`;
+
+fragmentLightLoopStart := `
+    uvec2 clusterGrid = lightGrid[clusterIndex];
+    for (uint clusterI = 0u; clusterI < clusterGrid.y; clusterI++)
+    {
+        Light light = lights[lightIndices[clusterGrid.x + clusterI]];
+        float shadow = 1.0;
+        switch (light.kind)
+        {
+        case 0u:
+            shadow = SampleDirectionalShadow(light.shadowIndex, worldPos, -clusterView.z);
+            break;
+        default:
+        {
+            break;
+        }
+        }
+`;
+
+fragmentLightLoopEnd := `
+    }
+`;
 
 string WriteFragmentShader(assetDef: AssetDef)
 {
     fragmentStage := assetDef.fragment;
     fragmentShader := fragmentShaderStart.Copy();
 
-    if (assetDef.flags & AssetDefFlags.UseLighting)
+    if (fragmentStage.IsLit())
     {
-        fragmentShader.AppendIn(fragmentLightCullDecls);
-        fragmentShader.AppendIn(fragmentDirectionalShadowDecls);
+        fragmentShader.AppendIn(fragmentLightDecls);
     }
 
     fragmentShader = WriteVariableSet(
@@ -757,8 +793,23 @@ string WriteFragmentShader(assetDef: AssetDef)
     defer delete functions;
     fragmentShader.AppendIn(functions);
 
-    code := WriteShaderNodes(fragmentStage.nodes);
+    code := string();
     defer delete code;
+    if (fragmentStage.forLight.count)
+    {
+        code.AppendIn(fragmentLightVariables);
+    }
+
+    code.AppendIn(WriteShaderNodes(fragmentStage.init));
+
+    if (fragmentStage.forLight.count)
+    {
+        code.AppendIn(fragmentLightLoopStart);
+        code.AppendIn(WriteShaderNodes(fragmentStage.forLight));
+        code.AppendIn(fragmentLightLoopEnd);
+    }
+
+    code.AppendIn(WriteShaderNodes(fragmentStage.post));
 
     fragmentShader.AppendIn(shaderMainStart);
     fragmentShader.AppendIn(code);

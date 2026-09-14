@@ -9,6 +9,8 @@ import SceneRegistry
 import Input
 import Math
 import RenderAssetDef
+import Physics
+
 import Tracy
 
 running := false;
@@ -25,6 +27,7 @@ Initialize()
 	SDLEvents.Insert(0, Event.Emitter());
 	
 	InitializeInput();
+	InitializePhysics();
 	InitializeRenderAssetDefs();
 
 	globalEvents := GetGlobalEventEmitter();

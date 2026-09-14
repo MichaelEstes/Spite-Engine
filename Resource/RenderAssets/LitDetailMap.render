@@ -16,7 +16,7 @@
             detailMap: sampler2D
         },
         using: [uv1],
-        nodes: [
+        init: [
             {
                 name: detailMap,
                 code: `

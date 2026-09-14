@@ -370,7 +370,7 @@ string PrintType(type: *HeaderType)
 
 string PrintFunction(function: HeaderFunction)
 {
-	str := PrintType(function.returnType) + " ";
+	str := "\t" + PrintType(function.returnType) + " ";
 	str = str + function.name;
 	str = str + "("
 	for (i .. function.params.count)

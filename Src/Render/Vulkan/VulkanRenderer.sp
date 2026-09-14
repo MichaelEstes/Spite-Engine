@@ -352,7 +352,6 @@ CreateVulkanRenderer(scene: *Scene, entity: Entity, passes: Array<string>,
 			renderPassInfo.clearValueCount = attachmentIndex;
 			renderPassInfo.pClearValues = fixed clearValues;
 
-			
 			vkCmdBeginRenderPass(commandBuffer, renderPassInfo@, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
 
 			return vkRenderPass;

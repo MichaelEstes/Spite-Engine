@@ -99,7 +99,7 @@ UpdateWorldTransform(entity: Entity, scene: Scene)
 		);
 		if (parentWorld)
 		{
-			worldMatrix.mat = parentWorld.mat * worldMatrix.mat;
+			worldMatrix.mat = worldMatrix.mat * parentWorld.mat;
 		}
 	}
 

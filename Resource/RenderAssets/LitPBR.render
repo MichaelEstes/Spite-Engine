@@ -1,6 +1,5 @@
 {
     name: LitPBR,
-    flags: ["useLighting"]
     vertex: {
         attributes: {
             position: vec3,
@@ -138,14 +137,13 @@
                 `
             }
         ]
-        nodes: [
+        init: [
             {
                 name: litColor,
                 code: `
                     outColor = color * baseColor * texture(colorTexture, uv0);
                     if (outColor.a < alphaCutoff) discard;
-                `,
-                after: main
+                `
             },
             {
                 name: litNormal,
@@ -157,8 +155,7 @@
                     vec3 tangentNormal = texture(normalTexture, uv0).xyz * 2.0 - 1.0;
                     tangentNormal.xy *= normalScale;
                     vec3 shadingNormal = normalize(TBN * tangentNormal);
-                `,
-                after: litColor
+                `
             },
             {
                 name: litMetallicRoughness,
@@ -167,59 +164,44 @@
                     float roughness = metallicRoughness.g * roughnessFactor;
                     float metallic = metallicRoughness.b * metallicFactor;
                     float alpha = roughness * roughness;
-                `,
-                after: litNormal
+                `
             },
+            {
+                name: litSharedVariables,
+                code: `
+                    vec3 F0 = mix(vec3(0.04), outColor.rgb, metallic);
+                    float NdotV = max(dot(shadingNormal, viewDir), 0.0);
+                    vec3 lightOut = vec3(0.0);
+                `
+            }
+        ],
+        forLight: [
             {
                 name: litLightStart,
                 code: `
-                    vec2 clusterNdc = (gl_FragCoord.xy / clusterInfo.screenAndTile.xy) * 2.0 - 1.0;
-                    vec4 clusterView = clusterInfo.invProj * vec4(clusterNdc, gl_FragCoord.z, 1.0);
-                    clusterView /= clusterView.w;
-                    vec3 worldPos = (clusterInfo.invView * vec4(clusterView.xyz, 1.0)).xyz;
-
-                    float clusterNear = clusterInfo.zParams.x;
-                    float clusterFar = clusterInfo.zParams.y;
-                    uint clusterSlice = uint(max(float(clusterInfo.clusterDims.z) * log(-clusterView.z / clusterNear) / log(clusterFar / clusterNear), 0.0));
-                    clusterSlice = min(clusterSlice, clusterInfo.clusterDims.z - 1u);
-                    uvec2 clusterTile = uvec2(gl_FragCoord.xy / clusterInfo.screenAndTile.zw);
-                    uint clusterIndex = clusterSlice * clusterInfo.clusterDims.x * clusterInfo.clusterDims.y
-                                      + clusterTile.y * clusterInfo.clusterDims.x + clusterTile.x;
-
-                    vec3 viewDir = normalize(clusterInfo.invView[3].xyz - worldPos);
-                    vec3 F0 = mix(vec3(0.04), outColor.rgb, metallic);
-                    float NdotV = max(dot(shadingNormal, viewDir), 0.0);
-
-                    vec3 lightOut = vec3(0.0);
-
-                    uvec2 clusterGrid = lightGrid[clusterIndex];
-                    for (uint clusterI = 0u; clusterI < clusterGrid.y; clusterI++)
+                    vec3 lightDir;
+                    float attenuation;
+                    switch (light.kind)
                     {
-                        ClusterLight light = clusterLights[lightIndices[clusterGrid.x + clusterI]];
+                    case 0u:
+                        lightDir = normalize(-light.positionRadius.xyz);
+                        attenuation = shadow;
+                        break;
+                    default:
+                    {
+                        vec3 clusterToLight = light.positionRadius.xyz - worldPos;
+                        float lightDist = length(clusterToLight);
+                        if (lightDist >= light.positionRadius.w) continue;
+                        lightDir = clusterToLight / lightDist;
+                        float falloffWindow = clamp(1.0 - pow(lightDist / light.positionRadius.w, 4.0), 0.0, 1.0);
+                        attenuation = falloffWindow * falloffWindow;
+                        break;
+                    }
+                    }
 
-                        vec3 lightDir;
-                        float attenuation;
-                        switch (light.kind)
-                        {
-                        case 0u:   // directional: constant direction, no attenuation
-                            lightDir = normalize(-light.positionRadius.xyz);
-                            attenuation = SampleDirectionalShadow(light.shadowIndex, worldPos, -clusterView.z);
-                            break;
-                        default:   // point: attenuate by distance, skip if outside radius
-                        {
-                            vec3 clusterToLight = light.positionRadius.xyz - worldPos;
-                            float lightDist = length(clusterToLight);
-                            if (lightDist >= light.positionRadius.w) continue;
-                            lightDir = clusterToLight / lightDist;
-                            attenuation = 1.0 - lightDist / light.positionRadius.w;
-                            break;
-                        }
-                        }
-
-                        vec3 radiance = light.colorIntensity.rgb * light.colorIntensity.a * attenuation;
-                        vec3 halfDir = normalize(viewDir + lightDir);
-                `,
-                after: litMetallicRoughness
+                    vec3 radiance = light.colorIntensity.rgb * light.colorIntensity.a * attenuation;
+                    vec3 halfDir = normalize(viewDir + lightDir);
+                `
             },
             {
                 name: litDiffuse,
@@ -230,9 +212,7 @@
 
                         vec3 albedo = (1.0 - metallic) * outColor.rgb;
                         vec3 diffuse = DiffuseHammon(albedo, alpha, NdotL, NdotV, NdotH, LdotV);
-                `,
-                after: litLightStart,
-                before: litLightEnd
+                `
             },
             {
                 name: litSpecular,
@@ -242,35 +222,30 @@
                         vec3 F = fresnelSchlick(max(dot(halfDir, viewDir), 0.0), F0);
 
                         vec3 specular = NDF * V * F;
-                `,
-                after: litDiffuse,
-                before: litLightEnd
+                `
             },
             {
                 name: litLightOut,
                 code: `
                         lightOut += (diffuse + specular) * radiance * NdotL;
-                `,
-                after: litSpecular,
-                before: litLightEnd
-            },
+                `
+            }
+        ],
+        post: [
             {
                 name: litLightEnd,
                 code: `
-                    }
                     float occlusion = texture(occlusionTexture, uv0).r;
                     vec3 ambient = vec3(0.03) * outColor.rgb * mix(1.0, occlusion, occlusionStrength);
                     outColor = vec4(ambient + lightOut, outColor.a);
-                `,
-                after: litLightStart
+                `
             },
             {
                 name: litEmissive,
                 code: `
                     vec3 emissive = texture(emissiveTexture, uv0).rgb * emissiveFactor;
                     outColor.rgb += emissive;
-                `,
-                after: litLightEnd
+                `
             }
         ],
 
