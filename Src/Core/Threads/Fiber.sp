@@ -34,15 +34,13 @@ state FiberJob
 
 FiberJob::()
 {
-	this.id = 0;
 	this.func = null;
 	this.data = null;
 	this.handle = null;
 }
 
-FiberJob::(id: uint64, func: ::(*any), data: *void, handle: *JobHandle)
+FiberJob::(func: ::(*any), data: *void, handle: *JobHandle)
 {
-	this.id = id;
 	this.func = func;
 	this.data = data;
 	this.handle = handle;
@@ -63,7 +61,6 @@ state Fibers
 	fiberEnabled: FixedArray<bool>,
 
 	handleAllocator: BucketAllocator,
-	nextJobID: Atomic<uint>,
 	currentIndex: Atomic<uint32>,
 	mainThreadID: uint32,
 	fiberCount: uint32
@@ -102,7 +99,6 @@ InitalizeFibers()
 	fibers.mainThreadID = GetCurrentThreadID();
 
 	fibers.currentIndex.Init(0);
-	fibers.nextJobID.Init(0);
 }
 
 int32 GetCurrentFiberIndex()
@@ -152,11 +148,22 @@ DeallocJobHandle(handle: *JobHandle)
 AddJob(func: ::(*any), data: *any, handle: **JobHandle = null)
 {
 	jobHandle := InitJobHandle(handle, uint32(1));
-	jobID := fibers.nextJobID.Add(1);
-	job := FiberJob(jobID, func, data, jobHandle);
+	job := FiberJob(func, data, jobHandle);
 
 	index := fibers.currentIndex.Add(1) % fibers.fiberCount;
 	fibers.jobQueueArr[index].Enqueue(job);
+}
+
+AddJobMultipleData(func: ::(*any), data: []*any, handle: **JobHandle = null)
+{
+	jobHandle := InitJobHandle(handle, data.count);
+
+	for (item in data)
+	{
+		job := FiberJob(func, item, jobHandle);
+		index := fibers.currentIndex.Add(1) % fibers.fiberCount;
+		fibers.jobQueueArr[index].Enqueue(job);
+	}
 }
 
 bool CurrentThreadIsMainThread() => GetCurrentThreadID() == fibers.mainThreadID;
@@ -164,8 +171,7 @@ bool CurrentThreadIsMainThread() => GetCurrentThreadID() == fibers.mainThreadID;
 RunOnMainThread(func: ::(*any), data: *any, handle: **JobHandle = null)
 {
 	jobHandle := InitJobHandle(handle, uint32(1));
-	jobID := fibers.nextJobID.Add(1);
-	job := FiberJob(jobID, func, data, jobHandle);
+	job := FiberJob(func, data, jobHandle);
 
 	if (CurrentThreadIsMainThread())
 	{

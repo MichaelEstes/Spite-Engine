@@ -69,7 +69,6 @@ BoxMeshComponent := ECS.RegisterComponent<BoxMesh>(
         mesh.geometry.GetAttributeValue(colorIndex)~ = ArrayView<byte>(colors[0]@ as *byte, #sizeof Color * 8);
         mesh.geometry.indices = ArrayView<uint16>(indices[0]@, 36);
 
-        scene.SetComponent<Transform>(entity, Transform());
         scene.SetComponent<Mesh>(entity, mesh);
     }
 );

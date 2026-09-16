@@ -10,6 +10,7 @@ import SceneDescription
 import VulkanRenderPass
 
 import GLTFManager
+import PhysicsComponent
 import RenderComponents
 import SceneComponents
 import Transform
@@ -24,8 +25,16 @@ _ := SceneRegistry.RegisterScene(
 		
 		sceneEntity := scene.CreateEntity();
 
+		scene.SetSingleton<PhysicsWorld>(PhysicsWorld());
+
+		floorEntity := scene.CreateEntity();
+		scene.SetComponent<Transform>(floorEntity, Transform(Vec3(0.0, -1.0, 0.0)));
+		floor := PhysicsFloor();
+		floor.extents = Vec2(100.0, 100.0);
+		scene.SetComponent<PhysicsFloor>(floorEntity, floor);
+
 		camera := Camera();
-		camera.position = Vec3(0, 1.0, 4.0);
+		camera.position = Vec3(-4.0, 1.0, 0.0);
 		camera.fov = Math.Deg2Rad(70.0);
 		camera.near = 0.1;
 		camera.far = 1000.0;
@@ -99,13 +108,18 @@ _ := SceneRegistry.RegisterScene(
 			8.0
 		));
 
-		boxEntity := scene.CreateEntity();
-		scene.SetComponent<BoxMesh>(lineEntity, BoxMesh(
-			1.0,
-			1.0,
-			1.0,
-			Color(1.0, 0.0, 0.0, 1.0)
-		));
+		for (i .. 20)
+		{
+			boxEntity := scene.CreateEntity();
+			scene.SetComponent<Transform>(boxEntity, Transform(Vec3(0.0, i, 0.0)));
+			scene.SetComponent<BoxMesh>(boxEntity, BoxMesh(
+				1.0,
+				1.0,
+				1.0,
+				Color(1.0, 0.0, 0.0, 1.0)
+			));
+			scene.SetComponent<PhysicsBox>(boxEntity, PhysicsBox());
+		}
 
 		// model := "./Resource/Models/Box/Box.gltf";
 		// model := "./Resource/Models/BoxTextured/BoxTextured.gltf";

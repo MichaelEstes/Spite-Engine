@@ -3,13 +3,14 @@ package Jolt
 extern
 {
 	#link windows "./extern/joltc";
+	// #link windows "./extern/joltcd";
 
 	*JPH_JobSystem JPH_JobSystemThreadPool_Create(config: *JobSystemThreadPoolConfig);
 	*JPH_JobSystem JPH_JobSystemCallback_Create(config: *JPH_JobSystemConfig);
 	*JPH_JobSystem JPH_JobSystemCallback_CreateParams(
-		context: *void, 
-		queueJob: ::(*void, ::(*void), *void),
-		queueJobs: ::(*void, ::(*void), **void, uint32),
+		context: *any, 
+		queueJob: ::(*any, ::(*void), *void),
+		queueJobs: ::(*any, ::(*void), **void, uint32),
 		maxConcurrency: uint32, maxBarriers: uint32
 	);
 	void JPH_JobSystem_Destroy(jobSystem: *JPH_JobSystem);
@@ -1272,6 +1273,8 @@ extern
 	void JPH_TempAllocator_Destroy(allocator: *JPH_TempAllocator);
 	JPH_PhysicsUpdateError JPH_PhysicsSystem_Update2(system: *JPH_PhysicsSystem, deltaTime: float32, collisionSteps: int32, tempAllocator: *JPH_TempAllocator, jobSystem: *JPH_JobSystem);
 }
+
+JPH_DEFAULT_CONVEX_RADIUS: float32 = 0.05;
 
 enum JPH_PhysicsUpdateError: uint32
 {

@@ -1,5 +1,6 @@
 package Event
 
+import Array
 import SDL
 import SparseSet
 
@@ -32,8 +33,8 @@ EventCallback::(func: ::(any, *any), data: *any)
 
 state Emitter
 {
-	callbacks := SparseSet<[]EventCallback>(),
-	onceCallbacks := SparseSet<[]EventCallback>()
+	callbacks := SparseSet<Array<EventCallback>>(),
+	onceCallbacks := SparseSet<Array<EventCallback>>()
 }
 
 Emitter::On(id: uint32, callback: ::(any, *any), data: *any = null)
@@ -46,7 +47,7 @@ Emitter::On(id: uint32, callback: ::(any, *any), data: *any = null)
 	}
 	else
 	{
-		this.callbacks.Insert(id, [eventCallback,]);
+		this.callbacks.Insert(id, Array<EventCallback>([eventCallback,]));
 	}
 }
 
@@ -60,7 +61,7 @@ Emitter::Once(id: uint32, callback: ::(any, *any), data: *any = null)
 	}
 	else
 	{
-		this.onceCallbacks.Insert(id, [callback,]);
+		this.onceCallbacks.Insert(id, Array<EventCallback>([callback,]));
 	}
 }
 
@@ -68,7 +69,8 @@ Emitter::Emit<Arg>(id: uint32, arg: Arg)
 {
 	if (this.callbacks.Has(id))
 	{
-		for (callback in this.callbacks.Get(id)) (callback.func as ::(Arg, *any))(arg, callback.data);
+		for (callback in this.callbacks.Get(id)) 
+			(callback.func as ::(Arg, *any))(arg, callback.data);
 	}
 
 	if (this.onceCallbacks.Has(id))

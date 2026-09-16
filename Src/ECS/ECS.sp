@@ -297,6 +297,32 @@ ECS::RunSystems(systems: Array<System>)
 	Fiber.WaitForHandle(handle);
 }
 
+ECS::RunFixedSystems(systems: Array<System>)
+{
+	count := this.scenes.count * systems.count;
+	if (!count) return;
+
+	handle: *Fiber.JobHandle = null;
+	for (scene in this.scenes.Values())
+	{
+		for (system in systems) 
+		{
+			sceneSystem := instance.frameAllocator.AllocType<SceneSystem>();
+			sceneSystem~ = SceneSystem(scene@, system);
+			Fiber.AddJob(::(data: *SceneSystem) {
+				scene := data.scene;
+				system := data.system;
+				dt := fixedUpdateRate;
+				
+				system.run(scene~, dt);
+			}, sceneSystem, handle@);
+		}
+	}
+
+	Fiber.FlushMainThreadJobs();
+	Fiber.WaitForHandle(handle);
+}
+
 ECS::RunFrameSystems(systems: Array<FrameSystem>)
 {
 	if (!systems.count) return;
@@ -329,13 +355,13 @@ ECS::Stop()
 ECS::PreFrame()
 {
 	time := Time.SecondsSinceStart();
-	this.dt = Math.FMin(time - this.lastFrameTime, 0.3);
+	this.dt = Math.FMin(time - this.lastFrameTime, 0.333);
 	this.lastFrameTime = time;
 
 	this.fixedAccum = this.fixedAccum + this.dt;
 	while (this.fixedAccum > fixedUpdateRate)
 	{
-		this.RunSystems(this.systems.onFixed);
+		this.RunFixedSystems(this.systems.onFixed);
 		this.fixedAccum = this.fixedAccum - fixedUpdateRate;
 	}
 
