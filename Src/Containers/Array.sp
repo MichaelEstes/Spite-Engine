@@ -202,7 +202,7 @@ Array::ExpandAtLeastTo(size: uint32)
 {
 	capacity := this.capacity;
 	while (capacity < size) capacity = ResizeFunc(capacity);
-	this.SizeTo(capacity);
+	if (capacity > this.capacity) this.SizeTo(capacity);
 }
 
 Array::SizeTo(capacity: uint32)

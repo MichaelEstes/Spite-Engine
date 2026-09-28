@@ -12,8 +12,8 @@ import ImageManager
 import SceneComponents
 import Transform
 import RenderAssetDef
-
-import RotateComponent
+import Assets
+import SparseSet
 
 gltfModeToTopologyKindTable := [
 	TopologyKind.PointList,
@@ -36,7 +36,8 @@ state GLTFResources
 {
 	buffers: Array<ResourceHandle>,
 	images: Array<ResourceHandle>,
-	generatedBuffers: Array<Allocator<byte>>
+	generatedBuffers: Array<Allocator<byte>>,
+	deinterleavedAccessors := SparseSet<ArrayView<byte>>()
 }
 
 state GLTFNodeResource
@@ -189,27 +190,99 @@ ResourceHandle UseGLTFResource(
 		});
 }
 
+ResourceHandle useGLTFAssetResource(
+	asset: Asset, scene: *Scene, 
+	onLoad: ::(*Scene, Entity, *any) = null, arg: *any = null
+)
+{
+	assetPath := GetAssetPath(asset);
+	if (!assetPath) return ResourceHandle();
+	return UseGLTFResource(assetPath, scene, onLoad, arg);
+}
+
 ResourceHandle GetBufferHandle(gltfData: GLTFResource, buffer: uint32)
 {
 	gltf := gltfData.gltf;
 	gltfBuffer := gltf.buffers[buffer];
 
-	uri := gltfBuffer.uri.uri~;
+	uri := gltfBuffer.uri~;
 	return LoadURIResource(uri, gltf.path);
 }
 
-ArrayView<byte> GetBufferViewData(gltfData: GLTFResource, bufferView: uint32)
+ArrayView<byte> GetDeinterleavedBufferData(gltfData: GLTFResource, data: *byte, bufferView: uint32, accessor: uint32)
 {
 	gltf := gltfData.gltf;
 	gltfBufferView := gltf.bufferViews[bufferView];
+	gltfAccessor := gltf.accessors[accessor];
 
-	handle := GetBufferHandle(gltfData, gltfBufferView.buffer);
-	gltfData.resources.buffers.Add(handle);
+	deinterleavedAccessors := gltfData.resources.deinterleavedAccessors;
+	if (deinterleavedAccessors.Has(accessor))
+	{
+		return deinterleavedAccessors.Get(accessor)~;
+	}
 
-	data := URIResourceManager.TakeResourceRef(handle).data.buffer;
+	byteStride := gltfBufferView.byteStride;
+
+	itemByteLength := GetAccessorItemByteLength(gltfAccessor);
+	itemByteCount := GetAccessorItemByteCount(gltfAccessor);
+	itemByteSize := itemByteLength * itemByteCount;
+	totalByteSize := gltfAccessor.count * itemByteSize;
+
+	deinterleavedBuf := Allocator<byte>().Alloc(totalByteSize);
+
+	start := data + gltfAccessor.byteOffset;
+
+	for (i .. gltfAccessor.count)
+	{
+		itemOffset := i * byteStride;
+		itemStart := start + itemOffset;
+
+		for (j .. itemByteSize)
+		{
+			itemByte := itemStart + j;
+			deinterleavedBuf[(i * itemByteSize) + j]~ = itemByte~;
+		}
+	}
+
+	deinterleavedArrayView := ArrayView<byte>(deinterleavedBuf[0], totalByteSize);
+	deinterleavedAccessors.Insert(accessor, deinterleavedArrayView);
+	return deinterleavedArrayView;
+}
+
+ArrayView<byte> GetBufferViewData(gltfData: GLTFResource, bufferView: uint32, accessor: uint32 = InvalidGLTFIndex)
+{
+	gltf := gltfData.gltf;
+	gltfBufferView := gltf.bufferViews[bufferView];
+	gltfBuffer := gltf.buffers[gltfBufferView.buffer];
+
+	data: *byte = null;
+	if (gltfBuffer.uri)
+	{
+		handle := GetBufferHandle(gltfData, gltfBufferView.buffer);
+		gltfData.resources.buffers.Add(handle);
+
+		data = URIResourceManager.TakeResourceRef(handle).data.buffer;
+	}
+	else
+	{
+		data = gltfBuffer.data[0];
+	}
+
 	data = data + gltfBufferView.byteOffset;
-
-	return ArrayView<byte>(data, gltfBufferView.byteLength);
+	
+	if (gltfBufferView.byteStride != 0)
+	{
+		return GetDeinterleavedBufferData(gltfData, data, bufferView, accessor);
+	}
+	else
+	{
+		if (accessor != InvalidGLTFIndex)
+		{
+			gltfAccessor := gltf.accessors[accessor];
+			data = data + gltfAccessor.byteOffset;
+		}
+		return ArrayView<byte>(data, gltfBufferView.byteLength);
+	}
 }
 
 uint GetAccessorItemByteLength(accessor: GLTFAccessor)
@@ -255,8 +328,7 @@ ArrayView<byte> GetAccessorData(gltfData: GLTFResource, accessor: uint32)
 	gltf := gltfData.gltf;
 	gltfAccessor := gltf.accessors[accessor];
 
-	data := GetBufferViewData(gltfData, gltfAccessor.bufferView)[0]@;
-	data = data + gltfAccessor.byteOffset;
+	data := GetBufferViewData(gltfData, gltfAccessor.bufferView, accessor)[0]@;
 
 	return ArrayView<byte>(data, gltfAccessor.count);
 }
@@ -266,8 +338,7 @@ ArrayView<byte> GetAccessorByteView(gltfData: GLTFResource, accessor: uint32)
 	gltf := gltfData.gltf;
 	gltfAccessor := gltf.accessors[accessor];
 
-	data := GetBufferViewData(gltfData, gltfAccessor.bufferView)[0]@;
-	data = data + gltfAccessor.byteOffset;
+	data := GetBufferViewData(gltfData, gltfAccessor.bufferView, accessor)[0]@;
 
 	return ArrayView<byte>(data, GetAccessorByteCount(gltfAccessor));
 }
@@ -438,13 +509,14 @@ TextureMap LoadTexture(gltfData: GLTFResource, textureIndex: uint32)
 
 	if (gltfImage.bufferView != InvalidGLTFIndex)
 	{
-		//bufferView := gltf.bufferViews[gltfImage.bufferView];
-		//handle := GetBufferHandle(gltfData, gltf, bufferView.buffer);
-		//buffer := URIResourceManager.TakeResourceRef(handle).data.buffer;
+		imageView := GetBufferViewData(gltfData, gltfImage.bufferView);
+		imageData := string(imageView.count, imageView.start);
+
+		texture.imageHandle = CreateImageResource(imageData, gltf.path);
 	}
 	else
 	{
-		uri := gltfImage.uri.uri~;
+		uri := gltfImage.uri~;
 		imageHandle := LoadImageResource(uri, gltf.path);
 
 		texture.imageHandle = imageHandle;
@@ -464,11 +536,8 @@ AlphaMode GetAlphaMode(gltfMaterial: GLTFMaterial)
 	else return AlphaMode.Opaque;
 }
 
-AssignMaterialToPrimitive(gltfData: GLTFResource, materialIndex: uint32, primitive: Mesh)
+AssignMaterialToPrimitive(gltfData: GLTFResource, gltfMaterial: GLTFMaterial, primitive: Mesh)
 {
-	gltf := gltfData.gltf;
-	gltfMaterial := gltf.materials[materialIndex];
-
 	pbr := GLTFMaterialPBRMetallicRoughness();
 	if (gltfMaterial.pbrMetallicRoughness)
 	{
@@ -582,7 +651,12 @@ AssignGLTFMesh(gltfData: GLTFResource, meshIndex: uint32, nodeResource: *GLTFNod
 
 		if (gltfPrim.material != InvalidGLTFIndex)
 		{
-			AssignMaterialToPrimitive(gltfData, gltfPrim.material, primitive);
+			gltfMaterial := gltf.materials[gltfPrim.material];
+			AssignMaterialToPrimitive(gltfData, gltfMaterial, primitive);
+		}
+		else
+		{
+			AssignMaterialToPrimitive(gltfData, GLTFMaterial(), primitive);
 		}
 
 		nodeResource.meshes.Add(primitive);

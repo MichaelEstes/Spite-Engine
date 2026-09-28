@@ -1,19 +1,38 @@
 package ECS
 
 NullEntityID := uint32(0);
-NullEntity := Entity(NullEntityID);
+NullEntityVersion := uint16(0);
+NullEntity := Entity(NullEntityID, NullEntityVersion);
 
 state Entity
 {
 	[value]
 	id: uint32,
+	version: uint16,
+	layerMask: uint16
 }
 
-Entity::(id: uint32) => this.id = id;
+Entity::(id: uint32, version: uint16)
+{
+	this.id = id;
+	this.version = version;
+}
 
 bool Entity::operator::!()
 {
 	return this.id == NullEntityID;
+}
+
+state EntityIDComponent<Type>
+{
+	component: *Type,
+	entityID: uint32
+}
+
+EntityIDComponent::(entityID: uint32, component: *Type)
+{
+	this.entityID = entityID;
+	this.component = component;
 }
 
 state EntityComponent<Type>

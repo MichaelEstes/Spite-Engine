@@ -2,13 +2,15 @@ package ECS
 
 state EntityTagComponentIterator
 {
-	container: ?{bitSet: *BitSet, entitySet: *EntitySet},
+	scene: *Scene,
+	container: *BitSet,
 	kind: ComponentKind
 }
 
-EntityTagComponentIterator::(componentKind: ComponentKind, 
-							 container: ?{bitSet: *BitSet, entitySet: *EntitySet})
+EntityTagComponentIterator::(scene: *Scene, componentKind: ComponentKind, 
+							 container: *BitSet)
 {
+	this.scene = scene;
 	this.container = container;
 	this.kind = componentKind;
 }
@@ -20,37 +22,14 @@ Iterator EntityTagComponentIterator::operator::in()
 
 bool EntityTagComponentIterator::next(it: Iterator)
 {
-	switch (this.kind)
-	{
-		case (ComponentKind.Common)
-		{
-			it.index += 1;
-			bitSet := this.container.bitSet~;
-			while (it.index < bitSet.bitCount && !bitSet[it.index]) it.index += 1;
-			return it.index < bitSet.bitCount;
-		}
-		case (ComponentKind.Sparse)
-		{
-			return this.container.entitySet.next(it);
-		}
-	}
-
-	return false;
+	if (!this.container) return false;
+	it.index += 1;
+	bitSet := this.container~;
+	while (it.index < bitSet.bitCount && !bitSet[it.index]) it.index += 1;
+	return it.index < bitSet.bitCount;
 }
 
 Entity EntityTagComponentIterator::current(it: Iterator)
 {
-	switch (this.kind)
-	{
-		case (ComponentKind.Common)
-		{
-			return Entity(it.index);
-		}
-		case (ComponentKind.Sparse)
-		{
-			return this.container.entitySet.current(it);
-		}
-	}
-
-	return NullEntity;
+	return this.scene.RegisterEntity(it.index);
 }

@@ -33,6 +33,18 @@ Transform::RotateAround(axis: Norm<Vec3>, angle: float32)
 	this.rotation = rot * this.rotation;
 }
 
+TransformComponent := ECS.RegisterComponent<Transform>(
+	ComponentKind.Common, 
+	::(entity: Entity, transform: *Transform, scene: Scene) 
+	{
+		//log "Removing transform: ", transform;
+	}
+	::(entity: Entity, transform: *Transform, scene: Scene) 
+	{
+		SetTransformDirty(scene, entity);
+	}
+);
+
 state WorldTransform
 {
 	mat: Matrix4
@@ -44,12 +56,10 @@ WorldTransformComponent := ECS.RegisterComponent<WorldTransform>(
 
 TransformDirtyTag := ECS.RegisterTagComponent(
 	"TransformDirtyTag"
-	ComponentKind.Sparse
 );
 
 TransformUpdatedTag := ECS.RegisterTagComponent(
 	"TransformUpdatedTag"
-	ComponentKind.Sparse
 );
 
 FillHierarchyDirty(scene: Scene, entity: Entity)
@@ -68,18 +78,6 @@ SetTransformDirty(scene: Scene, entity: Entity) =>
 	scene.SetTagComponent(entity, TransformDirtyTag);
 	FillHierarchyDirty(scene, entity);
 }
-
-TransformComponent := ECS.RegisterComponent<Transform>(
-	ComponentKind.Common, 
-	::(entity: Entity, transform: *Transform, scene: Scene) 
-	{
-		//log "Removing transform: ", transform;
-	}
-	::(entity: Entity, transform: *Transform, scene: Scene) 
-	{
-		SetTransformDirty(scene, entity);
-	}
-);
 
 UpdateWorldTransform(entity: Entity, scene: Scene)
 {

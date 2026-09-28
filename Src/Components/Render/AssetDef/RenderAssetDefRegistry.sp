@@ -4,6 +4,9 @@ import BlockAllocator
 import HandleSet
 import SparseSet
 
+import Fiber
+import ECS
+
 state AssetDefHandle
 {
     handle: uint32 = uint32(0)
@@ -51,12 +54,20 @@ InitializeRenderAssetDefs()
     assetDefs := ParseRenderAssetDefs();
     defer delete assetDefs;
 
-    compiler := InitShaderCompiler();
-    defer delete compiler;
+    handle := null as *Fiber.JobHandle;
+    for (assetDef in assetDefs.Values())
+    {
+        Fiber.AddJob(::(assetDef: *AssetDef) {
+            compiler := InitShaderCompiler();
+            defer delete compiler;
+
+            assetDef.Compile(compiler);
+		}, assetDef@, handle@);
+    }
+    Fiber.WaitForHandle(handle);
 
     for (assetDef in assetDefs.Values())
     {
-        assetDef.Compile(compiler);
         handleValue := assetDefRegistry.assetDefs.GetNext();
         handleValue.value~ = assetDef;
         assetDefRegistry.assetDefNameToHandle.Insert(

@@ -2,11 +2,7 @@
     name: Line,
     vertex: {
         attributes: {
-            position: vec3,
-            color: {
-                type: vec4,
-                default: [1.0, 1.0, 1.0, 1.0]
-            }
+            position: vec3
         },
         variables: {},
         nodes: [
@@ -20,7 +16,12 @@
         ]
     },
     fragment: {
-        using: [color],
+        variables: {
+            color: {
+                type: vec4,
+                default: [1.0, 1.0, 1.0, 1.0]
+            }
+        },
         out: {
             outColor: vec4
         },

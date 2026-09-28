@@ -13,6 +13,10 @@ import FileManager
 
 InvalidGLTFIndex := -1 as uint32;
 
+GLBMagic := 0x46546C67 as uint32;
+GLBJSONChunk := 0x4E4F534A as uint32;
+GLBBinaryChunk := 0x004E4942 as uint32;
+
 bool IsValidGLTFIndex(index: uint32) => index != InvalidGLTFIndex;
 
 state GLTF
@@ -22,6 +26,8 @@ state GLTF
 
     src: string,
     path: string,
+
+    embeddedBuffer: string,
 
     asset: GLTFAsset,
 
@@ -249,7 +255,8 @@ state GLTFBuffer
 {
     name: *string,
 
-    uri: GLTFURI,
+    uri: *string,
+    data: string,
     byteLength: uint32
 }
 
@@ -330,7 +337,7 @@ state GLTFImage
 {
     name: *string,
     
-    uri: GLTFURI,
+    uri: *string,
     mimeType: *string,
     
     bufferView: uint32 = InvalidGLTFIndex;
@@ -385,11 +392,6 @@ GLTFSkin::delete
     delete this.joints;
 }
 
-state GLTFURI
-{
-    uri: *string
-}
-
 GLTF ParseGLTF(gltf: GLTF, root: *JSONObject)
 {
     ParseGLTFAsset(gltf, root);
@@ -426,6 +428,19 @@ GLTF LoadGLTF(file: string)
     gltf.fileHandle = fileHandle;
     gltfFileContents := FileManager.TakeFileRef(fileHandle);
 
+    if ((gltfFileContents[0] as *uint32)~ == GLBMagic)
+    {
+        jsonChunkLength := (gltfFileContents[12] as *uint32)~;
+
+        bufferChunkOffset := 20 + jsonChunkLength;
+        bufferChunkLength := (gltfFileContents[bufferChunkOffset] as *uint32)~;
+        bufferChunk := string(bufferChunkLength, gltfFileContents[bufferChunkOffset + 8]);
+
+        gltf.embeddedBuffer = bufferChunk;
+
+        gltfFileContents = string(jsonChunkLength, gltfFileContents[20]);
+    }
+
     json := ParseJSON(gltfFileContents);
     defer delete json;
 
@@ -447,15 +462,15 @@ GLTF LoadGLTF(file: string)
     return str;
 }
 
-GLTFURI ParseGLTFURI(gltf: GLTF, value: *JSONValue)
+*string ParseGLTFURI(gltf: GLTF, value: *JSONValue)
 {
-    uri := GLTFURI();
+    uri := null as *string;
 
     if (value)
     {
         uriPtr := gltf.mem.Emplace<string>();
         uriPtr~ = gltf.strMem.Copy(value.String().value);
-        uri.uri = uriPtr;
+        uri = uriPtr;
     }
 
     return uri;
@@ -1137,7 +1152,8 @@ ParseGLTFBuffers(gltf: GLTF, root: *JSONObject)
         buffer.name = ParseGLTFStringPtr(gltf, bufferObj.GetMember("name"));
         
         buffer.uri = ParseGLTFURI(gltf, bufferObj.GetMember("uri"));
-        
+        if (!buffer.uri) buffer.data = gltf.embeddedBuffer;
+
         byteLengthValue := bufferObj.GetMember("byteLength");
         buffer.byteLength = byteLengthValue.Number().value.i;
         

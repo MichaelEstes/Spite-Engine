@@ -21,7 +21,11 @@ extern
 
     int32 SDL_GetVersion();
     *void SDL_GetPointerProperty(propID: uint32, name: *byte, defaultValue: *void);
+
+    *IOStream SDL_IOFromConstMem(mem: *byte, size: uint);
 }
+
+Win32WindowHandle := "SDL.window.win32.hwnd"[0];
 
 enum InitFlags
 {
@@ -226,6 +230,11 @@ state Surface
     reserved: *void
 }
 
+state IOStream
+{
+    opaque: any
+}
+
 bool Init(flags: uint32) => SDL_Init(flags);
 Quit() => SDL_Quit();
 *byte GetError() => SDL_GetError();
@@ -252,4 +261,4 @@ int32 Version() => SDL_GetVersion();
 *void GetPointerProperty(propID: uint32, name: *byte, defaultValue: *void) 
                          => SDL_GetPointerProperty(propID, name, defaultValue);
 
-Win32WindowHandle := "SDL.window.win32.hwnd"[0];
+*IOStream IOFromConstMem(mem: *byte, size: uint) => SDL_IOFromConstMem(mem, size);

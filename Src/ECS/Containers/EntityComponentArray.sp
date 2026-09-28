@@ -1,10 +1,13 @@
 package ECS
 
+import Math
+
 state EntityComponentArray<Type, InitialCapacity = 1024>
 {
 	activeArr: ZeroedAllocator<bool>,
 	componentArr: Allocator<Type>,
 
+	maxEntityID: uint32,
 	capacity: uint32,
 }
 
@@ -21,17 +24,17 @@ EntityComponentArray::delete
 	this.componentArr.Dealloc(this.capacity);
 }
 
-[]EntityComponent<Type> EntityComponentArray::log()
+[]EntityIDComponent<Type> EntityComponentArray::log()
 {
-	arr := []EntityComponent<Type>;
+	arr := []EntityIDComponent<Type>;
 
 	for (i .. this.capacity)
 	{
 		if (this.activeArr[i]~)
 		{
-			entity := Entity(i);
+			entity := i as uint32;
 			component := this.componentArr[i];
-			arr.Add({ entity, component });
+			arr.Add(EntityIDComponent<Type>(entity, component));
 		}
 	}
 
@@ -46,15 +49,20 @@ Iterator EntityComponentArray::operator::in()
 bool EntityComponentArray::next(it: Iterator)
 {
 	it.index += 1;
-	return it.index < this.capacity;
+
+	while (it.index < this.maxEntityID & this.activeArr[it.index]~)
+	{
+		it.index += 1;
+	}
+
+	return it.index <= this.maxEntityID;
 }
 
-EntityComponent<Type> EntityComponentArray::current(it: Iterator)
+EntityIDComponent<Type> EntityComponentArray::current(it: Iterator)
 {
 	index := it.index;
-	entity := Entity(index);
 	component := this.componentArr[index];
-	return {entity, component} as EntityComponent<Type>;
+	return EntityIDComponent<Type>(index, component);
 }
 
 EntityComponentArray::Resize(amount: uint32)
@@ -66,13 +74,15 @@ EntityComponentArray::Resize(amount: uint32)
 	this.capacity = resizedCapacity;
 }
 
-*Type EntityComponentArray::Insert(entity: Entity, component: Type)
+*Type EntityComponentArray::Insert(entityID: uint32, component: Type)
 {
-	assert !!entity, "Cannot insert null entity";
+	assert entityID, "Cannot insert null entity ID";
 
-	if (entity.id >= this.capacity) this.Resize(entity.id);
+	if (entityID >= this.capacity) this.Resize(entityID);
 
-	index := entity.id;
+	this.maxEntityID = Math.UMax(this.maxEntityID, entityID);
+
+	index := entityID;
 	activePtr := this.activeArr[index];
 	activePtr~ = true;
 
@@ -81,45 +91,45 @@ EntityComponentArray::Resize(amount: uint32)
 	return componentPtr;
 }
 
-bool EntityComponentArray::Has(entity: Entity)
+bool EntityComponentArray::Has(entityID: uint32)
 {
-	return entity.id < this.capacity && this.activeArr[entity.id]~;
+	return entityID < this.capacity && this.activeArr[entityID]~;
 }
 
-*Component EntityComponentArray::Get(entity: Entity)
+*Component EntityComponentArray::Get(entityID: uint32)
 {
-	if (!this.Has(entity)) return null;
+	if (!this.Has(entityID)) return null;
 
-	index := entity.id;
+	index := entityID;
 	return this.componentArr[index];
 }
 
-EntityComponentArray::Remove(entity: Entity)
+EntityComponentArray::Remove(entityID: uint32)
 {
-	if (!this.Has(entity)) return;
+	if (!this.Has(entityID)) return;
 
-	index := entity.id;
+	index := entityID;
 	this.activeArr[index]~ = false;
 }
 
 uint32 EntityComponentArray::Count() => this.capacity;
 
-*any EntityComponentArray::GetUntyped(entity: Entity, size: uint32)
+*any EntityComponentArray::GetUntyped(entityID: uint32, size: uint32)
 {
-	if (!this.Has(entity)) return null;
+	if (!this.Has(entityID)) return null;
 
-	index := entity.id;
+	index := entityID;
 	byteArr := this.componentArr.ptr as *byte;
 	return byteArr[index * size];
 }
 
-*any EntityComponentArray::SetUntyped(entity: Entity, data: *any, size: uint32)
+*any EntityComponentArray::SetUntyped(entityID: uint32, data: *any, size: uint32)
 {
-	assert !!entity, "Cannot insert null entity";
+	assert entityID, "Cannot insert null entity";
 
-	if (entity.id >= this.capacity) this.Resize(entity.id);
+	if (entityID >= this.capacity) this.Resize(entityID);
 
-	index := entity.id;
+	index := entityID;
 	activePtr := this.activeArr[index];
 	activePtr~ = true;
 	

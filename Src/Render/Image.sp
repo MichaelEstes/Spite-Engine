@@ -12,8 +12,10 @@ import SDL
 	return SDL.ConvertSurface(surface, format);
 }
 
-*SDL.Surface CreateTextureImage()
+*SDL.Surface CreateTextureImage(image: *byte, count: uint, format: SDL.PixelFormat = SDL.PixelFormat.ABGR8888)
 {
-	return null;
+	ioStream := SDL.IOFromConstMem(image, count);
+	surface := SDL.CreateImage(ioStream, false);
+	return SDL.ConvertSurface(surface, format);
 }
 

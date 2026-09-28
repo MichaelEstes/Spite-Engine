@@ -55,7 +55,7 @@ bool QueryIterator::next(it: QueryIndex)
 				{
 					compMap := this.scene.sparseComponents.Get(this.unionOf.comp.id);
 					if (!compMap.next(iterator)) return false;
-					it.entityID = compMap.entityArr[iterator.index].id;
+					it.entityID = compMap.entityArr[iterator.index]~;
 					it.itIndex = iterator.index;
 				}
 			}
@@ -68,7 +68,7 @@ bool QueryIterator::next(it: QueryIndex)
 			it.itIndex = iterator.index;
 		}
 
-		nextEntity = Entity(it.entityID);
+		nextEntity = this.scene.RegisterEntity(it.entityID);
 
 		for (with in this.with)
 		{
@@ -76,7 +76,7 @@ bool QueryIterator::next(it: QueryIndex)
 			if (with.kind == ComponentKind.Common)
 			{
 				compArr := this.scene.commonComponents.Get(with.id);
-				if (!compArr || !compArr.Has(nextEntity))
+				if (!compArr || !compArr.Has(nextEntity.id))
 				{
 					nextEntity = NullEntity;
 					break;
@@ -85,7 +85,7 @@ bool QueryIterator::next(it: QueryIndex)
 			else if (with.kind == ComponentKind.Sparse)
 			{
 				compMap := this.scene.sparseComponents.Get(with.id);
-				if (!compMap || !compMap.Has(nextEntity))
+				if (!compMap || !compMap.Has(nextEntity.id))
 				{
 					nextEntity = NullEntity;
 					break;
@@ -112,7 +112,7 @@ bool QueryIterator::next(it: QueryIndex)
 			if (without.kind == ComponentKind.Common)
 			{
 				compArr := this.scene.commonComponents.Get(without.id);
-				if (compArr && compArr.Has(nextEntity))
+				if (compArr && compArr.Has(nextEntity.id))
 				{
 					nextEntity = NullEntity;
 					break;
@@ -121,7 +121,7 @@ bool QueryIterator::next(it: QueryIndex)
 			else if (without.kind == ComponentKind.Sparse)
 			{
 				compMap := this.scene.sparseComponents.Get(without.id);
-				if (compMap && compMap.Has(nextEntity))
+				if (compMap && compMap.Has(nextEntity.id))
 				{
 					nextEntity = NullEntity;
 					break;
@@ -146,7 +146,7 @@ bool QueryIterator::next(it: QueryIndex)
 
 Entity QueryIterator::current(it: QueryIndex)
 {
-	return Entity(it.entityID);	
+	return this.scene.RegisterEntity(it.entityID);	
 }
 
 state Query
@@ -251,35 +251,15 @@ QueryIterator Query::Result()
 
 	for (tagComponent in this.withTags)
 	{
-		switch (tagComponent.kind)
+		compArr := this.scene.tagComponents.Get(tagComponent.id);
+		if (compArr)
 		{
-			case (ComponentKind.Common)
+			currCount := compArr.SetBitsCount();
+			if (currCount < leastComponentCount)
 			{
-				compArr := this.scene.commonTagComponents.Get(tagComponent.id);
-				if (compArr)
-				{
-					currCount := compArr.SetBitsCount();
-					if (currCount < leastComponentCount)
-					{
-						leastComponentCount = currCount;
-						leastComponent = tagComponent;
-						leastComponentIsTag = true;
-					}
-				}
-			}
-			case (ComponentKind.Sparse)
-			{
-				compMap := this.scene.sparseTagComponents.Get(tagComponent.id);
-				if (compMap)
-				{
-					currCount := compMap.count as uint;
-					if (currCount < leastComponentCount)
-					{
-						leastComponentCount = currCount;
-						leastComponent = tagComponent;
-						leastComponentIsTag = true;
-					}
-				}
+				leastComponentCount = currCount;
+				leastComponent = tagComponent;
+				leastComponentIsTag = true;
 			}
 		}
 	}

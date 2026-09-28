@@ -56,7 +56,7 @@ uint HashResourceKey(resourceKey: ResourceKey)
 {
 	if (resourceKey.IsString())
 	{
-		return DefaultHash<string>(resourceKey.value.name)
+		return DefaultHash<string>(resourceKey.value.name);
 	}
 
 	return resourceKey.value.id;

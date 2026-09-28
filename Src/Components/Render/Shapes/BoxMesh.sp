@@ -45,10 +45,6 @@ BoxMeshComponent := ECS.RegisterComponent<BoxMesh>(
             Vec3(-halfWidth, halfHeight, halfDepth),
             Vec3(halfWidth, halfHeight, halfDepth)
         ];
-        colors := [
-            boxMesh.color, boxMesh.color, boxMesh.color, boxMesh.color,
-            boxMesh.color, boxMesh.color, boxMesh.color, boxMesh.color
-        ];
         indices := uint16:[
             4, 5, 6, 6, 5, 7,
             1, 0, 3, 3, 0, 2,
@@ -63,11 +59,12 @@ BoxMeshComponent := ECS.RegisterComponent<BoxMesh>(
         mesh.geometry.indexKind = IndexKind.I16;
 
         positionIndex := mesh.geometry.GetAttributeIndex("position");
-        colorIndex := mesh.geometry.GetAttributeIndex("color");
 
         mesh.geometry.GetAttributeValue(positionIndex)~ = ArrayView<byte>(positions[0]@ as *byte, #sizeof Vec3 * 8);
-        mesh.geometry.GetAttributeValue(colorIndex)~ = ArrayView<byte>(colors[0]@ as *byte, #sizeof Color * 8);
         mesh.geometry.indices = ArrayView<uint16>(indices[0]@, 36);
+        
+        colorIndex := mesh.material.GetVariableIndex("color");
+        mesh.material.GetVariableValue<Color>(colorIndex)~ = boxMesh.color;
 
         scene.SetComponent<Mesh>(entity, mesh);
     }

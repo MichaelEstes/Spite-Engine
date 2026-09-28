@@ -16,7 +16,7 @@ uint16 ResizeFactor(capacity: uint16)
 state EntityComponentMap<Type, InitialCapacity = 16, InitialSparseCapacity = 1024>
 {
 	sparseArr: ZeroedAllocator<uint16>,
-	entityArr: Allocator<Entity>,
+	entityArr: Allocator<uint32>,
 	componentArr: Allocator<Type>,
 
 	sparseCapacity: uint32,
@@ -42,15 +42,15 @@ EntityComponentMap::delete
 	this.componentArr.Dealloc(this.capacity);
 }
 
-[]EntityComponent<Type> EntityComponentMap::log()
+[]EntityIDComponent<Type> EntityComponentMap::log()
 {
-	arr := []EntityComponent<Type>;
+	arr := []EntityIDComponent<Type>;
 
 	for (i .. this.count)
 	{
-		entity := this.entityArr[i]~;
+		entityID := this.entityArr[i]~;
 		component := this.componentArr[i];
-		arr.Add({ entity, component });
+		arr.Add(EntityIDComponent<Type>(entityID, component));
 	}
 
 	return arr;
@@ -67,12 +67,12 @@ bool EntityComponentMap::next(it: Iterator)
 	return it.index < this.count;
 }
 
-EntityComponent<Type> EntityComponentMap::current(it: Iterator)
+EntityIDComponent<Type> EntityComponentMap::current(it: Iterator)
 {
 	index := it.index;
-	entity := this.entityArr[index]~;
+	entityID := this.entityArr[index]~;
 	component := this.componentArr[index];
-	return {entity, component} as EntityComponent<Type>;
+	return EntityIDComponent<Type>(entityID, component);
 }
 
 EntityComponentMap::ResizeSparse(amount: uint32)
@@ -93,11 +93,11 @@ EntityComponentMap::ResizeDense()
 	this.capacity = resizedCapacity;
 }
 
-*Type EntityComponentMap::Insert(entity: Entity, component: Type)
+*Type EntityComponentMap::Insert(entityID: uint32, component: Type)
 {
-	assert !!entity, "Cannot insert null entity";
+	assert entityID, "Cannot insert null entity ID";
 
-	index := this.GetIndex(entity);
+	index := this.GetIndex(entityID);
 	if (index)
 	{
 		index -= 1;
@@ -106,64 +106,64 @@ EntityComponentMap::ResizeDense()
 		return componentPtr;
 	}
 
-	if (entity.id >= this.sparseCapacity) this.ResizeSparse(entity.id);
+	if (entityID >= this.sparseCapacity) this.ResizeSparse(entityID);
 	if (this.count >= this.capacity) this.ResizeDense();
 
-	this.entityArr[this.count]~ = entity;
+	this.entityArr[this.count]~ = entityID;
 	componentPtr := this.componentArr[this.count];
 	componentPtr~ = component;
 
 	this.count += 1;
-	this.sparseArr[entity.id]~ = this.count;
+	this.sparseArr[entityID]~ = this.count;
 	return componentPtr;
 }
 
-bool EntityComponentMap::Has(entity: Entity)
+bool EntityComponentMap::Has(entityID: uint32)
 {
-	if (entity.id >= this.sparseCapacity) return false;
-	return this.sparseArr[entity.id]~ != 0;
+	if (entityID >= this.sparseCapacity) return false;
+	return this.sparseArr[entityID]~ != 0;
 }
 
-uint16 EntityComponentMap::GetIndex(entity: Entity)
+uint16 EntityComponentMap::GetIndex(entityID: uint32)
 {
-	if (entity.id >= this.sparseCapacity) return uint16(0);
-	index := this.sparseArr[entity.id]~;
+	if (entityID >= this.sparseCapacity) return uint16(0);
+	index := this.sparseArr[entityID]~;
 	return index;
 }
 
-*Component EntityComponentMap::Get(entity: Entity)
+*Component EntityComponentMap::Get(entityID: uint32)
 {
-	index := this.GetIndex(entity);
+	index := this.GetIndex(entityID);
 	if (!index) return null;
 	index -= 1;
 
 	return this.componentArr[index];
 }
 
-EntityComponentMap::Remove(entity: Entity)
+EntityComponentMap::Remove(entityID: uint32)
 {
-	index := this.GetIndex(entity);
+	index := this.GetIndex(entityID);
 	if (!index) return;
 	index -= 1;
 
-	this.sparseArr[entity.id]~ = 0;
+	this.sparseArr[entityID]~ = 0;
 
 	this.count -= 1;
 	if (!this.count) return;
 
-	endEntity := this.entityArr[this.count]~;
+	endEntityID := this.entityArr[this.count]~;
 	endComponent := this.componentArr[this.count]~;
 
-	this.entityArr[index]~ = endEntity;
+	this.entityArr[index]~ = endEntityID;
 	this.componentArr[index]~ = endComponent;
-	this.sparseArr[endEntity.id]~ = index + 1;
+	this.sparseArr[endEntityID]~ = index + 1;
 }
 
 uint16 EntityComponentMap::Count() => this.count;
 
-*any EntityComponentMap::GetUntyped(entity: Entity, size: uint32)
+*any EntityComponentMap::GetUntyped(entityID: uint32, size: uint32)
 {
-	index := this.GetIndex(entity);
+	index := this.GetIndex(entityID);
 	if (!index) return null;
 	index -= 1;
 
@@ -171,11 +171,11 @@ uint16 EntityComponentMap::Count() => this.count;
 	return byteArr[index * size];
 }
 
-*any EntityComponentMap::SetUntyped(entity: Entity, data: *any, size: uint32)
+*any EntityComponentMap::SetUntyped(entityID: uint32, data: *any, size: uint32)
 {
-	assert !!entity, "Cannot insert null entity";
+	assert entityID, "Cannot insert null entity ID";
 
-	index := this.GetIndex(entity);
+	index := this.GetIndex(entityID);
 	if (index)
 	{
 		index -= 1;
@@ -185,27 +185,27 @@ uint16 EntityComponentMap::Count() => this.count;
 		return dst;
 	}
 
-	if (entity.id >= this.sparseCapacity) this.ResizeSparse(entity.id);
+	if (entityID >= this.sparseCapacity) this.ResizeSparse(entityID);
 	if (this.count >= this.capacity) this.ResizeDense();
 
-	this.entityArr[this.count]~ = entity;
+	this.entityArr[this.count]~ = entityID;
 	byteArr := this.componentArr.ptr as *byte;
 
 	dst := byteArr[this.count * size];
 	copy_bytes(dst, data, size);
 
 	this.count += 1;
-	this.sparseArr[entity.id]~ = this.count;
+	this.sparseArr[entityID]~ = this.count;
 	return dst;
 }
 
-EntityComponentMap::RemoveUntyped(entity: Entity, size: uint32)
+EntityComponentMap::RemoveUntyped(entityID: uint32, size: uint32)
 {
-	index := this.GetIndex(entity);
+	index := this.GetIndex(entityID);
 	if (!index) return;
 	index -= 1;
 
-	this.sparseArr[entity.id]~ = 0;
+	this.sparseArr[entityID]~ = 0;
 
 	byteArr := this.componentArr.ptr as *byte;
 	componentDst := byteArr[index * size];
@@ -213,11 +213,11 @@ EntityComponentMap::RemoveUntyped(entity: Entity, size: uint32)
 	this.count -= 1;
 	if (!this.count) return;
 
-	endEntity := this.entityArr[this.count]~;
+	endEntityID := this.entityArr[this.count]~;
 	componentSrc := byteArr[this.count * size];
 
-	this.entityArr[index]~ = endEntity;
-	this.sparseArr[endEntity.id]~ = index + 1;
+	this.entityArr[index]~ = endEntityID;
+	this.sparseArr[endEntityID]~ = index + 1;
 
 	copy_bytes(componentDst, componentSrc, size);
 }

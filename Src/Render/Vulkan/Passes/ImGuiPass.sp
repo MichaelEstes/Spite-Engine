@@ -17,7 +17,7 @@ ImGuiPass := RegisterRenderPass(
 				renderer := builder.Renderer();
 				builder.Read(renderer.swapchainHandle, ResourceUsageFlags.Sampled | ResourceUsageFlags.LoadUndefined);
 				builder.Write(renderer.swapchainHandle);
-				builder.SetClearColor(renderer.swapchainHandle, Color(0.12, 0.12, 0.12, 0.0));
+				builder.SetClearColor(renderer.swapchainHandle, Color(0.01, 0.01, 0.012, 0.0));
 
 				return true;
 			},

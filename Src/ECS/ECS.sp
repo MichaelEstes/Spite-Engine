@@ -34,7 +34,6 @@ state Component
 state TagComponent
 {
 	id: uint32,
-	kind: ComponentKind
 }
 
 state SceneSystem { scene: *Scene, system: System }
@@ -52,10 +51,9 @@ Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.S
 }
 
 TagComponent RegisterTagComponent(serializeName: string
-								  componentKind: ComponentKind = ComponentKind.Sparse,
 								  onRemove: ::(Entity, Scene) = null, 
 								  onEnter: ::(Entity, Scene) = null)
-			=> instance.RegisterTagComponent(serializeName, componentKind, onRemove, onEnter);
+			=> instance.RegisterTagComponent(serializeName, onRemove, onEnter);
 
 SystemID RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
 			=> instance.RegisterSystem(run, step);
@@ -141,7 +139,6 @@ Component ECS::RegisterComponent<Type>(componentKind: ComponentKind = ComponentK
 }
 
 TagComponent ECS::RegisterTagComponent(serializeName: string
-									   componentKind: ComponentKind = ComponentKind.Sparse,
 									   onRemove: ::(Entity, Scene) = null, 
 									   onEnter: ::(Entity, Scene) = null)
 {
@@ -151,7 +148,7 @@ TagComponent ECS::RegisterTagComponent(serializeName: string
 	if (!onRemove) onRemove = defaultCallBack;
 	if (!onEnter) onEnter = defaultCallBack;
 
-	tagComponent := { this.tagComponentCount, componentKind } as TagComponent;
+	tagComponent := { this.tagComponentCount } as TagComponent;
 	this.tagComponentNameMap.Insert(serializeName, tagComponent);
 	this.tagComponentSerializeMap.Insert(tagComponent.id, serializeName);
 	this.tagComponentRemoveCallbacks.Insert(tagComponent.id, onRemove);

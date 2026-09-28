@@ -20,6 +20,18 @@ PhysicsBodyComponent := ECS.RegisterComponent<PhysicsBody>(
 	}
 );
 
+SetBodyEntity(world: *PhysicsWorld, bodyID: uint32, entity: Entity) =>
+{
+    bodyInterface := world.bodyInterface;
+    JPH_BodyInterface_SetUserData(bodyInterface, bodyID, entity as uint64);
+}
+
+Entity GetBodyEntity(world: *PhysicsWorld, bodyID: uint32) =>
+{
+    bodyInterface := world.bodyInterface;
+    return JPH_BodyInterface_GetUserData(bodyInterface, bodyID) as Entity;
+}
+
 CreatePhysicsBody(scene: *Scene, entity: Entity,
                   shape: *JPH_Shape,
                   motionMode: MotionMode, layer: uint32,
@@ -50,6 +62,8 @@ CreatePhysicsBody(scene: *Scene, entity: Entity,
     bodyID := JPH_BodyInterface_CreateAndAddBody(
         bodyInterface, settings, activation
     );
+
+    SetBodyEntity(physicsWorld, bodyID, entity);
 
     scene.SetComponentDirect<PhysicsBody>(entity, { bodyID }, PhysicsBodyComponent);
 

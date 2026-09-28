@@ -29,6 +29,11 @@ SceneEntityIterator::delete
 	delete this.sparse;
 }
 
+Entity SceneEntityIterator::GetEntity(id: uint32)
+{
+	return Entity(id, uint16(0));
+}
+
 Iterator SceneEntityIterator::operator::in()
 {
 	return {null, -1};
@@ -41,9 +46,9 @@ bool SceneEntityIterator::next(it: Iterator)
     this.common.Clear();
 	this.sparse.Clear();
 
-	while (it.index < this.scene.currEntity)
+	while (it.index < this.scene.currEntity.Load())
 	{
-		this.Populate(Entity(it.index + 1));
+		this.Populate(this.GetEntity(it.index + 1));
 		if (this.common.count || this.sparse.count) return true;
 
 		it.index += 1;
@@ -56,12 +61,12 @@ SceneEntityIterator::Populate(entity: Entity)
 {
 	for (kv in this.scene.commonComponents)
 	{
-		if (kv.value.Has(entity)) this.common.Add(ECS.instance.GetComponentByID(kv.key));
+		if (kv.value.Has(entity.id)) this.common.Add(ECS.instance.GetComponentByID(kv.key));
 	}
 
 	for (kv in this.scene.sparseComponents)
 	{
-		if (kv.value.Has(entity)) this.sparse.Add(ECS.instance.GetComponentByID(kv.key));
+		if (kv.value.Has(entity.id)) this.sparse.Add(ECS.instance.GetComponentByID(kv.key));
 	}
 }
 
@@ -69,7 +74,7 @@ SceneEntityComponents SceneEntityIterator::current(it: Iterator)
 {
     commonArrView := ArrayView<Component>(this.common[0]@, this.common.count);
     sparseArrView := ArrayView<Component>(this.sparse[0]@, this.sparse.count);
-	return { commonArrView, sparseArrView, Entity(it.index + 1) } as SceneEntityComponents;
+	return { commonArrView, sparseArrView, this.GetEntity(it.index + 1) } as SceneEntityComponents;
 }
 
 SceneEntityIterator IterateSceneEntities(scene: *Scene)

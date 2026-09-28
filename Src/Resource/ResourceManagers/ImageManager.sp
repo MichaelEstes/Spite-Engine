@@ -14,7 +14,8 @@ state ImageParam
 {
 	uri: string,
 	basePath: string,
-	parent: ResourceHandle
+	parent: ResourceHandle,
+	uriIsImage := false
 }
 
 ImageResourceManager := Resource.CreateResourceManager<ImageResource, ImageParam>(
@@ -29,7 +30,15 @@ ImageResourceManager := Resource.CreateResourceManager<ImageResource, ImageParam
 
 ImageResourceManagerID := Resource.RegisterResourceManager(ImageResourceManager@);
 
-ResourceKey GetImageKey(param: ImageParam) => ResourceKey(OS.JoinPaths([param.basePath, param.uri]));
+ResourceKey GetImageKey(param: ImageParam) 
+{
+	if (param.uriIsImage)
+	{
+		return ResourceKey(param.uri.mem as uint);
+	}
+	
+	return ResourceKey(OS.JoinPaths([param.basePath, param.uri]));
+}
 
 ImageManagerLoad(imageResourceParam: *ResourceParam<ImageResource, ImageParam>)
 {
@@ -38,6 +47,7 @@ ImageManagerLoad(imageResourceParam: *ResourceParam<ImageResource, ImageParam>)
 	
 	uri := param.uri;
 	parent := param.parent;
+	uriIsImage := param.uriIsImage;
 
 	resourceManager := imageResourceParam.manager;
 	resource := resourceManager.GetResource(handle);
@@ -45,7 +55,11 @@ ImageManagerLoad(imageResourceParam: *ResourceParam<ImageResource, ImageParam>)
 	resource.parent = param.parent;
 	resourceData := resource.data;
 
-	if (File.IsDataURI(uri))
+	if (uriIsImage)
+	{
+		resourceData.image = Image.CreateTextureImage(uri[0], uri.count);
+	}
+	else if (File.IsDataURI(uri))
     {
 		
     }
@@ -64,6 +78,17 @@ ResourceHandle LoadImageResource(uri: string, basePath: string = "", parent: Res
 	textureParam.uri = uri;
 	textureParam.basePath = basePath;
 	textureParam.parent = parent;
+
+	return ImageResourceManager.LoadResource(textureParam, null);
+}
+
+ResourceHandle CreateImageResource(imageData: string, basePath: string = "", parent: ResourceHandle = InvalidResourceHandle)
+{
+	textureParam := ImageParam();
+	textureParam.uri = imageData;
+	textureParam.basePath = basePath;
+	textureParam.parent = parent;
+	textureParam.uriIsImage = true;
 
 	return ImageResourceManager.LoadResource(textureParam, null);
 }

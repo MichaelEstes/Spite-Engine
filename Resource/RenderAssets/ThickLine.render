@@ -10,10 +10,6 @@
             side: {
                 type: float,
                 default: 1.0
-            },
-            color: {
-                type: vec4,
-                default: [1.0, 1.0, 1.0, 1.0]
             }
         },
         variables: {
@@ -49,7 +45,12 @@
         ]
     },
     fragment: {
-        using: [color],
+        variables: {
+            color: {
+                type: vec4,
+                default: [1.0, 1.0, 1.0, 1.0]
+            }
+        },
         out: {
             outColor: vec4
         },

@@ -22,7 +22,7 @@ extern
 	void ImGui_ShowIDStackToolWindow();
 	void ImGui_ShowIDStackToolWindowEx(p_open: *bool);
 	void ImGui_ShowAboutWindow(p_open: *bool);
-	void ImGui_ShowStyleEditor(styleRef: *ImGuiStyle_t);
+	void ImGui_ShowStyleEditor(style: *ImGuiStyle_t);
 	bool ImGui_ShowStyleSelector(label: *byte);
 	void ImGui_ShowFontSelector(label: *byte);
 	void ImGui_ShowUserGuide();
@@ -40,10 +40,12 @@ extern
 	bool ImGui_IsWindowFocused(flags: int32);
 	bool ImGui_IsWindowHovered(flags: int32);
 	*ImDrawList_t ImGui_GetWindowDrawList();
+	float32 ImGui_GetWindowDpiScale();
 	ImVec2_t ImGui_GetWindowPos();
 	ImVec2_t ImGui_GetWindowSize();
 	float32 ImGui_GetWindowWidth();
 	float32 ImGui_GetWindowHeight();
+	*ImGuiViewport_t ImGui_GetWindowViewport();
 	void ImGui_SetNextWindowPos(pos: ImVec2_t, cond: int32);
 	void ImGui_SetNextWindowPosEx(pos: ImVec2_t, cond: int32, pivot: ImVec2_t);
 	void ImGui_SetNextWindowSize(size: ImVec2_t, cond: int32);
@@ -53,6 +55,7 @@ extern
 	void ImGui_SetNextWindowFocus();
 	void ImGui_SetNextWindowScroll(scroll: ImVec2_t);
 	void ImGui_SetNextWindowBgAlpha(alpha: float32);
+	void ImGui_SetNextWindowViewport(viewport_id: uint32);
 	void ImGui_SetWindowPos(pos: ImVec2_t, cond: int32);
 	void ImGui_SetWindowSize(size: ImVec2_t, cond: int32);
 	void ImGui_SetWindowCollapsed(collapsed: bool, cond: int32);
@@ -142,19 +145,14 @@ extern
 	void ImGui_Text(fmt: *byte);
 	void ImGui_TextV(fmt: *byte, args: any);
 	void ImGui_TextColored(col: ImVec4_t, fmt: *byte);
-	void ImGui_TextColoredUnformatted(col: ImVec4_t, text: *byte);
 	void ImGui_TextColoredV(col: ImVec4_t, fmt: *byte, args: any);
 	void ImGui_TextDisabled(fmt: *byte);
-	void ImGui_TextDisabledUnformatted(text: *byte);
 	void ImGui_TextDisabledV(fmt: *byte, args: any);
 	void ImGui_TextWrapped(fmt: *byte);
-	void ImGui_TextWrappedUnformatted(text: *byte);
 	void ImGui_TextWrappedV(fmt: *byte, args: any);
 	void ImGui_LabelText(label: *byte, fmt: *byte);
-	void ImGui_LabelTextUnformatted(label: *byte, text: *byte);
 	void ImGui_LabelTextV(label: *byte, fmt: *byte, args: any);
 	void ImGui_BulletText(fmt: *byte);
-	void ImGui_BulletTextUnformatted(text: *byte);
 	void ImGui_BulletTextV(fmt: *byte, args: any);
 	void ImGui_SeparatorText(label: *byte);
 	bool ImGui_Button(label: *byte);
@@ -272,16 +270,12 @@ extern
 	void ImGui_SetColorEditOptions(flags: int32);
 	bool ImGui_TreeNode(label: *byte);
 	bool ImGui_TreeNodeStr(str_id: *byte, fmt: *byte);
-	bool ImGui_TreeNodeStrUnformatted(str_id: *byte, text: *byte);
 	bool ImGui_TreeNodePtr(ptr_id: *void, fmt: *byte);
-	bool ImGui_TreeNodePtrUnformatted(ptr_id: *void, text: *byte);
 	bool ImGui_TreeNodeV(str_id: *byte, fmt: *byte, args: any);
 	bool ImGui_TreeNodeVPtr(ptr_id: *void, fmt: *byte, args: any);
 	bool ImGui_TreeNodeEx(label: *byte, flags: int32);
 	bool ImGui_TreeNodeExStr(str_id: *byte, flags: int32, fmt: *byte);
-	bool ImGui_TreeNodeExStrUnformatted(str_id: *byte, flags: int32, text: *byte);
 	bool ImGui_TreeNodeExPtr(ptr_id: *void, flags: int32, fmt: *byte);
-	bool ImGui_TreeNodeExPtrUnformatted(ptr_id: *void, flags: int32, text: *byte);
 	bool ImGui_TreeNodeExV(str_id: *byte, flags: int32, fmt: *byte, args: any);
 	bool ImGui_TreeNodeExVPtr(ptr_id: *void, flags: int32, fmt: *byte, args: any);
 	void ImGui_TreePush(str_id: *byte);
@@ -330,7 +324,6 @@ extern
 	void ImGui_SetTooltipV(fmt: *byte, args: any);
 	bool ImGui_BeginItemTooltip();
 	void ImGui_SetItemTooltip(fmt: *byte);
-	void ImGui_SetItemTooltipUnformatted(text: *byte);
 	void ImGui_SetItemTooltipV(fmt: *byte, args: any);
 	bool ImGui_BeginPopup(str_id: *byte, flags: int32);
 	bool ImGui_BeginPopupModal(name: *byte, p_open: *bool, flags: int32);
@@ -383,13 +376,20 @@ extern
 	void ImGui_EndTabItem();
 	bool ImGui_TabItemButton(label: *byte, flags: int32);
 	void ImGui_SetTabItemClosed(tab_or_docked_window_label: *byte);
+	uint32 ImGui_DockSpace(dockspace_id: uint32);
+	uint32 ImGui_DockSpaceEx(dockspace_id: uint32, size: ImVec2_t, flags: int32, window_class: *ImGuiWindowClass_t);
+	uint32 ImGui_DockSpaceOverViewport();
+	uint32 ImGui_DockSpaceOverViewportEx(dockspace_id: uint32, viewport: *ImGuiViewport_t, flags: int32, window_class: *ImGuiWindowClass_t);
+	void ImGui_SetNextWindowDockID(dock_id: uint32, cond: int32);
+	void ImGui_SetNextWindowClass(window_class: *ImGuiWindowClass_t);
+	uint32 ImGui_GetWindowDockID();
+	bool ImGui_IsWindowDocked();
 	void ImGui_LogToTTY(auto_open_depth: int32);
 	void ImGui_LogToFile(auto_open_depth: int32, filename: *byte);
 	void ImGui_LogToClipboard(auto_open_depth: int32);
 	void ImGui_LogFinish();
 	void ImGui_LogButtons();
 	void ImGui_LogText(fmt: *byte);
-	void ImGui_LogTextUnformatted(text: *byte);
 	void ImGui_LogTextV(fmt: *byte, args: any);
 	bool ImGui_BeginDragDropSource(flags: int32);
 	bool ImGui_SetDragDropPayload(type: *byte, data: *void, sz: uint64, cond: int32);
@@ -427,7 +427,9 @@ extern
 	ImVec2_t ImGui_GetItemRectSize();
 	*ImGuiViewport_t ImGui_GetMainViewport();
 	*ImDrawList_t ImGui_GetBackgroundDrawList();
+	*ImDrawList_t ImGui_GetBackgroundDrawListEx(viewport: *ImGuiViewport_t);
 	*ImDrawList_t ImGui_GetForegroundDrawList();
+	*ImDrawList_t ImGui_GetForegroundDrawListEx(viewport: *ImGuiViewport_t);
 	bool ImGui_IsRectVisibleBySize(size: ImVec2_t);
 	bool ImGui_IsRectVisible(rect_min: ImVec2_t, rect_max: ImVec2_t);
 	float64 ImGui_GetTime();
@@ -439,7 +441,7 @@ extern
 	ImVec2_t ImGui_CalcTextSize(text: *byte);
 	ImVec2_t ImGui_CalcTextSizeEx(text: *byte, text_end: *byte, hide_text_after_double_hash: bool, wrap_width: float32);
 	ImVec4_t ImGui_ColorConvertU32ToFloat4(val: uint32);
-	uint32 ImGui_ColorConvertFloat4ToU32(val: ImVec4_t);
+	uint32 ImGui_ColorConvertFloat4ToU32(vec: ImVec4_t);
 	void ImGui_ColorConvertRGBtoHSV(r: float32, g: float32, b: float32, out_h: *float32, out_s: *float32, out_v: *float32);
 	void ImGui_ColorConvertHSVtoRGB(h: float32, s: float32, v: float32, out_r: *float32, out_g: *float32, out_b: *float32);
 	bool ImGui_IsKeyDown(key: int32);
@@ -484,14 +486,23 @@ extern
 	void ImGui_DebugStartItemPicker();
 	bool ImGui_DebugCheckVersionAndDataLayout(version_str: *byte, sz_io: uint64, sz_style: uint64, sz_vec2: uint64, sz_vec4: uint64, sz_drawvert: uint64, sz_drawidx: uint64);
 	void ImGui_DebugLog(fmt: *byte);
-	void ImGui_DebugLogUnformatted(text: *byte);
 	void ImGui_DebugLogV(fmt: *byte, args: any);
 	void ImGui_SetAllocatorFunctions(alloc_func: ::(), free_func: ::(), user_data: *void);
 	void ImGui_GetAllocatorFunctions(p_alloc_func: *::(), p_free_func: *::(), p_user_data: **void);
 	*void ImGui_MemAlloc(size: uint64);
 	void ImGui_MemFree(ptr: *void);
+	void ImGui_UpdatePlatformWindows();
+	void ImGui_RenderPlatformWindowsDefault();
+	void ImGui_RenderPlatformWindowsDefaultEx(platform_render_arg: *void, renderer_render_arg: *void);
+	void ImGui_DestroyPlatformWindows();
+	*ImGuiViewport_t ImGui_FindViewportByID(viewport_id: uint32);
+	*ImGuiViewport_t ImGui_FindViewportByPlatformHandle(platform_handle: *void);
 	void ImVector_Construct(vector: *void);
 	void ImVector_Destruct(vector: *void);
+	void ImGuiPlatformIO_SetPlatform_GetWindowWorkAreaInsets(getWindowWorkAreaInsetsFunc: ::());
+	void ImGuiPlatformIO_SetPlatform_GetWindowFramebufferScale(getWindowFramebufferScaleFunc: ::());
+	void ImGuiPlatformIO_SetPlatform_GetWindowPos(getWindowPosFunc: ::());
+	void ImGuiPlatformIO_SetPlatform_GetWindowSize(getWindowSizeFunc: ::());
 	void ImGuiStyle_ScaleAllSizes(self: *ImGuiStyle_t, scale_factor: float32);
 	void ImGuiIO_AddKeyEvent(self: *ImGuiIO_t, key: int32, down: bool);
 	void ImGuiIO_AddKeyAnalogEvent(self: *ImGuiIO_t, key: int32, down: bool, v: float32);
@@ -499,6 +510,7 @@ extern
 	void ImGuiIO_AddMouseButtonEvent(self: *ImGuiIO_t, button: int32, down: bool);
 	void ImGuiIO_AddMouseWheelEvent(self: *ImGuiIO_t, wheel_x: float32, wheel_y: float32);
 	void ImGuiIO_AddMouseSourceEvent(self: *ImGuiIO_t, source: int32);
+	void ImGuiIO_AddMouseViewportEvent(self: *ImGuiIO_t, id: uint32);
 	void ImGuiIO_AddFocusEvent(self: *ImGuiIO_t, focused: bool);
 	void ImGuiIO_AddInputCharacter(self: *ImGuiIO_t, c: uint32);
 	void ImGuiIO_AddInputCharacterUTF16(self: *ImGuiIO_t, c: uint16);
@@ -663,7 +675,7 @@ extern
 	void ImDrawData_AddDrawList(self: *ImDrawData_t, draw_list: *ImDrawList_t);
 	void ImDrawData_DeIndexAllBuffers(self: *ImDrawData_t);
 	void ImDrawData_ScaleClipRects(self: *ImDrawData_t, fb_scale: ImVec2_t);
-	void ImTextureData_Create(self: *ImTextureData_t, format: ImTextureFormat, w: int32, h: int32);
+	void ImTextureData_Create(self: *ImTextureData_t, format: uint32, w: int32, h: int32);
 	void ImTextureData_DestroyPixels(self: *ImTextureData_t);
 	*void ImTextureData_GetPixels(self: *ImTextureData_t);
 	*void ImTextureData_GetPixelsAt(self: *ImTextureData_t, x: int32, y: int32);
@@ -672,7 +684,7 @@ extern
 	ImTextureRef_t ImTextureData_GetTexRef(self: *ImTextureData_t);
 	uint64 ImTextureData_GetTexID(self: *ImTextureData_t);
 	void ImTextureData_SetTexID(self: *ImTextureData_t, tex_id: uint64);
-	void ImTextureData_SetStatus(self: *ImTextureData_t, status: ImTextureStatus);
+	void ImTextureData_SetStatus(self: *ImTextureData_t, status: uint32);
 	void ImFontGlyphRangesBuilder_Clear(self: *ImFontGlyphRangesBuilder_t);
 	bool ImFontGlyphRangesBuilder_GetBit(self: *ImFontGlyphRangesBuilder_t, n: uint64);
 	void ImFontGlyphRangesBuilder_SetBit(self: *ImFontGlyphRangesBuilder_t, n: uint64);
@@ -759,7 +771,6 @@ extern
 	bool ImGui_ListBoxObsolete(label: *byte, current_item: *int32, old_callback: ::(), user_data: *void, items_count: int32);
 	bool ImGui_ListBoxObsoleteEx(label: *byte, current_item: *int32, old_callback: ::(), user_data: *void, items_count: int32, height_in_items: int32);
 }
-
 enum ImGuiWindowFlags_: uint32
 {
 	ImGuiWindowFlags_None = 0,
@@ -782,9 +793,11 @@ enum ImGuiWindowFlags_: uint32
 	ImGuiWindowFlags_NoNavInputs = 65536,
 	ImGuiWindowFlags_NoNavFocus = 131072,
 	ImGuiWindowFlags_UnsavedDocument = 262144,
+	ImGuiWindowFlags_NoDocking = 524288,
 	ImGuiWindowFlags_NoNav = 196608,
 	ImGuiWindowFlags_NoDecoration = 43,
 	ImGuiWindowFlags_NoInputs = 197120,
+	ImGuiWindowFlags_DockNodeHost = 8388608,
 	ImGuiWindowFlags_ChildWindow = 16777216,
 	ImGuiWindowFlags_Tooltip = 33554432,
 	ImGuiWindowFlags_Popup = 67108864,
@@ -957,6 +970,7 @@ enum ImGuiFocusedFlags_: uint32
 	ImGuiFocusedFlags_RootWindow = 2,
 	ImGuiFocusedFlags_AnyWindow = 4,
 	ImGuiFocusedFlags_NoPopupHierarchy = 8,
+	ImGuiFocusedFlags_DockHierarchy = 16,
 	ImGuiFocusedFlags_RootAndChildWindows = 3
 }
 
@@ -967,6 +981,7 @@ enum ImGuiHoveredFlags_: uint32
 	ImGuiHoveredFlags_RootWindow = 2,
 	ImGuiHoveredFlags_AnyWindow = 4,
 	ImGuiHoveredFlags_NoPopupHierarchy = 8,
+	ImGuiHoveredFlags_DockHierarchy = 16,
 	ImGuiHoveredFlags_AllowWhenBlockedByPopup = 32,
 	ImGuiHoveredFlags_AllowWhenBlockedByActiveItem = 128,
 	ImGuiHoveredFlags_AllowWhenOverlappedByItem = 256,
@@ -982,6 +997,20 @@ enum ImGuiHoveredFlags_: uint32
 	ImGuiHoveredFlags_DelayShort = 32768,
 	ImGuiHoveredFlags_DelayNormal = 65536,
 	ImGuiHoveredFlags_NoSharedDelay = 131072
+}
+
+enum ImGuiDockNodeFlags_: uint32
+{
+	ImGuiDockNodeFlags_None = 0,
+	ImGuiDockNodeFlags_KeepAliveOnly = 1,
+	ImGuiDockNodeFlags_NoDockingOverCentralNode = 4,
+	ImGuiDockNodeFlags_PassthruCentralNode = 8,
+	ImGuiDockNodeFlags_NoDockingSplit = 16,
+	ImGuiDockNodeFlags_NoResize = 32,
+	ImGuiDockNodeFlags_AutoHideTabBar = 64,
+	ImGuiDockNodeFlags_NoUndocking = 128,
+	ImGuiDockNodeFlags_NoSplit = 16,
+	ImGuiDockNodeFlags_NoDockingInCentralNode = 4
 }
 
 enum ImGuiDragDropFlags_: uint32
@@ -1231,10 +1260,14 @@ enum ImGuiConfigFlags_: uint32
 	ImGuiConfigFlags_NoMouse = 16,
 	ImGuiConfigFlags_NoMouseCursorChange = 32,
 	ImGuiConfigFlags_NoKeyboard = 64,
+	ImGuiConfigFlags_DockingEnable = 128,
+	ImGuiConfigFlags_ViewportsEnable = 1024,
 	ImGuiConfigFlags_IsSRGB = 1048576,
 	ImGuiConfigFlags_IsTouchScreen = 2097152,
 	ImGuiConfigFlags_NavEnableSetMousePos = 4,
-	ImGuiConfigFlags_NavNoCaptureKeyboard = 8
+	ImGuiConfigFlags_NavNoCaptureKeyboard = 8,
+	ImGuiConfigFlags_DpiEnableScaleFonts = 16384,
+	ImGuiConfigFlags_DpiEnableScaleViewports = 32768
 }
 
 enum ImGuiBackendFlags_: uint32
@@ -1244,7 +1277,11 @@ enum ImGuiBackendFlags_: uint32
 	ImGuiBackendFlags_HasMouseCursors = 2,
 	ImGuiBackendFlags_HasSetMousePos = 4,
 	ImGuiBackendFlags_RendererHasVtxOffset = 8,
-	ImGuiBackendFlags_RendererHasTextures = 16
+	ImGuiBackendFlags_RendererHasTextures = 16,
+	ImGuiBackendFlags_RendererHasViewports = 1024,
+	ImGuiBackendFlags_PlatformHasViewports = 2048,
+	ImGuiBackendFlags_HasMouseHoveredViewport = 4096,
+	ImGuiBackendFlags_HasParentViewport = 8192
 }
 
 enum ImGuiCol_: uint32
@@ -1290,30 +1327,32 @@ enum ImGuiCol_: uint32
 	ImGuiCol_TabDimmed = 38,
 	ImGuiCol_TabDimmedSelected = 39,
 	ImGuiCol_TabDimmedSelectedOverline = 40,
-	ImGuiCol_PlotLines = 41,
-	ImGuiCol_PlotLinesHovered = 42,
-	ImGuiCol_PlotHistogram = 43,
-	ImGuiCol_PlotHistogramHovered = 44,
-	ImGuiCol_TableHeaderBg = 45,
-	ImGuiCol_TableBorderStrong = 46,
-	ImGuiCol_TableBorderLight = 47,
-	ImGuiCol_TableRowBg = 48,
-	ImGuiCol_TableRowBgAlt = 49,
-	ImGuiCol_TextLink = 50,
-	ImGuiCol_TextSelectedBg = 51,
-	ImGuiCol_TreeLines = 52,
-	ImGuiCol_DragDropTarget = 53,
-	ImGuiCol_DragDropTargetBg = 54,
-	ImGuiCol_UnsavedMarker = 55,
-	ImGuiCol_NavCursor = 56,
-	ImGuiCol_NavWindowingHighlight = 57,
-	ImGuiCol_NavWindowingDimBg = 58,
-	ImGuiCol_ModalWindowDimBg = 59,
-	ImGuiCol_COUNT = 60,
+	ImGuiCol_DockingPreview = 41,
+	ImGuiCol_DockingEmptyBg = 42,
+	ImGuiCol_PlotLines = 43,
+	ImGuiCol_PlotLinesHovered = 44,
+	ImGuiCol_PlotHistogram = 45,
+	ImGuiCol_PlotHistogramHovered = 46,
+	ImGuiCol_TableHeaderBg = 47,
+	ImGuiCol_TableBorderStrong = 48,
+	ImGuiCol_TableBorderLight = 49,
+	ImGuiCol_TableRowBg = 50,
+	ImGuiCol_TableRowBgAlt = 51,
+	ImGuiCol_TextLink = 52,
+	ImGuiCol_TextSelectedBg = 53,
+	ImGuiCol_TreeLines = 54,
+	ImGuiCol_DragDropTarget = 55,
+	ImGuiCol_DragDropTargetBg = 56,
+	ImGuiCol_UnsavedMarker = 57,
+	ImGuiCol_NavCursor = 58,
+	ImGuiCol_NavWindowingHighlight = 59,
+	ImGuiCol_NavWindowingDimBg = 60,
+	ImGuiCol_ModalWindowDimBg = 61,
+	ImGuiCol_COUNT = 62,
 	ImGuiCol_TabActive = 36,
 	ImGuiCol_TabUnfocused = 38,
 	ImGuiCol_TabUnfocusedActive = 39,
-	ImGuiCol_NavHighlight = 56
+	ImGuiCol_NavHighlight = 58
 }
 
 enum ImGuiStyleVar_: uint32
@@ -1357,7 +1396,8 @@ enum ImGuiStyleVar_: uint32
 	ImGuiStyleVar_SeparatorTextBorderSize = 36,
 	ImGuiStyleVar_SeparatorTextAlign = 37,
 	ImGuiStyleVar_SeparatorTextPadding = 38,
-	ImGuiStyleVar_COUNT = 39
+	ImGuiStyleVar_DockingSeparatorSize = 39,
+	ImGuiStyleVar_COUNT = 40
 }
 
 enum ImGuiButtonFlags_: uint32
@@ -1647,7 +1687,18 @@ enum ImGuiViewportFlags_: uint32
 	ImGuiViewportFlags_None = 0,
 	ImGuiViewportFlags_IsPlatformWindow = 1,
 	ImGuiViewportFlags_IsPlatformMonitor = 2,
-	ImGuiViewportFlags_OwnedByApp = 4
+	ImGuiViewportFlags_OwnedByApp = 4,
+	ImGuiViewportFlags_NoDecoration = 8,
+	ImGuiViewportFlags_NoTaskBarIcon = 16,
+	ImGuiViewportFlags_NoFocusOnAppearing = 32,
+	ImGuiViewportFlags_NoFocusOnClick = 64,
+	ImGuiViewportFlags_NoInputs = 128,
+	ImGuiViewportFlags_NoRendererClear = 256,
+	ImGuiViewportFlags_NoAutoMerge = 512,
+	ImGuiViewportFlags_TopMost = 1024,
+	ImGuiViewportFlags_CanHostOtherWindows = 2048,
+	ImGuiViewportFlags_IsMinimized = 4096,
+	ImGuiViewportFlags_IsFocused = 8192
 }
 
 state ImDrawListSharedData_t
@@ -1866,11 +1917,25 @@ state ImVector_ImFontConfigPtr_t
 	Data: **ImFontConfig_t
 }
 
+state ImVector_ImGuiPlatformMonitor_t
+{
+	Size: int32,
+	Capacity: int32,
+	Data: *ImGuiPlatformMonitor_t
+}
+
 state ImVector_ImTextureDataPtr_t
 {
 	Size: int32,
 	Capacity: int32,
 	Data: **ImTextureData_t
+}
+
+state ImVector_ImGuiViewportPtr_t
+{
+	Size: int32,
+	Capacity: int32,
+	Data: **ImGuiViewport_t
 }
 
 state ImGuiStyle_t
@@ -1931,13 +1996,15 @@ state ImGuiStyle_t
 	SeparatorTextPadding: ImVec2_t,
 	DisplayWindowPadding: ImVec2_t,
 	DisplaySafeAreaPadding: ImVec2_t,
+	DockingNodeHasCloseButton: bool,
+	DockingSeparatorSize: float32,
 	MouseCursorScale: float32,
 	AntiAliasedLines: bool,
 	AntiAliasedLinesUseTex: bool,
 	AntiAliasedFill: bool,
 	CurveTessellationTol: float32,
 	CircleTessellationMaxError: float32,
-	Colors: [60]ImVec4_t,
+	Colors: [62]ImVec4_t,
 	HoverStationaryDelay: float32,
 	HoverDelayShort: float32,
 	HoverDelayNormal: float32,
@@ -1976,6 +2043,18 @@ state ImGuiIO_t
 	ConfigNavEscapeClearFocusWindow: bool,
 	ConfigNavCursorVisibleAuto: bool,
 	ConfigNavCursorVisibleAlways: bool,
+	ConfigDockingNoSplit: bool,
+	ConfigDockingNoDockingOver: bool,
+	ConfigDockingWithShift: bool,
+	ConfigDockingAlwaysTabBar: bool,
+	ConfigDockingTransparentPayload: bool,
+	ConfigViewportsNoAutoMerge: bool,
+	ConfigViewportsNoTaskBarIcon: bool,
+	ConfigViewportsNoDecoration: bool,
+	ConfigViewportsNoDefaultParent: bool,
+	ConfigViewportsPlatformFocusSetsImGuiFocus: bool,
+	ConfigDpiScaleFonts: bool,
+	ConfigDpiScaleViewports: bool,
 	MouseDrawCursor: bool,
 	ConfigMacOSXBehaviors: bool,
 	ConfigInputTrickleEventQueue: bool,
@@ -2027,6 +2106,7 @@ state ImGuiIO_t
 	MouseWheel: float32,
 	MouseWheelH: float32,
 	MouseSource: int32,
+	MouseHoveredViewport: uint32,
 	KeyCtrl: bool,
 	KeyShift: bool,
 	KeyAlt: bool,
@@ -2049,6 +2129,7 @@ state ImGuiIO_t
 	MouseCtrlLeftAsRightClick: bool,
 	MouseDownDuration: [5]float32,
 	MouseDownDurationPrev: [5]float32,
+	MouseDragMaxDistanceAbs: [5]ImVec2_t,
 	MouseDragMaxDistanceSqr: [5]float32,
 	PenPressure: float32,
 	AppFocusLost: bool,
@@ -2086,6 +2167,19 @@ state ImGuiSizeCallbackData_t
 	DesiredSize: ImVec2_t
 }
 
+state ImGuiWindowClass_t
+{
+	ClassId: uint32,
+	ParentViewportId: uint32,
+	FocusRouteParentWindowId: uint32,
+	ViewportFlagsOverrideSet: int32,
+	ViewportFlagsOverrideClear: int32,
+	TabItemFlagsOverrideSet: int32,
+	DockNodeFlagsOverrideSet: int32,
+	DockingAlwaysTabBar: bool,
+	DockingAllowUnclassed: bool
+}
+
 state ImGuiPayload_t
 {
 	Data: *void,
@@ -2119,10 +2213,10 @@ state ImGuiTextBuffer_t
 state ImGuiStoragePair_t
 {
 	key: uint32,
-	vals: ?{
-		val_i: int32,
-		val_f: float32,
-		val_p: *void
+	val: ?{
+		i: int32,
+		f: float32,
+		p: *void
 	}
 }
 
@@ -2432,8 +2526,18 @@ state ImGuiViewport_t
 	FramebufferScale: ImVec2_t,
 	WorkPos: ImVec2_t,
 	WorkSize: ImVec2_t,
+	DpiScale: float32,
+	ParentViewportId: uint32,
+	ParentViewport: *ImGuiViewport_t,
+	DrawData: *ImDrawData_t,
+	RendererUserData: *void,
+	PlatformUserData: *void,
 	PlatformHandle: *void,
-	PlatformHandleRaw: *void
+	PlatformHandleRaw: *void,
+	PlatformWindowCreated: bool,
+	PlatformRequestMove: bool,
+	PlatformRequestResize: bool,
+	PlatformRequestClose: bool
 }
 
 state ImGuiPlatformIO_t
@@ -2449,7 +2553,44 @@ state ImGuiPlatformIO_t
 	Renderer_TextureMaxWidth: int32,
 	Renderer_TextureMaxHeight: int32,
 	Renderer_RenderState: *void,
-	Textures: ImVector_ImTextureDataPtr_t
+	Platform_CreateWindow: ::(),
+	Platform_DestroyWindow: ::(),
+	Platform_ShowWindow: ::(),
+	Platform_SetWindowPos: ::(),
+	Platform_GetWindowPos: ::(),
+	Platform_SetWindowSize: ::(),
+	Platform_GetWindowSize: ::(),
+	Platform_GetWindowFramebufferScale: ::(),
+	Platform_SetWindowFocus: ::(),
+	Platform_GetWindowFocus: ::(),
+	Platform_GetWindowMinimized: ::(),
+	Platform_SetWindowTitle: ::(),
+	Platform_SetWindowAlpha: ::(),
+	Platform_UpdateWindow: ::(),
+	Platform_RenderWindow: ::(),
+	Platform_SwapBuffers: ::(),
+	Platform_GetWindowDpiScale: ::(),
+	Platform_OnChangedViewport: ::(),
+	Platform_GetWindowWorkAreaInsets: ::(),
+	Platform_CreateVkSurface: ::(),
+	Renderer_CreateWindow: ::(),
+	Renderer_DestroyWindow: ::(),
+	Renderer_SetWindowSize: ::(),
+	Renderer_RenderWindow: ::(),
+	Renderer_SwapBuffers: ::(),
+	Monitors: ImVector_ImGuiPlatformMonitor_t,
+	Textures: ImVector_ImTextureDataPtr_t,
+	Viewports: ImVector_ImGuiViewportPtr_t
+}
+
+state ImGuiPlatformMonitor_t
+{
+	MainPos: ImVec2_t,
+	MainSize: ImVec2_t,
+	WorkPos: ImVec2_t,
+	WorkSize: ImVec2_t,
+	DpiScale: float32,
+	PlatformHandle: *void
 }
 
 state ImGuiPlatformImeData_t
