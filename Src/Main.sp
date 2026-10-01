@@ -19,6 +19,8 @@ import Array
 
 import Time
 
+import Common
+
 state Test
 {
 	i: int
@@ -51,7 +53,7 @@ tagTestComponent := ECS.RegisterTagComponent(
 );
 
 queryTestSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
-	//log "Transform System called", dt;
+	// log "Transform System called", dt;
 	
 	for (item in scene.Iterate<Transform>())
 	{
@@ -68,10 +70,10 @@ queryTestSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	// {
 	// 	log "Query entity: ", entity;
 	// }
-});
+}, SystemStep.PreDraw, SystemRelation.Before, TransformUpdateSystem);
 
 testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
-	//log "Test System called", dt;
+	// log "Test System called", dt;
 	for (item in scene.Iterate<Test>())
 	{
 		//log item;
@@ -100,7 +102,7 @@ testSystem := ECS.RegisterSystem(::(scene: Scene, dt: float) {
 	//log "Data: ", data;
 
 	if (scene.HasSingleton<SingletonTest>()) scene.GetSingleton<SingletonTest>().myValue += 1;
-});
+}, SystemStep.PreDraw, SystemRelation.After, queryTestSystem);
 
 Main()
 {

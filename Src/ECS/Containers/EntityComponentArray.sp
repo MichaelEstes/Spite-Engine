@@ -50,7 +50,7 @@ bool EntityComponentArray::next(it: Iterator)
 {
 	it.index += 1;
 
-	while (it.index < this.maxEntityID & this.activeArr[it.index]~)
+	while ((it.index == 0) | ((it.index < this.maxEntityID) & !this.activeArr[it.index]~))
 	{
 		it.index += 1;
 	}

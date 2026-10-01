@@ -1,5 +1,5 @@
 {
-    name: Line,
+    name: Unlit,
     vertex: {
         attributes: {
             position: vec3
@@ -27,7 +27,7 @@
         },
         init: [
             {
-                name: lineColor,
+                name: unlitColor,
                 code: `
                     outColor = color;
                 `

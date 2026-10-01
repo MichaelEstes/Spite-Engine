@@ -6,11 +6,10 @@ import Stack
 import RingBuffer
 import Fiber
 import Atomic
-import FrameAllocator
 import Event
 import Math
 
-fixedUpdateRate: float = 1.0 / 50.0;
+fixedUpdateRate: float = 1.0 / 60.0;
 
 instance: ECS = ECS();
 
@@ -36,33 +35,61 @@ state TagComponent
 	id: uint32,
 }
 
-state SceneSystem { scene: *Scene, system: System }
-SceneSystem::(scene: *Scene, system: System)
+state SceneSystem { scene: *Scene, system: *System, dt: float, handle: **Fiber.JobHandle }
+SceneSystem::(scene: *Scene, system: *System, dt: float, handle: **Fiber.JobHandle)
 {
 	this.scene = scene;
 	this.system = system;
+	this.dt = dt;
+	this.handle = handle;
+}
+
+state FrameSystemJob { system: *FrameSystem, handle: **Fiber.JobHandle }
+FrameSystemJob::(system: *FrameSystem, handle: **Fiber.JobHandle)
+{
+	this.system = system;
+	this.handle = handle;
 }
 
 Component RegisterComponent<Type>(componentKind: ComponentKind = ComponentKind.Sparse,
 								  onRemove: ::(Entity, *Type, Scene) = null, 
 								  onEnter: ::(Entity, *Type, Scene) = null) 
-{
-	return instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
-}
+			=> instance.RegisterComponent<Type>(componentKind, onRemove, onEnter);
 
 TagComponent RegisterTagComponent(serializeName: string
 								  onRemove: ::(Entity, Scene) = null, 
 								  onEnter: ::(Entity, Scene) = null)
 			=> instance.RegisterTagComponent(serializeName, onRemove, onEnter);
 
-SystemID RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
-			=> instance.RegisterSystem(run, step);
+*System RegisterSystem(run: ::(Scene, float), 
+					   step: SystemStep = SystemStep.Frame,
+					   relation: SystemRelation = SystemRelation.Before,
+					   relationTo: *System = null)
+			=> instance.RegisterSystem(run, step, relation, relationTo);
 
-FrameSystemID RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
-			=> instance.RegisterFrameSystem(run, step);
+*FrameSystem RegisterFrameSystem(run: ::(float), 
+								 step: FrameSystemStep,
+								 relation: SystemRelation = SystemRelation.Before,
+								 relationTo: *FrameSystem = null)
+			=> instance.RegisterFrameSystem(run, step, relation, relationTo);
 
-*void FrameAlloc<Type>(size: uint32) => instance.frameAllocator.Alloc(size);
-*Type FrameAllocType<Type>() => instance.frameAllocator.AllocType<Type>();
+*void FrameAlloc<Type>(size: uint32)
+{
+	alloc := Fiber.GetFrameAllocator();
+	return alloc.Alloc(size);
+}
+
+*Type FrameAllocType<Type>()
+{
+	alloc := Fiber.GetFrameAllocator();
+	return alloc.AllocType<Type>();
+}
+
+Array<Type, InvalidResizeFunc> FrameAllocArray<Type>(count: uint32)
+{
+	alloc := Fiber.GetFrameAllocator();
+	return alloc.AllocArray<Type>(count);
+}
 
 ArrayView<Scene> Scenes() => instance.scenes.Values();
 
@@ -86,7 +113,6 @@ OnSceneRemoved(callback: ::(*Scene, *any), data: *any = null)
 
 state ECS
 {
-	frameAllocator := FrameAllocator(),
 	scenes := SparseSet<Scene>(),
 	systems := Systems(),
 
@@ -157,51 +183,30 @@ TagComponent ECS::RegisterTagComponent(serializeName: string
 	return tagComponent;
 }
 
-SystemID ECS::RegisterSystem(run: ::(Scene, float), step: SystemStep = SystemStep.Frame)
+*System ECS::RegisterSystem(run: ::(Scene, float), 
+							step: SystemStep = SystemStep.Frame,
+							relation: SystemRelation = SystemRelation.Before,
+							relationTo: *System = null)
 {	
 	assert run != null, "Cannot register null systems";
 
 	system := System();
 	system.run = run;
-	data := this.AddSystem(system, step);
-	return data;
+	systemID := this.systems.AddSystem(system, step, relationTo, relation);
+	return systemID;
 }
 
-FrameSystemID ECS::RegisterFrameSystem(run: ::(float), step: FrameSystemStep)
+*FrameSystem ECS::RegisterFrameSystem(run: ::(float), 
+									  step: FrameSystemStep,
+									  relation: SystemRelation = SystemRelation.Before,
+							  		  relationTo: *FrameSystem = null)
 {	
 	assert run != null, "Cannot register null frame systems";
 
-	system := {run} as FrameSystem;
-	id := uint32(0);
-
-	switch (step)
-	{
-		case (FrameSystemStep.Start) id = this.systems.frameStart.Add(system);
-		case (FrameSystemStep.End) id = this.systems.frameEnd.Add(system);
-		default log "ECS::RegisterFrameSystem Invalid step for frame system";
-	}
-	
-	return { id, step };
-}
-
-SystemID ECS::AddSystem(system: System, step: SystemStep)
-{
-	id := uint32(0);
-	
-	switch (step)
-	{
-		case (SystemStep.Fixed) id = this.systems.onFixed.Add(system);
-		case (SystemStep.PreFrame) id = this.systems.onPreFrame.Add(system);
-		case (SystemStep.Frame) id = this.systems.onFrame.Add(system);
-		case (SystemStep.PostFrame) id = this.systems.onPostFrame.Add(system);
-		case (SystemStep.PreDraw) id = this.systems.onPreDraw.Add(system);
-		case (SystemStep.Draw) id = this.systems.onDraw.Add(system);
-		case (SystemStep.Start) id = this.systems.onStart.Add(system);
-		case (SystemStep.Stop) id = this.systems.onStop.Add(system);
-		default log "ECS::AddSystem Invalid step for system";
-	}
-
-	return { id, step };
+	system := FrameSystem();
+	system.run = run;
+	systemID := this.systems.AddFrameSystem(system, step, relationTo, relation);
+	return systemID;
 }
 
 *Scene ECS::CreateScene()
@@ -268,25 +273,75 @@ ECS::OnTagComponentEnter(id: uint32, entity: Entity, scene: Scene)
 	callback(entity, scene);
 }
 
-ECS::RunSystems(systems: Array<System>)
+RunSystem(sceneSystem: *SceneSystem)
+{
+	Fiber.AddJob(::(data: *SceneSystem) {
+		scene := data.scene;
+		system := data.system;
+		handleRef := data.handle;
+		dt := data.dt;
+
+		beforeHandle: *Fiber.JobHandle = null;
+		for (before in system.before)
+		{
+			beforeSceneSystem := FrameAllocType<SceneSystem>();
+			beforeSceneSystem~ = SceneSystem(scene, before, dt, beforeHandle@);
+			RunSystem(beforeSceneSystem);
+		}
+		Fiber.WaitForHandle(beforeHandle);
+
+		system.run(scene~, dt);
+
+		for (after in system.after)
+		{
+			afterSceneSystem := FrameAllocType<SceneSystem>();
+			afterSceneSystem~ = SceneSystem(scene, after, dt, handleRef);
+			RunSystem(afterSceneSystem);
+		}
+	}, sceneSystem, sceneSystem.handle);
+}
+
+RunFrameSystem(frameSystemJob: *FrameSystemJob)
+{
+	Fiber.AddJob(::(data: *FrameSystemJob) {
+		system := data.system;
+		handleRef := data.handle;
+		dt := instance.dt;
+
+		beforeHandle: *Fiber.JobHandle = null;
+		for (before in system.before)
+		{
+			beforeFrameSystemJob := FrameAllocType<FrameSystemJob>();
+			beforeFrameSystemJob~ = FrameSystemJob(before, beforeHandle@);
+			RunFrameSystem(beforeFrameSystemJob);
+		}
+		Fiber.WaitForHandle(beforeHandle);
+
+		system.run(dt);
+
+		for (after in system.after)
+		{
+			afterFrameSystemJob := FrameAllocType<FrameSystemJob>();
+			afterFrameSystemJob~ = FrameSystemJob(after, handleRef);
+			RunFrameSystem(afterFrameSystemJob);
+		}
+	}, frameSystemJob, frameSystemJob.handle);
+}
+
+ECS::RunSystems(systems: Array<*System>, dt: float)
 {
 	count := this.scenes.count * systems.count;
 	if (!count) return;
 
 	handle: *Fiber.JobHandle = null;
+	handleRef := handle@;
 	for (scene in this.scenes.Values())
 	{
 		for (system in systems) 
 		{
-			sceneSystem := instance.frameAllocator.AllocType<SceneSystem>();
-			sceneSystem~ = SceneSystem(scene@, system);
-			Fiber.AddJob(::(data: *SceneSystem) {
-				scene := data.scene;
-				system := data.system;
-				dt := instance.dt;
-				
-				system.run(scene~, dt);
-			}, sceneSystem, handle@);
+			sceneSystem := FrameAllocType<SceneSystem>();
+			sceneSystem~ = SceneSystem(scene@, system, dt, handleRef);
+			RunSystem(sceneSystem);
 		}
 	}
 
@@ -294,45 +349,17 @@ ECS::RunSystems(systems: Array<System>)
 	Fiber.WaitForHandle(handle);
 }
 
-ECS::RunFixedSystems(systems: Array<System>)
-{
-	count := this.scenes.count * systems.count;
-	if (!count) return;
-
-	handle: *Fiber.JobHandle = null;
-	for (scene in this.scenes.Values())
-	{
-		for (system in systems) 
-		{
-			sceneSystem := instance.frameAllocator.AllocType<SceneSystem>();
-			sceneSystem~ = SceneSystem(scene@, system);
-			Fiber.AddJob(::(data: *SceneSystem) {
-				scene := data.scene;
-				system := data.system;
-				dt := fixedUpdateRate;
-				
-				system.run(scene~, dt);
-			}, sceneSystem, handle@);
-		}
-	}
-
-	Fiber.FlushMainThreadJobs();
-	Fiber.WaitForHandle(handle);
-}
-
-ECS::RunFrameSystems(systems: Array<FrameSystem>)
+ECS::RunFrameSystems(systems: Array<*FrameSystem>)
 {
 	if (!systems.count) return;
 
 	handle: *Fiber.JobHandle = null;
-	for (system in systems) 
+	handleRef := handle@;
+	for (system in systems)
 	{
-		Fiber.AddJob(::(system: *void) {
-			func := system as ::(float);
-			dt := instance.dt;
-			
-			func(dt);
-		}, system.run as *void, handle@);
+		frameSystemJob := FrameAllocType<FrameSystemJob>();
+		frameSystemJob~ = FrameSystemJob(system, handleRef);
+		RunFrameSystem(frameSystemJob);
 	}
 
 	Fiber.FlushMainThreadJobs();
@@ -341,12 +368,12 @@ ECS::RunFrameSystems(systems: Array<FrameSystem>)
 
 ECS::Start()
 {
-	this.RunSystems(this.systems.onStart);
+	this.RunSystems(this.systems.onStart, this.dt);
 }
 
 ECS::Stop()
 {
-	this.RunSystems(this.systems.onStop);
+	this.RunSystems(this.systems.onStop, this.dt);
 }
 
 ECS::PreFrame()
@@ -358,34 +385,34 @@ ECS::PreFrame()
 	this.fixedAccum = this.fixedAccum + this.dt;
 	while (this.fixedAccum > fixedUpdateRate)
 	{
-		this.RunFixedSystems(this.systems.onFixed);
+		this.RunSystems(this.systems.onFixed, fixedUpdateRate);
 		this.fixedAccum = this.fixedAccum - fixedUpdateRate;
 	}
 
 	this.RunFrameSystems(this.systems.frameStart);
-	this.RunSystems(this.systems.onPreFrame);
+	this.RunSystems(this.systems.onPreFrame, this.dt);
 }
 
 ECS::Frame()
 {
-	this.RunSystems(this.systems.onFrame);
+	this.RunSystems(this.systems.onFrame, this.dt);
 }
 
 ECS::PreDraw()
 {
-	this.RunSystems(this.systems.onPreDraw);
+	this.RunSystems(this.systems.onPreDraw, this.dt);
 }
 
 ECS::Draw()
 {
-	this.RunSystems(this.systems.onDraw);
+	this.RunSystems(this.systems.onDraw, this.dt);
 }
 
 ECS::PostFrame()
 {
-	this.RunSystems(this.systems.onPostFrame);
+	this.RunSystems(this.systems.onPostFrame, this.dt);
 	this.RunFrameSystems(this.systems.frameEnd);
 
-	this.frameAllocator.Clear();
+	Fiber.ClearFrameAllocators();
 	this.frameCount += 1;
 }

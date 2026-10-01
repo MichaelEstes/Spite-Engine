@@ -383,7 +383,6 @@ AssignIndiciesToPrimitive(gltfData: GLTFResource, accessor: uint32, primitive: M
 	else if (itemLength == 4)
 	{
 		primitive.geometry.indexKind = IndexKind.I32;
-		count = count * 2;
 	}
 	else
 	{
@@ -420,12 +419,7 @@ GenerateTangentsForPrimitive(gltfData: GLTFResource, primitive: Mesh)
 	hasIndices := primitive.geometry.indexKind != IndexKind.None &&
 				  primitive.geometry.indices.count > 0;
 
-	indexCount := vertexCount; 
-	if (hasIndices)
-	{
-		indexCount = primitive.geometry.indices.count;
-		if (primitive.geometry.indexKind == IndexKind.I32) indexCount = indexCount / 2;
-	}
+	indexCount := primitive.geometry.indices.count; 
 
 	tanAcc := ZeroedAllocator<Vec3>();
 	tanAcc.Alloc(vertexCount);

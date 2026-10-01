@@ -29,7 +29,7 @@ BuildThinLine(entity: Entity, lineMesh: *LineMesh, scene: Scene)
     positions := [lineMesh.start, lineMesh.end];
     indices := uint16:[0, 1];
 
-    mesh := Mesh(AssetDefNameToHandle("Line"));
+    mesh := Mesh(AssetDefNameToHandle("Unlit"));
     mesh.geometry.topologyKind = TopologyKind.LineList;
     mesh.geometry.indexKind = IndexKind.I16;
 

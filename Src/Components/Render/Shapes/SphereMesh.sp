@@ -69,7 +69,7 @@ SphereMeshComponent := ECS.RegisterComponent<SphereMesh>(
             }
         }
 
-        mesh := Mesh(AssetDefNameToHandle("Line"));
+        mesh := Mesh(AssetDefNameToHandle("Unlit"));
         mesh.geometry.topologyKind = TopologyKind.TriangleList;
         mesh.geometry.indexKind = IndexKind.I16;
 

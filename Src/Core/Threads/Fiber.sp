@@ -9,6 +9,7 @@ import Atomic
 import BucketAllocator
 import Mutex
 import BitSet
+import FrameAllocator
 
 state JobHandle 
 {
@@ -54,7 +55,9 @@ string FiberJob::JobName()
 state Fibers
 {
 	mainThreadJobs: MultipleConsumerQueue<FiberJob>,
+	mainThreadFrameAllocator := FrameAllocator(),
 
+	frameAllocators: FixedArray<FrameAllocator>,
 	jobQueueArr: FixedArray<MultipleConsumerQueue<FiberJob>>,
 	threadIDs: FixedArray<uint32>,
 	threadHandles: FixedArray<uint>,
@@ -78,6 +81,7 @@ InitalizeFibers()
 
 	fibers.handleAllocator = BucketAllocator(#sizeof JobHandle, FiberJobCount, fibers.fiberCount + 1);
 
+	fibers.frameAllocators = FixedArray<FrameAllocator>(fibers.fiberCount);
 	fibers.jobQueueArr = FixedArray<MultipleConsumerQueue<FiberJob>>(fibers.fiberCount);
 	fibers.threadIDs = FixedArray<uint32>(fibers.fiberCount);
 	fibers.threadHandles = FixedArray<uint>(fibers.fiberCount);
@@ -86,6 +90,7 @@ InitalizeFibers()
 	for (i: uint .. fibers.fiberCount)
 	{
 		log "Creating Fiber state: " +  UIntToString(i);
+		fibers.frameAllocators[i]~ = FrameAllocator();
 		fibers.fiberEnabled[i]~ = true;
 		fibers.jobQueueArr[i]~ = MultipleConsumerQueue<FiberJob>(FiberJobCount);
 	}
@@ -109,7 +114,24 @@ int32 GetCurrentFiberIndex()
 		if (id == fibers.threadIDs[i]~) return i;
 	}
 
-	return -1;
+	return uint32(-1);
+}
+
+*FrameAllocator GetFrameAllocator()
+{
+	fiberIndex := GetCurrentFiberIndex();
+	if (fiberIndex != uint32(-1))
+	{
+		return fibers.frameAllocators[fiberIndex];
+	}
+
+	return fibers.mainThreadFrameAllocator@;
+}
+
+ClearFrameAllocators()
+{
+	for (i .. fibers.fiberCount) fibers.frameAllocators[i].Clear();
+	fibers.mainThreadFrameAllocator.Clear();
 }
 
 *JobHandle AllocJobHandle(index: int32, initialCount: uint32)
@@ -217,7 +239,7 @@ FlushMainThreadJobs()
 
 WaitForHandle(handle: *JobHandle)
 {
-	assert handle != null, "Cannot wait for a null handle";
+	if (!handle) return;
 
 	defer DeallocJobHandle(handle);
 

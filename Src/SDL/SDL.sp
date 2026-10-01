@@ -23,6 +23,8 @@ extern
     *void SDL_GetPointerProperty(propID: uint32, name: *byte, defaultValue: *void);
 
     *IOStream SDL_IOFromConstMem(mem: *byte, size: uint);
+
+    *Surface SDL_CreateSurfaceFrom(width: int32, height: int32, format: PixelFormat, pixels: *void, pitch: uint32);
 }
 
 Win32WindowHandle := "SDL.window.win32.hwnd"[0];
@@ -262,3 +264,6 @@ int32 Version() => SDL_GetVersion();
                          => SDL_GetPointerProperty(propID, name, defaultValue);
 
 *IOStream IOFromConstMem(mem: *byte, size: uint) => SDL_IOFromConstMem(mem, size);
+
+*Surface CreateSurfaceFrom(width: int32, height: int32, format: PixelFormat, pixels: *void, pitch: uint32)
+    => SDL_CreateSurfaceFrom(width, height, format, pixels, pitch);

@@ -981,7 +981,7 @@ VulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(
 	ComponentKind.Sparse
 );
 
-vulkanDrawSystem := ECS.RegisterSystem(
+VulkanDrawSystem := ECS.RegisterSystem(
 	::(scene: Scene, dt: float) 
 	{
 		for (ec in scene.Iterate<VulkanRenderer>())
@@ -993,7 +993,7 @@ vulkanDrawSystem := ECS.RegisterSystem(
 	SystemStep.Draw
 );
 
-vulkanDrawCleanupSystem := ECS.RegisterFrameSystem(
+VulkanDrawCleanupSystem := ECS.RegisterFrameSystem(
 	::(dt: float) 
 	{
 		vulkanInstance.resourceTables.ReleaseTrackedResources();

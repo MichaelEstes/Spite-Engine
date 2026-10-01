@@ -202,7 +202,7 @@ VulkanTexture CreateVulkanTexture(pixels: *byte, size: uint, width: uint32, heig
 // 		if (reflSet.set == 0 || IsBindlessReflectSet(reflSet)) continue;
 
 // 		bindingCount := reflSet.binding_count;
-// 		bindings := ECS.instance.frameAllocator.AllocArray<VkDescriptorSetLayoutBinding>(bindingCount);
+// 		bindings := ECS.FrameAllocArray<VkDescriptorSetLayoutBinding>(bindingCount);
 // 		for (i .. bindingCount)
 // 		{
 // 			reflBinding := reflSet.bindings[i];

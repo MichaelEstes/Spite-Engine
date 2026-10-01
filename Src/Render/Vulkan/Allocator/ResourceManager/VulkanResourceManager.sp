@@ -122,7 +122,7 @@ VulkanResourceManager::UploadGeometry(geometry: *Geometry, vulkanGeometry: *Vulk
 
 	attributeCount := geometry.attributes.count;
 
-	attributeSlots := ECS.instance.frameAllocator.AllocArray<VulkanGeometryAttrSlot>(attributeCount);
+	attributeSlots := ECS.FrameAllocArray<VulkanGeometryAttrSlot>(attributeCount);
 
 	if (attributeCount)
 	{
@@ -193,7 +193,7 @@ VulkanResourceManager::UploadMaterial(material: *Material, vulkanMaterial: *Vulk
 	assetDef := GetAssetDefWithHandle(material.defHandle);
 
 	textureCount := material.textures.count;
-	textureSlots := ECS.instance.frameAllocator.AllocArray<VulkanMaterialTextureSlot>(textureCount);
+	textureSlots := ECS.FrameAllocArray<VulkanMaterialTextureSlot>(textureCount);
 
 	for (i .. textureCount)
 	{

@@ -130,7 +130,7 @@ Geometry::UpdatedAttribute(index: uint32)
 
 Geometry::ComputeBounds()
 {
-    positions := this.attributes[0]~ as ArrayView<Vec3>;
+    positions := this.GetPositionAttr();
     positions.count = positions.count / #sizeof Vec3;
 
     min := positions[0]~;
@@ -157,3 +157,61 @@ Geometry::ComputeBounds()
     this.bounds.center = Vec4(center, 1.0);
     this.bounds.half = Vec4(max - center, 1.0);
 }
+
+ArrayView<Vec3> Geometry::GetPositionAttr() => this.attributes[0] as ArrayView<Vec3>;
+
+uint32 Geometry::GetIndexCount() =>
+{
+    if (this.indexKind == IndexKind.None)
+    {
+        return this.GetPositionAttr().count;
+    }
+
+    return this.indices.count;
+}
+
+uint32 Geometry::GetIndex(i: uint32) =>
+{
+    if (this.indexKind == IndexKind.I16)
+    {
+        return this.indices[i];
+    }
+    else if (this.indexKind == IndexKind.I32)
+    {
+        return (this.indices as ArrayView<uint32>)[i];
+    }
+
+    return i;
+}
+
+state GeoTriangleIterator
+{
+    geo: *Geometry
+}
+
+Iterator GeoTriangleIterator::operator::in()
+{
+	return {null, -3};
+}
+
+bool GeoTriangleIterator::next(it: Iterator)
+{
+	it.index += 3;
+	return it.index + 2 < this.geo.GetIndexCount();
+}
+
+Triangle GeoTriangleIterator::current(it: Iterator)
+{
+	positions := this.geo.GetPositionAttr();
+	return Triangle(
+		positions[this.geo.GetIndex(it.index)],
+		positions[this.geo.GetIndex(it.index + 1)],
+		positions[this.geo.GetIndex(it.index + 2)]
+	);
+}
+
+GeoTriangleIterator Geometry::IterateTriangles()
+{
+    return GeoTriangleIterator:{this@};
+}
+

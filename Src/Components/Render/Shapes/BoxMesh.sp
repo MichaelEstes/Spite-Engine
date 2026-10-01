@@ -54,7 +54,7 @@ BoxMeshComponent := ECS.RegisterComponent<BoxMesh>(
             0, 1, 4, 4, 1, 5
         ];
 
-        mesh := Mesh(AssetDefNameToHandle("Line"));
+        mesh := Mesh(AssetDefNameToHandle("Unlit"));
         mesh.geometry.topologyKind = TopologyKind.TriangleList;
         mesh.geometry.indexKind = IndexKind.I16;
 
