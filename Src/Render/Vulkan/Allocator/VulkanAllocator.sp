@@ -16,6 +16,12 @@ enum VulkanMemoryFlags: uint32
 	Addressable = 1 << 17,
 }
 
+enum VulkanAllocationKind: ubyte
+{
+	Buffer,
+	Image
+}
+
 state VulkanAllocHandle
 {
 	handle: uint32
@@ -31,6 +37,7 @@ state VulkanAllocation
 	offset: uint64,
 	index: uint64,
 	blockIndex: uint16,
+	kind: VulkanAllocationKind,
 	freed: bool
 }
 
@@ -99,6 +106,7 @@ VulkanAllocHandle VulkanAllocator::AllocBuffer(buffer: *VkBuffer_T, memoryFlags:
 	block.currentOffset = align_up(block.currentOffset, memoryRequirements.alignment);
 	alloc := VulkanAllocation();
 	alloc.data.buffer = buffer;
+	alloc.kind = VulkanAllocationKind.Buffer;
 	alloc.size = memoryRequirements.size;
 	alloc.offset = block.currentOffset;
 	alloc.index = block.allocations.count;
@@ -133,6 +141,7 @@ VulkanAllocHandle VulkanAllocator::AllocImage(image: *VkImage_T, memoryFlags: ui
 	block.currentOffset = align_up(block.currentOffset, memoryRequirements.alignment);
 	alloc := VulkanAllocation();
 	alloc.data.image = image;
+	alloc.kind = VulkanAllocationKind.Image;
 	alloc.size = memoryRequirements.size;
 	alloc.offset = block.currentOffset;
 	alloc.index = block.allocations.count;
@@ -151,6 +160,36 @@ VulkanAllocHandle VulkanAllocator::AllocImage(image: *VkImage_T, memoryFlags: ui
 	block.allocations.Add(handle);
 
 	return handle;
+}
+
+VulkanAllocator::Free(allocHandle: VulkanAllocHandle)
+{
+	alloc := this.GetAllocation(allocHandle);
+	alloc.freed = true;
+
+	block := this.GetAllocationBlock(allocHandle);
+	while (block.allocations.count)
+	{
+		lastHandle := block.allocations.Last()~;
+		last := this.GetAllocation(lastHandle);
+		if (!last.freed) break;
+
+		block.currentOffset = last.offset;
+		block.allocations.count -= 1;
+		this.allocationHandles.Remove(lastHandle.handle);
+	}
+}
+
+VulkanAllocator::FreeAlloc(allocHandle: VulkanAllocHandle)
+{
+	alloc := this.GetAllocation(allocHandle);
+	switch (alloc.kind)
+	{
+		case (VulkanAllocationKind.Buffer) vkDestroyBuffer(this.device, alloc.data.buffer, null);
+		case (VulkanAllocationKind.Image) vkDestroyImage(this.device, alloc.data.image, null);
+	}
+
+	this.Free(allocHandle);
 }
 
 *VulkanBlock VulkanAllocator::FindBlock(size: uint32, memoryFlags: uint32)

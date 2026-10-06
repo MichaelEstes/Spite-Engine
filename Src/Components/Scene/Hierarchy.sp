@@ -32,13 +32,13 @@ ParentEntity(parent: Entity, child: Entity, scene: *Scene)
 	childHierarchy.parent = parent;
 }
 
-IterateHierarchy(entity: Entity, scene: *Scene, iterateFunc: ::(Entity, *Scene))
+IterateHierarchy(entity: Entity, scene: *Scene, iterateFunc: ::(Entity, *Scene, *any), data: *any = null)
 {
-	iterateFunc(entity, scene);
+	iterateFunc(entity, scene, data);
 
 	hierarchy := scene.GetComponentDirect<Hierarchy>(entity, HierarchyComponent);
 	for (child in hierarchy.children)
 	{
-		IterateHierarchy(child, scene, iterateFunc);
+		IterateHierarchy(child, scene, iterateFunc, data);
 	}
 }

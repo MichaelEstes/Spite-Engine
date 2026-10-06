@@ -8,6 +8,11 @@ state EditorTypedValue
     val: *any
 }
 
+EditorTypedValue::delete
+{
+    delete this.val;
+}
+
 bool ByteValueEditor(label: string, val: *byte)
 {
     return ImGui_InputScalar(label[0], ImGuiDataType_.ImGuiDataType_S8, val);

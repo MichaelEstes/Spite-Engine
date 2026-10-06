@@ -422,7 +422,7 @@ VulkanPipeline VulkanPipelineBuilder::Create(device: *VkDevice_T, renderPass: *V
 	shaderCount := 0;
 	if (this.shaderHandle.id)
 	{
-		shaderRes := ShaderResourceManager.GetResource(this.shaderHandle).data;
+		shaderRes := ShaderResourceManager.GetResource<ShaderResource>(this.shaderHandle).data;
 		shaderStages[0] = shaderRes.vertex.shaderStageInfo;
 		shaderCount = 1;
 

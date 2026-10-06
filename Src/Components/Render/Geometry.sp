@@ -5,6 +5,7 @@ import Vec
 import Common
 import ArrayView
 import Array
+import Resource
 
 state GeometryVariableUpdate
 {
@@ -55,17 +56,23 @@ state Geometry
 Geometry::(defHandle: AssetDefHandle)
 {
     this.defHandle = defHandle;
-    this.variables = AllocateVertexVariableSet(defHandle);
-
-    attrCount := GetAssetDefVertexAttributeCount(defHandle);
-    this.attributes.SizeTo(attrCount);
-    for (i .. attrCount) this.attributes.Add(ArrayView<byte>());
+    this.Allocate();
 }
 
 Geometry::delete
 {
     delete this.attributes;
-    delete this.variables;
+    FreeFragmentVariableSet(this.defHandle, this.variables);
+}
+
+Geometry::Allocate()
+{
+    defHandle := this.defHandle;
+    this.variables = AllocateVertexVariableSet(defHandle);
+
+    attrCount := GetAssetDefVertexAttributeCount(defHandle);
+    this.attributes.SizeTo(attrCount);
+    for (i .. attrCount) this.attributes.Add(ArrayView<byte>());
 }
 
 uint32 Geometry::GetAttributeIndex(name: string)

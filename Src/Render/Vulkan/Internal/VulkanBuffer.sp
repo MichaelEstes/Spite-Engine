@@ -131,6 +131,12 @@ BufferHandle UploadBuffer(createInfo: VkBufferCreateInfo, data: *byte, size: uin
 	return bufferHandle;
 }
 
+FreeBuffer(bufferHandle: BufferHandle)
+{
+	if (!bufferHandle.buffer) return;
+	vulkanInstance.allocator.FreeAlloc(bufferHandle.handle);
+}
+
 BufferHandle CreateDeviceStorageBuffer(size: uint32)
 {
 	device := vulkanInstance.device;

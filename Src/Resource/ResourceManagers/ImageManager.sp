@@ -10,7 +10,7 @@ state ImageResource
 	image: *SDL.Surface
 }
 
-state ImageParam
+state ImageResourceArg
 {
 	uri: string,
 	basePath: string,
@@ -18,41 +18,35 @@ state ImageParam
 	uriIsImage := false
 }
 
-ImageResourceManager := Resource.CreateResourceManager<ImageResource, ImageParam>(
+ImageResourceManager := Resource.CreateResourceManager<ImageResourceArg>(
 	['i', 'm', 'g', '_'],
-	GetImageKey, 
-	ImageManagerLoad,
+	::(manager: *ResourceManager<ImageResourceArg>) {
+		manager.RegisterResourceType<ImageResource>(CreateImageKey, ImageManagerLoad);
+	},
+	::*_Type(param: *ImageResourceArg) => return #typeof ImageResource,
 	::(handle: ResourceHandle) {
 		resource := Resource.GetResource<ImageResource>(handle);
 		SDL.DestroySurface(resource.data.image);
 	}
 );
 
-ImageResourceManagerID := Resource.RegisterResourceManager(ImageResourceManager@);
-
-ResourceKey GetImageKey(param: ImageParam) 
+ResourceKey CreateImageKey(param: *ImageResourceArg)
 {
 	if (param.uriIsImage)
 	{
 		return ResourceKey(param.uri.mem as uint);
 	}
-	
+
 	return ResourceKey(OS.JoinPaths([param.basePath, param.uri]));
 }
 
-ImageManagerLoad(imageResourceParam: *ResourceParam<ImageResource, ImageParam>)
+ImageManagerLoad(resourceArg: *ResourceArg<ImageResourceArg>, resource: *Resource<ImageResource>)
 {
-	handle := imageResourceParam.handle;
-	param := imageResourceParam.param;
-	
+	param := resourceArg.arg;
+
 	uri := param.uri;
-	parent := param.parent;
 	uriIsImage := param.uriIsImage;
 
-	resourceManager := imageResourceParam.manager;
-	resource := resourceManager.GetResource(handle);
-
-	resource.parent = param.parent;
 	resourceData := resource.data;
 
 	if (uriIsImage)
@@ -61,34 +55,34 @@ ImageManagerLoad(imageResourceParam: *ResourceParam<ImageResource, ImageParam>)
 	}
 	else if (File.IsDataURI(uri))
     {
-		
+
     }
     else
     {
-		path := imageResourceParam.key.value.name;
+		path := resourceArg.key.value.name;
 		resourceData.image = Image.LoadTextureImage(path);
 	}
 
-	imageResourceParam.onResourceLoad(imageResourceParam, ResourceResult.Loaded);
+	resource.result = ResourceResult.Loaded;
 }
 
 ResourceHandle LoadImageResource(uri: string, basePath: string = "", parent: ResourceHandle = InvalidResourceHandle)
 {
-	textureParam := ImageParam();
+	textureParam := ImageResourceArg();
 	textureParam.uri = uri;
 	textureParam.basePath = basePath;
 	textureParam.parent = parent;
 
-	return ImageResourceManager.LoadResource(textureParam, null);
+	return ImageResourceManager.LoadResource(textureParam);
 }
 
 ResourceHandle CreateImageResource(imageData: string, basePath: string = "", parent: ResourceHandle = InvalidResourceHandle)
 {
-	textureParam := ImageParam();
+	textureParam := ImageResourceArg();
 	textureParam.uri = imageData;
 	textureParam.basePath = basePath;
 	textureParam.parent = parent;
 	textureParam.uriIsImage = true;
 
-	return ImageResourceManager.LoadResource(textureParam, null);
+	return ImageResourceManager.LoadResource(textureParam);
 }

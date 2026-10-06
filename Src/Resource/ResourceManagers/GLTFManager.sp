@@ -13,7 +13,6 @@ import SceneComponents
 import Transform
 import RenderAssetDef
 import Assets
-import SparseSet
 
 gltfModeToTopologyKindTable := [
 	TopologyKind.PointList,
@@ -25,19 +24,49 @@ gltfModeToTopologyKindTable := [
 	TopologyKind.TriangleFan,
 ];
 
-state GLTFLoadParam
+state GLTFResourceArg
 {
-	file: string,
-	scene: *Scene,
-	data: *any
+	file: string
 }
 
-state GLTFResources
+state GLTFAccessorArg
 {
-	buffers: Array<ResourceHandle>,
-	images: Array<ResourceHandle>,
-	generatedBuffers: Array<Allocator<byte>>,
-	deinterleavedAccessors := SparseSet<ArrayView<byte>>()
+	gltf: *GLTF,
+	data: *byte,
+	bufferView: uint32,
+	accessor: uint32
+}
+
+state GLTFDeinterleavedAccessor
+{
+	mem: Allocator<byte>,
+	count: uint
+}
+
+GLTFDeinterleavedAccessor::delete
+{
+	this.mem.Dealloc(this.count);
+}
+
+state GLTFTangentsArg
+{
+	meshIndex: uint32,
+	primitiveIndex: uint32,
+	primitive: *Mesh,
+	positionView: ArrayView<byte>,
+	normalView: ArrayView<byte>,
+	uvView: ArrayView<byte>
+}
+
+state GLTFGeneratedTangents
+{
+	mem: Allocator<Vec4>,
+	count: uint
+}
+
+GLTFGeneratedTangents::delete
+{
+	this.mem.Dealloc(this.count);
 }
 
 state GLTFNodeResource
@@ -47,42 +76,59 @@ state GLTFNodeResource
 	children: Array<GLTFNodeResource>
 }
 
+GLTFNodeResource::delete
+{
+	delete this.meshes;
+	delete this.children;
+}
+
 state GLTFSceneResource
 {
 	nodes: Array<GLTFNodeResource>
+}
+
+GLTFSceneResource::delete
+{
+	delete this.nodes;
 }
 
 state GLTFResource
 {
 	gltf: GLTF,
 	scenes: Array<GLTFSceneResource>,
-	resources: GLTFResources,
+	handle: ResourceHandle
 }
 
-GLTFResourceManager := Resource.CreateResourceManager<GLTFResource, GLTFLoadParam>(
+GLTFResource::delete
+{
+	delete this.gltf;
+	delete this.scenes;
+}
+
+GLTFResourceManager := Resource.CreateResourceManager<GLTFResourceArg>(
 	['g', 'l', 't', 'f'],
-	GetGLTFKey, 
-	GLTFManagerLoad,
+	::(manager: *ResourceManager<GLTFResourceArg>) {
+		manager.RegisterResourceType<GLTFResource>(CreateGLTFKey, GLTFManagerLoad);
+		manager.RegisterSubResourceType<GLTFDeinterleavedAccessor>(CreateDeinterleavedAccessorKey, DeinterleavedAccessorLoad);
+		manager.RegisterSubResourceType<GLTFGeneratedTangents>(CreateGeneratedTangentsKey, GeneratedTangentsLoad);
+	},
+	::*_Type(param: *GLTFResourceArg) => return #typeof GLTFResource,
 	::(handle: ResourceHandle) {
 		resource := Resource.GetResource<GLTFResource>(handle);
 		gltfResource := resource.data;
-	},
-	::(handle: ResourceHandle, child: ResourceHandle) {
-		resource := Resource.GetResource<GLTFResource>(handle);
 	}
 );
 
-GLTFResourceManagerID := Resource.RegisterResourceManager(GLTFResourceManager@);
+ResourceKey CreateGLTFKey(param: *GLTFResourceArg) => ResourceKey(param.file.Copy());
 
-ResourceKey GetGLTFKey(param: GLTFLoadParam) => ResourceKey(param.file.Copy());
+ResourceKey CreateDeinterleavedAccessorKey(param: *GLTFAccessorArg) => ResourceKey(param.accessor);
 
-GLTFManagerLoad(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>)
+ResourceKey CreateGeneratedTangentsKey(param: *GLTFTangentsArg) => ResourceKey((param.meshIndex as uint << 32) | param.primitiveIndex);
+
+GLTFManagerLoad(resourceArg: *ResourceArg<GLTFResourceArg>, resource: *Resource<GLTFResource>)
 {
-	param := resourceParam.param;
-	handle := resourceParam.handle;
-	resourceManager := resourceParam.manager;
-	resource := resourceManager.GetResource(handle);
-	
+	param := resourceArg.arg;
+
 	file := param.file;
 
 	gltf := LoadGLTF(file);
@@ -90,7 +136,7 @@ GLTFManagerLoad(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>)
 	gltfData := resource.data;
 	gltfData.gltf = gltf;
 	gltfData.scenes = Array<GLTFSceneResource>(gltf.scenes.count);
-	gltfData.resources = GLTFResources();
+	gltfData.handle = resourceArg.handle;
 
 	for (sceneIndex .. gltf.scenes.count)
 	{
@@ -104,8 +150,8 @@ GLTFManagerLoad(resourceParam: *ResourceParam<GLTFResource, GLTFLoadParam>)
 			NodeToNodeResource(gltfData, nodeIndex, sceneResource.nodes[nodeResourceIndex]@);
 		}
 	}
-	
-	resourceParam.onResourceLoad(resourceParam, ResourceResult.Loaded);
+
+	resource.result = ResourceResult.Loaded;
 }
 
 AssignGLTFNodeToECS(nodeResource: *GLTFNodeResource, scene: *Scene, parent: Entity)
@@ -123,9 +169,10 @@ AssignGLTFNodeToECS(nodeResource: *GLTFNodeResource, scene: *Scene, parent: Enti
 		ParentEntity(nodeEntity, meshEntity, scene);
 
 		scene.SetComponent<Mesh>(meshEntity, mesh);
+		sceneMesh := scene.GetComponent<Mesh>(meshEntity);
 		if (!mesh.gpuResourceID)
 		{
-			mesh.gpuResourceID = scene.GetComponent<Mesh>(meshEntity).gpuResourceID;
+			mesh.gpuResourceID = sceneMesh.gpuResourceID;
 		}
 	}
 
@@ -135,59 +182,42 @@ AssignGLTFNodeToECS(nodeResource: *GLTFNodeResource, scene: *Scene, parent: Enti
 	}
 }
 
-state GLTFParamData
-{
-	onLoad: ::(*Scene, Entity, *any),
-	arg: *any
-}
-
 ResourceHandle UseGLTFResource(
-	file: string, scene: *Scene, 
+	file: string, scene: *Scene,
 	onLoad: ::(*Scene, Entity, *any) = null, arg: *any = null
 )
 {
-	data := AllocThreadParam<GLTFParamData>();
-	data.onLoad = onLoad;
-	data.arg = arg;
+	gltfArg := GLTFResourceArg();
+	gltfArg.file = file;
 
-	gltfParam := GLTFLoadParam();
-	gltfParam.file = file;
-	gltfParam.scene = scene;
-	gltfParam.data = data as *any;
-	
-	return GLTFResourceManager.LoadResource(
-		gltfParam, 
-		::(resourceHandle: ResourceHandle, params: *GLTFLoadParam)
+	resourceHandle := GLTFResourceManager.LoadResource(gltfArg);
+
+	gltfResource := GLTFResourceManager.ReferenceResource<GLTFResource>(resourceHandle);
+	gltfData := gltfResource.data;
+
+	rootEntity := scene.CreateEntity();
+	scene.SetComponent<Hierarchy>(rootEntity, Hierarchy());
+	scene.SetComponent<Transform>(rootEntity, Transform());
+
+	for (sceneResource in gltfData.scenes)
+	{
+		sceneEntity := scene.CreateEntity();
+		scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
+		scene.SetComponent<Transform>(sceneEntity, Transform());
+		ParentEntity(rootEntity, sceneEntity, scene);
+
+		for (nodeResource in sceneResource.nodes)
 		{
-			paramData := params.data as *GLTFParamData;
-			defer DeallocThreadParam<GLTFParamData>(paramData);
-			gltfResource := GLTFResourceManager.TakeResourceRef(resourceHandle);
-			gltfResult := gltfResource.result;
-			gltfData := gltfResource.data;
+			AssignGLTFNodeToECS(nodeResource@, scene, sceneEntity);
+		}
+	}
 
-			scene := params.scene;
-			rootEntity := scene.CreateEntity();
-			scene.SetComponent<Hierarchy>(rootEntity, Hierarchy());
-			scene.SetComponent<Transform>(rootEntity, Transform());
+	if (onLoad)
+	{
+		onLoad(scene, rootEntity, arg);
+	}
 
-			for (sceneResource in gltfData.scenes)
-			{
-				sceneEntity := scene.CreateEntity();
-				scene.SetComponent<Hierarchy>(sceneEntity, Hierarchy());
-				scene.SetComponent<Transform>(sceneEntity, Transform());
-				ParentEntity(rootEntity, sceneEntity, scene);
-
-				for (nodeResource in sceneResource.nodes)
-				{
-					AssignGLTFNodeToECS(nodeResource@, scene, sceneEntity);
-				}
-			}
-
-			if (paramData.onLoad)
-			{
-				paramData.onLoad(scene, rootEntity, paramData.arg);
-			}
-		});
+	return resourceHandle;
 }
 
 ResourceHandle useGLTFAssetResource(
@@ -209,17 +239,13 @@ ResourceHandle GetBufferHandle(gltfData: GLTFResource, buffer: uint32)
 	return LoadURIResource(uri, gltf.path);
 }
 
-ArrayView<byte> GetDeinterleavedBufferData(gltfData: GLTFResource, data: *byte, bufferView: uint32, accessor: uint32)
+DeinterleavedAccessorLoad(resourceArg: *ResourceArg<GLTFAccessorArg>, subResource: *SubResource<GLTFDeinterleavedAccessor>)
 {
-	gltf := gltfData.gltf;
-	gltfBufferView := gltf.bufferViews[bufferView];
-	gltfAccessor := gltf.accessors[accessor];
+	param := resourceArg.arg;
 
-	deinterleavedAccessors := gltfData.resources.deinterleavedAccessors;
-	if (deinterleavedAccessors.Has(accessor))
-	{
-		return deinterleavedAccessors.Get(accessor)~;
-	}
+	gltf := param.gltf;
+	gltfBufferView := gltf.bufferViews[param.bufferView];
+	gltfAccessor := gltf.accessors[param.accessor];
 
 	byteStride := gltfBufferView.byteStride;
 
@@ -228,9 +254,12 @@ ArrayView<byte> GetDeinterleavedBufferData(gltfData: GLTFResource, data: *byte, 
 	itemByteSize := itemByteLength * itemByteCount;
 	totalByteSize := gltfAccessor.count * itemByteSize;
 
-	deinterleavedBuf := Allocator<byte>().Alloc(totalByteSize);
+	deinterleaved := subResource.data;
+	deinterleaved.mem = Allocator<byte>();
+	deinterleaved.mem.Alloc(totalByteSize);
+	deinterleaved.count = totalByteSize;
 
-	start := data + gltfAccessor.byteOffset;
+	start := param.data + gltfAccessor.byteOffset;
 
 	for (i .. gltfAccessor.count)
 	{
@@ -240,13 +269,23 @@ ArrayView<byte> GetDeinterleavedBufferData(gltfData: GLTFResource, data: *byte, 
 		for (j .. itemByteSize)
 		{
 			itemByte := itemStart + j;
-			deinterleavedBuf[(i * itemByteSize) + j]~ = itemByte~;
+			deinterleaved.mem[(i * itemByteSize) + j]~ = itemByte~;
 		}
 	}
+}
 
-	deinterleavedArrayView := ArrayView<byte>(deinterleavedBuf[0], totalByteSize);
-	deinterleavedAccessors.Insert(accessor, deinterleavedArrayView);
-	return deinterleavedArrayView;
+ArrayView<byte> GetDeinterleavedBufferData(gltfData: GLTFResource, data: *byte, bufferView: uint32, accessor: uint32)
+{
+	accessorArg := GLTFAccessorArg();
+	accessorArg.gltf = gltfData.gltf@;
+	accessorArg.data = data;
+	accessorArg.bufferView = bufferView;
+	accessorArg.accessor = accessor;
+
+	handle := GLTFResourceManager.CreateSubResource<GLTFDeinterleavedAccessor>(gltfData.handle, accessorArg@);
+	deinterleaved := GLTFResourceManager.GetSubResource<GLTFDeinterleavedAccessor>(handle).data;
+
+	return ArrayView<byte>(deinterleaved.mem[0], deinterleaved.count);
 }
 
 ArrayView<byte> GetBufferViewData(gltfData: GLTFResource, bufferView: uint32, accessor: uint32 = InvalidGLTFIndex)
@@ -259,9 +298,9 @@ ArrayView<byte> GetBufferViewData(gltfData: GLTFResource, bufferView: uint32, ac
 	if (gltfBuffer.uri)
 	{
 		handle := GetBufferHandle(gltfData, gltfBufferView.buffer);
-		gltfData.resources.buffers.Add(handle);
+		AddSubResource(gltfData.handle, handle);
 
-		data = URIResourceManager.TakeResourceRef(handle).data.buffer;
+		data = URIResourceManager.GetResource<URIResource>(handle).data.buffer;
 	}
 	else
 	{
@@ -393,26 +432,15 @@ AssignIndiciesToPrimitive(gltfData: GLTFResource, accessor: uint32, primitive: M
 	primitive.geometry.indices = indices;
 }
 
-GenerateTangentsForPrimitive(gltfData: GLTFResource, primitive: Mesh)
+GeneratedTangentsLoad(resourceArg: *ResourceArg<GLTFTangentsArg>, subResource: *SubResource<GLTFGeneratedTangents>)
 {
-	if (primitive.geometry.topologyKind != TopologyKind.TriangleList) return;
+	param := resourceArg.arg;
+	primitive := param.primitive;
 
-	tangentIndex := primitive.geometry.GetAttributeIndex("tangents");
-	positionIndex := primitive.geometry.GetAttributeIndex("position");
-	normalIndex := primitive.geometry.GetAttributeIndex("normal");
-	uvIndex := primitive.geometry.GetAttributeIndex("uv0");
-
-	if (primitive.geometry.GetAttributeValue(tangentIndex)~.count) return;
-
-	positionView := primitive.geometry.GetAttributeValue(positionIndex)~;
-	normalView := primitive.geometry.GetAttributeValue(normalIndex)~;
-	uvView := primitive.geometry.GetAttributeValue(uvIndex)~;
-	if (!positionView.count || !normalView.count || !uvView.count) return;
-
-	vertexCount := positionView.count / (#sizeof Vec3);
-	positions := positionView.start as *Vec3;
-	normals := normalView.start as *Vec3;
-	uvs := uvView.start as *Vec2;
+	vertexCount := param.positionView.count / (#sizeof Vec3);
+	positions := param.positionView.start as *Vec3;
+	normals := param.normalView.start as *Vec3;
+	uvs := param.uvView.start as *Vec2;
 
 	indices16 := primitive.geometry.indices.start;
 	indices32 := primitive.geometry.indices.start as *uint32;
@@ -470,9 +498,10 @@ GenerateTangentsForPrimitive(gltfData: GLTFResource, primitive: Mesh)
 		bitanAcc[i2]~ = bitanAcc[i2]~ + bitangent;
 	}
 
-	tangentData := Allocator<Vec4>();
-	tangentData.Alloc(vertexCount);
-	gltfData.resources.generatedBuffers.Add(tangentData as Allocator<byte>);
+	tangents := subResource.data;
+	tangents.mem = Allocator<Vec4>();
+	tangents.mem.Alloc(vertexCount);
+	tangents.count = vertexCount;
 
 	for (i .. vertexCount)
 	{
@@ -482,12 +511,40 @@ GenerateTangentsForPrimitive(gltfData: GLTFResource, primitive: Mesh)
 		tangent = tangent - (normal * normal.Dot(tangent));
 		tangent.Normalize();
 
-		tangentData[i]~ = Vec4(tangent.x, tangent.y, tangent.z, 1.0);
-		if (normal.Cross(tangent).Dot(bitanAcc[i]~) < 0.0) tangentData[i].w = -1.0;
+		tangents.mem[i]~ = Vec4(tangent.x, tangent.y, tangent.z, 1.0);
+		if (normal.Cross(tangent).Dot(bitanAcc[i]~) < 0.0) tangents.mem[i].w = -1.0;
 	}
+}
+
+GenerateTangentsForPrimitive(gltfData: GLTFResource, meshIndex: uint32, primitiveIndex: uint32, primitive: Mesh)
+{
+	if (primitive.geometry.topologyKind != TopologyKind.TriangleList) return;
+
+	tangentIndex := primitive.geometry.GetAttributeIndex("tangents");
+	positionIndex := primitive.geometry.GetAttributeIndex("position");
+	normalIndex := primitive.geometry.GetAttributeIndex("normal");
+	uvIndex := primitive.geometry.GetAttributeIndex("uv0");
+
+	if (primitive.geometry.GetAttributeValue(tangentIndex)~.count) return;
+
+	positionView := primitive.geometry.GetAttributeValue(positionIndex)~;
+	normalView := primitive.geometry.GetAttributeValue(normalIndex)~;
+	uvView := primitive.geometry.GetAttributeValue(uvIndex)~;
+	if (!positionView.count || !normalView.count || !uvView.count) return;
+
+	tangentsArg := GLTFTangentsArg();
+	tangentsArg.meshIndex = meshIndex;
+	tangentsArg.primitiveIndex = primitiveIndex;
+	tangentsArg.primitive = primitive@;
+	tangentsArg.positionView = positionView;
+	tangentsArg.normalView = normalView;
+	tangentsArg.uvView = uvView;
+
+	handle := GLTFResourceManager.CreateSubResource<GLTFGeneratedTangents>(gltfData.handle, tangentsArg@);
+	tangents := GLTFResourceManager.GetSubResource<GLTFGeneratedTangents>(handle).data;
 
 	primitive.geometry.GetAttributeValue(tangentIndex)~ =
-		ArrayView<byte>(tangentData.ptr as *byte, vertexCount * (#sizeof Vec4));
+		ArrayView<byte>(tangents.mem.ptr as *byte, tangents.count * (#sizeof Vec4));
 }
 
 TextureMap LoadTexture(gltfData: GLTFResource, textureIndex: uint32)
@@ -515,6 +572,8 @@ TextureMap LoadTexture(gltfData: GLTFResource, textureIndex: uint32)
 
 		texture.imageHandle = imageHandle;
 	}
+
+	AddSubResource(gltfData.handle, texture.imageHandle);
 
 
 	textureMap := TextureMap();
@@ -623,9 +682,10 @@ AssignGLTFMesh(gltfData: GLTFResource, meshIndex: uint32, nodeResource: *GLTFNod
 	litHandle := AssetDefNameToHandle("LitPBR");
 
 	nodeResource.meshes.SizeTo(gltfMesh.primitives.count);
-	for (gltfPrim in gltfMesh.primitives)
+	for (primitiveIndex .. gltfMesh.primitives.count)
 	{
-		primitive := Mesh(litHandle);
+		gltfPrim := gltfMesh.primitives[primitiveIndex];
+		primitive := Mesh(litHandle, gltfData.handle);
 		primitive.geometry.topologyKind = gltfModeToTopologyKindTable[gltfPrim.mode];
 
 		for (attrKV in gltfPrim.attributes)
@@ -641,7 +701,7 @@ AssignGLTFMesh(gltfData: GLTFResource, meshIndex: uint32, nodeResource: *GLTFNod
 			AssignIndiciesToPrimitive(gltfData, gltfPrim.indices, primitive);
 		}
 
-		GenerateTangentsForPrimitive(gltfData, primitive);
+		GenerateTangentsForPrimitive(gltfData, meshIndex, primitiveIndex, primitive);
 
 		if (gltfPrim.material != InvalidGLTFIndex)
 		{

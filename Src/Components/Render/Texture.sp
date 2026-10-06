@@ -33,5 +33,5 @@ state Texture
 
 Texture::delete
 {
-	ReleaseResourceRef(this.imageHandle);
+	if (this.imageHandle.Valid()) ReleaseResourceRef(this.imageHandle);
 }

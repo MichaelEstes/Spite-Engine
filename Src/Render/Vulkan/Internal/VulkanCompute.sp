@@ -128,7 +128,7 @@ VulkanComputeLayout CreateComputePipelineLayoutFromShader(device: *VkDevice_T, s
 	existing := cache.pipelines.Get(shaderHandle.id);
 	if (existing) return existing;
 
-	shaderItem := ComputeShaderResourceManager.GetResource(shaderHandle).data.shader@;
+	shaderItem := ComputeShaderResourceManager.GetResource<ComputeShaderResource>(shaderHandle).data.shader@;
 
 	computeLayout := CreateComputePipelineLayoutFromShader(device, shaderItem);
 	pipeline := CreateComputePipeline(device, shaderItem.shaderStageInfo, computeLayout.layout);

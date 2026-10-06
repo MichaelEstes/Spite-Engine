@@ -974,7 +974,23 @@ VulkanRenderer::MeshUpdated(sceneEntity: SceneEntity, mesh: *Mesh)
 
 VulkanRenderer::MeshRemoved(sceneEntity: SceneEntity, mesh: *Mesh)
 {
-	
+	entity := sceneEntity.entity;
+
+	batch := this.drawList.batchMap.Find(CreatePipelineStateFromMesh(mesh));
+	if (!batch) return;
+
+	meshes := batch.meshes;
+	index := uint32(0);
+	while (index < meshes.count && meshes[index].entity.id != entity.id) index += 1;
+	if (index == meshes.count) return;
+
+	meshHandle := meshes[index].meshHandle;
+	drawIndex := index;
+	while (drawIndex && meshes[drawIndex - 1].meshHandle == meshHandle) drawIndex -= 1;
+
+	meshes.Shift(index);
+	meshes.count -= 1;
+	if (drawIndex < batch.dirtyIndex) batch.dirtyIndex = drawIndex;
 }
 
 VulkanRendererComponent := ECS.RegisterComponent<VulkanRenderer>(

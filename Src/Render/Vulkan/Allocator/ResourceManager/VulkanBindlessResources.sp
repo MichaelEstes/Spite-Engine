@@ -5,6 +5,7 @@ import SparseSet
 import RenderComponents
 import ImageManager
 import SDL
+import Atomic
 
 MaxBindlessTextures := uint32(4096);
 MaxBindlessSamplers := uint32(64);
@@ -141,7 +142,7 @@ uint32 VulkanBindlessResources::UploadTexture(textureMap: TextureMap, textureDef
 		return this.imageHandleCache.Get(imageHandle.id)~;
 	}
 
-	image := ImageResourceManager.GetResource(imageHandle).data.image;
+	image := ImageResourceManager.GetResource<ImageResource>(imageHandle).data.image;
 	width := image.w as uint32;
 	height := image.h as uint32;
 	imageSize := height * image.pitch;

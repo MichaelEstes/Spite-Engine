@@ -3,17 +3,20 @@ package RenderComponents
 import Array
 import ECS
 import Event
+import Resource
+import ImageManager
 
 MeshEntitySetEvent := RegisterEvent<SceneEntity>();
 MeshEntityRemovedEvent := RegisterEvent<SceneEntity>();
-
+MeshDeletedEvent := RegisterEvent<*Mesh>();
 
 state Mesh
 {
 	geometry: Geometry,
     material: Material,
 
-    defHandle: AssetDefHandle
+	resourceHandle: ResourceHandle,
+    defHandle: AssetDefHandle,
 	gpuResourceID: uint32
 }
 
@@ -24,10 +27,34 @@ Mesh::(defHandle: AssetDefHandle)
     this.material = Material(defHandle);
 }
 
+Mesh::(defHandle: AssetDefHandle, resourceHandle: ResourceHandle)
+{
+    this.defHandle = defHandle;
+	this.resourceHandle = resourceHandle;
+    this.geometry = Geometry(defHandle);
+    this.material = Material(defHandle);
+}
+
 Mesh::delete
 {
-	delete this.geometry;
-    delete this.material;
+	if (!ResourceHasReference(this.resourceHandle)) 
+    {
+		ECS.instance.events.Emit<*Mesh>(MeshDeletedEvent, this@);
+		delete this.geometry;
+		delete this.material;
+    }
+}
+
+Mesh::Init()
+{
+	// Mesh resources are owned by a resource manager
+	if (this.resourceHandle.Valid()) return;
+
+	for (textureMap in this.material.textures)
+	{
+		if (textureMap.texture.imageHandle == InvalidResourceHandle) continue;
+		TakeResourceRef<ImageResource>(textureMap.texture.imageHandle);
+	}
 }
 
 MeshComponent := ECS.RegisterComponent<Mesh>(

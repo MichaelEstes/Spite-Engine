@@ -103,12 +103,22 @@ AssetDefHandle AssetDefNameToHandle(name: string)
     // return mem;
 }
 
+FreeVertexVariableSet(defHandle: AssetDefHandle, ptr: *void)
+{
+    delete ptr;
+}
+
 *void AllocateFragmentVariableSet(defHandle: AssetDefHandle)
 {
     allocator := assetDefRegistry.assetDefAllocators.Get(defHandle.handle);
     return alloc(allocator.fragmentSetSize);
     // mem := allocator.fragmentAllocator.Alloc();
     // return mem;
+}
+
+FreeFragmentVariableSet(defHandle: AssetDefHandle, ptr: *void)
+{
+    delete ptr;
 }
 
 uint32 GetAssetDefFragmentTextureCount(defHandle: AssetDefHandle)

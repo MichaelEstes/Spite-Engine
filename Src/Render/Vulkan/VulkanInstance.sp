@@ -343,6 +343,17 @@ InitializeVulkanInstance()
 	);
 
 	ECS.instance.events.On(
+		MeshDeletedEvent,
+		::(mesh: *Mesh, data: *void)
+		{
+			log "Mesh Deleted Vulkan Instance";
+
+			resourceManager := vulkanInstance.resourceManager;
+			resourceManager.RemoveMesh(mesh);
+		}
+	);
+
+	ECS.instance.events.On(
 		GeometryVariableUpdateEvent,
 		::(update: GeometryVariableUpdate, data: *void)
 		{

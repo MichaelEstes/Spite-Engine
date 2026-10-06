@@ -3,6 +3,7 @@ package RenderComponents
 import RenderAssetDef
 import Vec
 import Common
+import Resource
 
 state MaterialVariableUpdate
 {
@@ -46,17 +47,23 @@ state Material
 Material::(defHandle: AssetDefHandle)
 {
     this.defHandle = defHandle;
-	this.variables = AllocateFragmentVariableSet(defHandle);
-
-    texCount := GetAssetDefFragmentTextureCount(defHandle);
-    this.textures.SizeTo(texCount);
-    for (i .. texCount) this.textures.Add(TextureMap());
+	this.Allocate();
 }
 
 Material::delete
 {
     delete this.textures;
-    delete this.variables;
+    FreeFragmentVariableSet(this.defHandle, this.variables);
+}
+
+Material::Allocate()
+{
+    defHandle := this.defHandle;
+    this.variables = AllocateFragmentVariableSet(defHandle);
+
+    texCount := GetAssetDefFragmentTextureCount(defHandle);
+    this.textures.SizeTo(texCount);
+    for (i .. texCount) this.textures.Add(TextureMap());
 }
 
 uint32 Material::GetVariableIndex(name: string)

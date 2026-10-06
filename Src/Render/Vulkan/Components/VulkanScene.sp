@@ -28,6 +28,7 @@ state VulkanGeometryAttrSlot
 state VulkanGeometry
 {
 	attributes: Array<VulkanAllocHandle>,
+	attributeBufferSlots: Array<uint32>,
 	attributeSlots: BufferHandle,
 
 	variables: BufferHandle,

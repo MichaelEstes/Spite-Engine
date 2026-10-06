@@ -12,11 +12,8 @@ state EditorOptions
 
 EditorOptions::delete
 {
-    for (kv in this.options)
-    {
-        delete kv.key;
-        delete kv.value.val;
-    }
+    this.options.DeleteAll();
+    delete this.options;
 }
 
 editorOptionsComponent := ECS.RegisterComponent<EditorOptions>(

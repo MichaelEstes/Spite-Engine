@@ -9,63 +9,57 @@ state URIResource
 	count: uint
 }
 
-state URIParam
+state URIResourceArg
 {
 	uri: string,
 	basePath: string,
 	parent: ResourceHandle
 }
 
-URIResourceManager := Resource.CreateResourceManager<URIResource, URIParam>(
+URIResourceManager := Resource.CreateResourceManager<URIResourceArg>(
 	['u', 'r', 'i', '_'],
-	GetURIKey, 
-	URIManagerLoad,
+	::(manager: *ResourceManager<URIResourceArg>) {
+		manager.RegisterResourceType<URIResource>(CreateURIKey, URIManagerLoad);
+	},
+	::*_Type(param: *URIResourceArg) => return #typeof URIResource,
 	::(handle: ResourceHandle) {
 		resource := Resource.GetResource<URIResource>(handle);
 		delete resource.data.buffer;
 	}
 );
 
-URIResourceManagerID := Resource.RegisterResourceManager(URIResourceManager@);
+ResourceKey CreateURIKey(param: *URIResourceArg) => ResourceKey(OS.JoinPaths([param.basePath, param.uri]));
 
-ResourceKey GetURIKey(param: URIParam) => ResourceKey(OS.JoinPaths([param.basePath, param.uri]));
-
-URIManagerLoad(uriResourceParam: *ResourceParam<URIResource, URIParam>)
+URIManagerLoad(resourceArg: *ResourceArg<URIResourceArg>, resource: *Resource<URIResource>)
 {
-	handle := uriResourceParam.handle;
-	param := uriResourceParam.param;
-	
+	param := resourceArg.arg;
+
 	uri := param.uri;
-	parent := param.parent;
 
-	resourceManager := uriResourceParam.manager;
-	resource := resourceManager.GetResource(handle);
-
-	resource.parent = param.parent;
 	resourceData := resource.data;
 
 	if (File.IsDataURI(uri))
     {
-		
+
     }
     else
     {
-		path := uriResourceParam.key.value.name;
+		path := resourceArg.key.value.name;
 
         fileContent := OS.ReadFile(path);
 		resourceData.buffer = fileContent[0];
 		resourceData.count = fileContent.count;
 	}
 
-	uriResourceParam.onResourceLoad(uriResourceParam, ResourceResult.Loaded);
+	resource.result = ResourceResult.Loaded;
 }
 
 ResourceHandle LoadURIResource(uri: string, basePath: string = "", parent: ResourceHandle = InvalidResourceHandle)
 {
-	uriParam := URIParam();
+	uriParam := URIResourceArg();
 	uriParam.uri = uri;
 	uriParam.basePath = basePath;
 	uriParam.parent = parent;
 
-	return URIResourceManager.LoadResource(uriParam, null);
+	return URIResourceManager.LoadResource(uriParam);
 }

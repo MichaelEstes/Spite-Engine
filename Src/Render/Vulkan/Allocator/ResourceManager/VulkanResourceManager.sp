@@ -6,6 +6,7 @@ import RenderComponents
 import RenderAssetDef
 import Transform
 import Array
+import Atomic
 
 MaxModelCount := uint32(4096);
 MaxSharedIndexCount := uint32(1 << 22);
@@ -25,8 +26,7 @@ state VulkanResourceManager
 	defaultBuffers := Map<Value, BufferHandle, HashValue>()
 
 	sharedIndexBuffer: BufferHandle,
-	sharedIndexCount: uint32,
-	currentMeshIndex: uint32 = 1
+	sharedIndexCount: uint32
 }
 
 VulkanResourceManager::()
@@ -108,6 +108,7 @@ VulkanResourceManager::UploadMesh(mesh: *Mesh)
 	handleValue := this.meshes.GetNext();
 	resourceID := handleValue.handle;
 	vulkanMesh := handleValue.value;
+
 	mesh.gpuResourceID = resourceID;
 
 	this.UploadGeometry(mesh.geometry@, vulkanMesh.geometry@);
@@ -127,6 +128,7 @@ VulkanResourceManager::UploadGeometry(geometry: *Geometry, vulkanGeometry: *Vulk
 	if (attributeCount)
 	{
 		vulkanGeometry.attributes = Array<VulkanAllocHandle>(attributeCount);
+		vulkanGeometry.attributeBufferSlots = Array<uint32>(attributeCount);
 
 		vertexAttr := geometry.attributes[0];
 		attrDef := assetDef.vertex.attributes[0].def;
@@ -157,6 +159,7 @@ VulkanResourceManager::UploadGeometry(geometry: *Geometry, vulkanGeometry: *Vulk
 		}
 
 		vulkanGeometry.attributes.Add(bufferHandle.handle);
+		vulkanGeometry.attributeBufferSlots.Add(attrSlot.index);
 		attributeSlots.Add(attrSlot);
 	}
 
@@ -216,4 +219,30 @@ VulkanResourceManager::UploadMaterial(material: *Material, vulkanMaterial: *Vulk
 
 	vulkanMaterial.textureSlots = UploadBindlessSlots<VulkanMaterialTextureSlot>(textureSlots[0]@, textureSlots.count);
 	vulkanMaterial.variables = UploadVariableSet(assetDef.fragment.variables, material.variables);
+}
+
+bool VulkanResourceManager::RemoveMesh(mesh: *Mesh)
+{
+	resourceID := mesh.gpuResourceID;
+	if (!this.meshes.Has(resourceID)) return false;
+
+	vulkanMesh := this.meshes.Get(resourceID);
+	allocator := vulkanInstance.allocator;
+
+	vulkanGeometry := vulkanMesh.geometry;
+	for (i .. vulkanGeometry.attributes.count)
+	{
+		if (mesh.geometry.attributes[i].count) allocator.FreeAlloc(vulkanGeometry.attributes[i]);
+		this.bindless.buffers.Remove(vulkanGeometry.attributeBufferSlots[i]);
+	}
+	delete vulkanGeometry.attributes;
+	delete vulkanGeometry.attributeBufferSlots;
+
+	FreeBuffer(vulkanGeometry.attributeSlots);
+	FreeBuffer(vulkanGeometry.variables);
+	FreeBuffer(vulkanMesh.material.textureSlots);
+	FreeBuffer(vulkanMesh.material.variables);
+
+	this.meshes.Remove(resourceID);
+	return true;
 }

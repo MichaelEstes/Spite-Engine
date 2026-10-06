@@ -150,6 +150,8 @@ SparseSet::Remove(key: uint32)
 
 SparseSet::Clear()
 {
+	if (!this.count) return;
+	
 	this.count = 0;
 	zero_out_bytes(this.sparseArr[0], this.sparseCapacity * #sizeof uint32);
 }

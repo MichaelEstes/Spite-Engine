@@ -21,7 +21,7 @@ state ShaderResource
 	fragment: ShaderItem
 }
 
-state ShaderParam
+state ShaderResourceArg
 {
 	assetDefHandle: AssetDefHandle
 }
@@ -64,24 +64,12 @@ CreateShaderItem(device: *VkDevice_T, compiled: string, item: *ShaderItem)
 	item.shaderStageInfo = shaderStageInfo;
 }
 
-ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderParam>(
+ShaderResourceManager := Resource.CreateResourceManager<ShaderResourceArg>(
 	['v', 'k', 's', 'h'],
-	::ResourceKey(param: ShaderParam) => ResourceKey(param.assetDefHandle.handle as uint),
-	::(shaderResourceParam: *ResourceParam<ShaderResource, ShaderParam>)
-	{
-		handle := shaderResourceParam.handle;
-		param := shaderResourceParam.param;
-		resourceManager := shaderResourceParam.manager;
-		resource := resourceManager.GetResource(handle);
-
-		device := vulkanInstance.device;
-		assetDef := GetAssetDefWithHandle(param.assetDefHandle);
-
-		CreateShaderItem(device, assetDef.vertex.compiled, resource.data.vertex@);
-		CreateShaderItem(device, assetDef.fragment.compiled, resource.data.fragment@);
-
-		shaderResourceParam.onResourceLoad(shaderResourceParam, ResourceResult.Loaded)
+	::(manager: *ResourceManager<ShaderResourceArg>) {
+		manager.RegisterResourceType<ShaderResource>(CreateShaderKey, ShaderManagerLoad);
 	},
+	::*_Type(param: *ShaderResourceArg) => return #typeof ShaderResource,
 	::(handle: ResourceHandle)
 	{
 		device := vulkanInstance.device;
@@ -95,11 +83,24 @@ ShaderResourceManager := Resource.CreateResourceManager<ShaderResource, ShaderPa
 	}
 );
 
-ShaderResourceManagerID := Resource.RegisterResourceManager(ShaderResourceManager@);
+ResourceKey CreateShaderKey(param: *ShaderResourceArg) => ResourceKey(param.assetDefHandle.handle as uint);
+
+ShaderManagerLoad(resourceArg: *ResourceArg<ShaderResourceArg>, resource: *Resource<ShaderResource>)
+{
+	param := resourceArg.arg;
+
+	device := vulkanInstance.device;
+	assetDef := GetAssetDefWithHandle(param.assetDefHandle);
+
+	CreateShaderItem(device, assetDef.vertex.compiled, resource.data.vertex@);
+	CreateShaderItem(device, assetDef.fragment.compiled, resource.data.fragment@);
+
+	resource.result = ResourceResult.Loaded;
+}
 
 ResourceHandle UseAssetDefShader(assetDefHandle: AssetDefHandle)
 {
-	shaderParam := ShaderParam();
+	shaderParam := ShaderResourceArg();
 	shaderParam.assetDefHandle = assetDefHandle;
 
 	return ShaderResourceManager.LoadResource(shaderParam);
@@ -110,39 +111,18 @@ state ComputeShaderResource
 	shader: ShaderItem
 }
 
-state ComputeShaderParam
+state ComputeShaderResourceArg
 {
 	name: string,
 	source: string
 }
 
-ComputeShaderResourceManager := Resource.CreateResourceManager<ComputeShaderResource, ComputeShaderParam>(
+ComputeShaderResourceManager := Resource.CreateResourceManager<ComputeShaderResourceArg>(
 	['v', 'k', 'c', 's'],
-	::ResourceKey(param: ComputeShaderParam) => ResourceKey(param.name.Copy()),
-	::(computeResourceParam: *ResourceParam<ComputeShaderResource, ComputeShaderParam>)
-	{
-		handle := computeResourceParam.handle;
-		param := computeResourceParam.param;
-		resourceManager := computeResourceParam.manager;
-		resource := resourceManager.GetResource(handle);
-
-		device := vulkanInstance.device;
-
-		compiler := InitShaderCompiler();
-		defer delete compiler;
-
-		spirv := CompileShader(param.source, compiler, param.name);
-		if (!spirv.count)
-		{
-			log "ComputeShaderResourceManager failed to compile compute shader: ", param.name;
-			computeResourceParam.onResourceLoad(computeResourceParam, ResourceResult.LoadFailed);
-			return;
-		}
-
-		CreateShaderItem(device, spirv, resource.data.shader@);
-
-		computeResourceParam.onResourceLoad(computeResourceParam, ResourceResult.Loaded);
+	::(manager: *ResourceManager<ComputeShaderResourceArg>) {
+		manager.RegisterResourceType<ComputeShaderResource>(CreateComputeShaderKey, ComputeShaderManagerLoad);
 	},
+	::*_Type(param: *ComputeShaderResourceArg) => return #typeof ComputeShaderResource,
 	::(handle: ResourceHandle)
 	{
 		device := vulkanInstance.device;
@@ -153,11 +133,33 @@ ComputeShaderResourceManager := Resource.CreateResourceManager<ComputeShaderReso
 	}
 );
 
-ComputeShaderResourceManagerID := Resource.RegisterResourceManager(ComputeShaderResourceManager@);
+ResourceKey CreateComputeShaderKey(param: *ComputeShaderResourceArg) => ResourceKey(param.name.Copy());
+
+ComputeShaderManagerLoad(resourceArg: *ResourceArg<ComputeShaderResourceArg>, resource: *Resource<ComputeShaderResource>)
+{
+	param := resourceArg.arg;
+
+	device := vulkanInstance.device;
+
+	compiler := InitShaderCompiler();
+	defer delete compiler;
+
+	spirv := CompileShader(param.source, compiler, param.name);
+	if (!spirv.count)
+	{
+		log "ComputeShaderResourceManager failed to compile compute shader: ", param.name;
+		resource.result = ResourceResult.LoadFailed;
+		return;
+	}
+
+	CreateShaderItem(device, spirv, resource.data.shader@);
+
+	resource.result = ResourceResult.Loaded;
+}
 
 ResourceHandle UseComputeShader(name: string, source: string)
 {
-	param := ComputeShaderParam();
+	param := ComputeShaderResourceArg();
 	param.name = name;
 	param.source = source;
 

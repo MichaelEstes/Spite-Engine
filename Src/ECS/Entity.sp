@@ -9,7 +9,7 @@ state Entity
 	[value]
 	id: uint32,
 	version: uint16,
-	layerMask: uint16
+	layers: uint16
 }
 
 Entity::(id: uint32, version: uint16)

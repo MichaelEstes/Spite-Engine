@@ -52,14 +52,14 @@ Iterator HandleSet::operator::in()
 bool HandleSet::next(it: Iterator)
 {
 	it.index += 1;
-	while(it.index < this.capacity && !this.Has(it.index)) it.index += 1;
+	while(it.index < this.capacity && !this.handleFlags[it.index]) it.index += 1;
 	return it.index < this.capacity;
 }
 
 HandleValue<Value> HandleSet::current(it: Iterator)
 {
-	handle := (it.index - StartAt) as uint32;
-	return {handle, this[it.index]} as HandleValue<Value>;
+	handle := (it.index + StartAt) as uint32;
+	return {handle, this.denseValueArr[it.index]} as HandleValue<Value>;
 }
 
 HandleSet::Expand()
@@ -109,9 +109,9 @@ bool HandleSet::Has(key: uint32)
 HandleSet::Remove(key: uint32)
 {
 	index := key - StartAt;
-	if (index > this.capacity) return;
-	
-	if (key < this.next) this.next = key;
+	if (index >= this.capacity) return;
+
+	if (index < this.next) this.next = index;
 	this.handleFlags.Clear(index);
 }
 

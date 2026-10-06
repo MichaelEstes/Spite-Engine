@@ -102,7 +102,7 @@ MergePushConstants(module: SpvReflectShaderModule, pushConstantRanges: Array<VkP
 *VkPipelineLayout_T CreatePipelineLayoutFromKey(device: *VkDevice_T, key: PipelineLayoutKey,
 												cache: VulkanPipelineLayoutCache)
 {
-	shaderRes := ShaderResourceManager.GetResource(UseAssetDefShader(key.assetDefHandle)).data;
+	shaderRes := ShaderResourceManager.GetResource<ShaderResource>(UseAssetDefShader(key.assetDefHandle)).data;
 	vertShaderRes := shaderRes.vertex;
 	fragShaderRes := shaderRes.fragment;
 
