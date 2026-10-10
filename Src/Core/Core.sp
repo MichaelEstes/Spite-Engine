@@ -15,10 +15,18 @@ import Tracy
 
 running := false;
 
+pollEventsZone: Tracy.SourceLocationData = Tracy.SourceLocationData("Poll Events"[0], "MainLoop"[0], "Src/Core/Core.sp"[0], 66, 0);
+updateInputZone: Tracy.SourceLocationData = Tracy.SourceLocationData("Update Input"[0], "MainLoop"[0], "Src/Core/Core.sp"[0], 70, 0);
+preFrameZone: Tracy.SourceLocationData = Tracy.SourceLocationData("PreFrame"[0], "MainLoop"[0], "Src/Core/Core.sp"[0], 74, 0);
+frameZone: Tracy.SourceLocationData = Tracy.SourceLocationData("Frame"[0], "MainLoop"[0], "Src/Core/Core.sp"[0], 78, 0);
+preDrawZone: Tracy.SourceLocationData = Tracy.SourceLocationData("PreDraw"[0], "MainLoop"[0], "Src/Core/Core.sp"[0], 82, 0);
+drawZone: Tracy.SourceLocationData = Tracy.SourceLocationData("Draw"[0], "MainLoop"[0], "Src/Core/Core.sp"[0], 86, 0);
+postFrameZone: Tracy.SourceLocationData = Tracy.SourceLocationData("PostFrame"[0], "MainLoop"[0], "Src/Core/Core.sp"[0], 90, 0);
+
 Initialize()
 {
 	InitializeTime();
-	// Tracy.StartupProfiler();
+	Tracy.StartupProfiler();
 	Math.SetRandomSeed(Time.StartTime);
 	Fiber.InitalizeFibers();
 
@@ -51,21 +59,39 @@ Start()
 MainLoop()
 {
 	running = true;
-
 	currEvent := SDL.Event();
+
 	while (running)
 	{
+		zone := Tracy.ZoneBegin(pollEventsZone@, 1);
 		while (SDL.PollEvent(currEvent@)) HandleSDLEvent(currEvent);
+		Tracy.ZoneEnd(zone);
 
+		zone = Tracy.ZoneBegin(updateInputZone@, 1);
 		UpdateInput();
+		Tracy.ZoneEnd(zone);
 
+		zone = Tracy.ZoneBegin(preFrameZone@, 1);
 		ECS.instance.PreFrame();
-		ECS.instance.Frame();
-		ECS.instance.PreDraw();
-		ECS.instance.Draw();
-		ECS.instance.PostFrame();
+		Tracy.ZoneEnd(zone);
 
-		// Tracy.FrameMark(null);
+		zone = Tracy.ZoneBegin(frameZone@, 1);
+		ECS.instance.Frame();
+		Tracy.ZoneEnd(zone);
+
+		zone = Tracy.ZoneBegin(preDrawZone@, 1);
+		ECS.instance.PreDraw();
+		Tracy.ZoneEnd(zone);
+
+		zone = Tracy.ZoneBegin(drawZone@, 1);
+		ECS.instance.Draw();
+		Tracy.ZoneEnd(zone);
+
+		zone = Tracy.ZoneBegin(postFrameZone@, 1);
+		ECS.instance.PostFrame();
+		Tracy.ZoneEnd(zone);
+
+		Tracy.FrameMark(null);
 	}
 
 	ECS.instance.Stop();
@@ -74,9 +100,10 @@ MainLoop()
 HandleSDLEvent(event: SDL.Event)
 {
 	eventWindowID := event.GetWindowID();
-	if (eventWindowID)
+	windowEvents := SDLEvents.Get(eventWindowID);
+	if (eventWindowID && windowEvents)
 	{
-		SDLEvents.Get(eventWindowID).Emit<SDL.Event>(event.type, event);
+		windowEvents.Emit<SDL.Event>(event.type, event);
 	}
 	SDLEvents.Get(0).Emit<SDL.Event>(event.type, event);
 	//log event;

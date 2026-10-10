@@ -5,21 +5,6 @@ import Vec
 import Common
 import Resource
 
-state MaterialVariableUpdate
-{
-    material: *Material,
-    index: uint32
-}
-
-state MaterialTextureUpdate
-{
-    material: *Material,
-    index: uint32
-}
-
-MaterialVariableUpdateEvent := RegisterEvent<MaterialVariableUpdate>();
-MaterialTextureUpdateEvent := RegisterEvent<MaterialTextureUpdate>();
-
 state TextureMap
 {
 	texture: Texture,
@@ -89,14 +74,13 @@ ref VariableDefinition Material::GetVariableDef(index: uint32)
     return (this.variables + offset) as *T;
 }
 
-bool Material::SetVariable<T>(name: string, value: T, update: bool = true)
+uint32 Material::SetVariable<T>(name: string, value: T)
 {
 	index := this.GetVariableIndex(name);
-	if (index == uint32(-1)) return false;
+	if (index == uint32(-1)) return index;
 
 	this.GetVariableValue<T>(index)~ = value;
-	if (update) this.UpdatedVariableSet(index);
-    return true;
+    return index;
 }
 
 uint32 Material::GetTextureIndex(name: string)
@@ -112,28 +96,11 @@ uint32 Material::GetTextureIndex(name: string)
     return this.textures[index]@;
 }
 
-bool Material::SetTexture(name: string, texture: TextureMap, update: bool = true)
+uint32 Material::SetTexture(name: string, texture: TextureMap)
 {
     index := this.GetTextureIndex(name);
-	if (index == uint32(-1)) return false;
+	if (index == uint32(-1)) return index;
 
 	this.GetTextureValue(index)~ = texture;
-	if (update) this.UpdatedTexture(index);
-	return true;
-}
-
-Material::UpdatedVariableSet(index: uint32)
-{
-    event := MaterialVariableUpdate();
-    event.material = this@;
-    event.index = index;
-    ECS.instance.events.Emit<MaterialVariableUpdate>(MaterialVariableUpdateEvent, event);
-}
-
-Material::UpdatedTexture(index: uint32)
-{
-	event := MaterialTextureUpdate();
-    event.material = this@;
-    event.index = index;
-    ECS.instance.events.Emit<MaterialVariableUpdate>(MaterialTextureUpdateEvent, event);
+	return index;
 }

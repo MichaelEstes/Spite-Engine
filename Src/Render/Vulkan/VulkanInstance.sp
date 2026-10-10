@@ -1,6 +1,7 @@
 package VulkanRenderer
 
 import ArrayView
+import ImageManager
 
 UINT64_MAX := uint64(-1);
 VkFalse := uint32(0);
@@ -38,6 +39,9 @@ state VulkanInstance
 	deviceFeatures: VkPhysicalDeviceFeatures,
 	deviceProperties: VkPhysicalDeviceProperties,
 	queues: VulkanQueues,
+
+	submitTimeline: *VkSemaphore_T,
+	submitValue: uint64,
 
 	resourceTables: ResourceTables<VulkanRenderer>,
 	resourceManager: VulkanResourceManager,
@@ -126,6 +130,7 @@ VulkanInstance::InitializeCurrentDevice()
 	indexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = VkTrue;
 	indexingFeatures.bufferDeviceAddress = VkTrue;
 	indexingFeatures.drawIndirectCount = VkTrue;
+	indexingFeatures.timelineSemaphore = VkTrue;
 
 	deviceFeatures2 := VkPhysicalDeviceFeatures2();
 	deviceFeatures2.sType = VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -163,6 +168,7 @@ VulkanInstance::InitializeCurrentDevice()
 	);
 
 	this.queues.GetQueues(this.device, physicalDevice, this.instance);
+	this.submitTimeline = CreateTimelineSemaphore(this.device);
 
 	this.transferCommands.Create(this.device, this.queues.transferQueueIndex, 1);
 	this.graphicsCommands.Create(this.device, this.queues.graphicsQueueIndex, 1);
@@ -179,6 +185,16 @@ VulkanInstance::InitializeCurrentDevice()
 	this.pipelineCache = VulkanPipelineMap();
 	this.pipelineLayoutCache = VulkanPipelineLayoutCache();
 	this.computePipelineCache = VulkanComputePipelineCache();
+}
+
+uint64 VulkanInstance::CompletedSubmitValue()
+{
+	value := uint64(0);
+	CheckResult(
+		vkGetSemaphoreCounterValue(this.device, this.submitTimeline, value@),
+		"Error reading Vulkan submit timeline"
+	);
+	return value;
 }
 
 ref VulkanStagingBuffer VulkanInstance::GetStagingBuffer()
@@ -329,7 +345,7 @@ InitializeVulkanInstance()
 		MeshEntityRemovedEvent,
 		::(sceneEntity: SceneEntity, data: *void)
 		{
-			log "Mesh Entity Removed Vulkan Instance";
+			// log "Mesh Entity Removed Vulkan Instance";
 			scene := sceneEntity.scene;
 			entity := sceneEntity.entity;
 			mesh := scene.GetComponent<Mesh>(entity);
@@ -346,42 +362,59 @@ InitializeVulkanInstance()
 		MeshDeletedEvent,
 		::(mesh: *Mesh, data: *void)
 		{
-			log "Mesh Deleted Vulkan Instance";
-
+			// log "Mesh Deleted Vulkan Instance";
 			resourceManager := vulkanInstance.resourceManager;
 			resourceManager.RemoveMesh(mesh);
 		}
 	);
 
 	ECS.instance.events.On(
-		GeometryVariableUpdateEvent,
-		::(update: GeometryVariableUpdate, data: *void)
+		ImageDeletedEvent,
+		::(id: uint32, data: *void)
 		{
-			log "Geometry variable update Vulkan Instance";
+			// log "Image Deleted Vulkan Instance";
+			resourceManager := vulkanInstance.resourceManager;
+			resourceManager.RemoveImage(id);
+		}
+	);
+
+	ECS.instance.events.On(
+		GeometryVariableUpdateEvent,
+		::(update: MeshPropertyUpdate, data: *void)
+		{
+			// log "Geometry variable update Vulkan Instance";
+			resourceManager := vulkanInstance.resourceManager;
+			resourceManager.UpdateGeometryVariable(update.mesh, update.index);
 		}
 	);
 
 	ECS.instance.events.On(
 		GeometryAttributeUpdateEvent,
-		::(update: GeometryAttributeUpdate, data: *void)
+		::(update: MeshPropertyUpdate, data: *void)
 		{
-			log "Geometry attribute update Vulkan Instance";
+			// log "Geometry attribute update Vulkan Instance";
+			resourceManager := vulkanInstance.resourceManager;
+			resourceManager.UpdateGeometryAttribute(update.mesh, update.index);
 		}
 	);
 
 	ECS.instance.events.On(
 		MaterialVariableUpdateEvent,
-		::(update: MaterialVariableUpdate, data: *void)
+		::(update: MeshPropertyUpdate, data: *void)
 		{
-			log "Material variable update Vulkan Instance";
+			// log "Material variable update Vulkan Instance";
+			resourceManager := vulkanInstance.resourceManager;
+			resourceManager.UpdateMaterialVariable(update.mesh, update.index);
 		}
 	);
 
 	ECS.instance.events.On(
 		MaterialTextureUpdateEvent,
-		::(update: MaterialTextureUpdate, data: *void)
+		::(update: MeshPropertyUpdate, data: *void)
 		{
-			log "Material texture update Vulkan Instance";
+			// log "Material texture update Vulkan Instance";
+			resourceManager := vulkanInstance.resourceManager;
+			resourceManager.UpdateMaterialTexture(update.mesh, update.index);
 		}
 	);
 

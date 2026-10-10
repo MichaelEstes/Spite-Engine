@@ -4,6 +4,10 @@ import Resource
 import RenderComponents
 import Image
 import SDL
+import ECS
+import Event
+
+ImageDeletedEvent := RegisterEvent<uint32>();
 
 state ImageResource
 {
@@ -25,6 +29,7 @@ ImageResourceManager := Resource.CreateResourceManager<ImageResourceArg>(
 	},
 	::*_Type(param: *ImageResourceArg) => return #typeof ImageResource,
 	::(handle: ResourceHandle) {
+		ECS.instance.events.Emit<uint32>(ImageDeletedEvent, handle.id);
 		resource := Resource.GetResource<ImageResource>(handle);
 		SDL.DestroySurface(resource.data.image);
 	}

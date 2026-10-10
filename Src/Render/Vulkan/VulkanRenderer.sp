@@ -911,17 +911,25 @@ VulkanRenderer::Draw(scene: *Scene)
 
 	waitSemaphores := [this.swapchain.waitSemaphores[frame],];
 	waitStages := [VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,];
-	signalSemaphores := [this.swapchain.signalSemaphores[frame],];
+	vulkanInstance.submitValue += 1;
+	signalSemaphores := [this.swapchain.signalSemaphores[frame], vulkanInstance.submitTimeline];
+	signalValues := [uint64(0), vulkanInstance.submitValue];
 	fence := this.frameFences[frame];
+
+	timelineInfo := VkTimelineSemaphoreSubmitInfo();
+	timelineInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+	timelineInfo.signalSemaphoreValueCount = 2;
+	timelineInfo.pSignalSemaphoreValues = fixed signalValues;
 
 	submitInfo := VkSubmitInfo();
 	submitInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.pNext = timelineInfo@;
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = fixed waitSemaphores;
 	submitInfo.pWaitDstStageMask = fixed waitStages;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = graphicsCommandBuffer@;
-	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.signalSemaphoreCount = 2;
 	submitInfo.pSignalSemaphores = fixed signalSemaphores;
 
 	CheckResult(
@@ -1013,6 +1021,7 @@ VulkanDrawCleanupSystem := ECS.RegisterFrameSystem(
 	::(dt: float) 
 	{
 		vulkanInstance.resourceTables.ReleaseTrackedResources();
+		vulkanInstance.resourceManager.ReleaseRetired();
 	},
 	FrameSystemStep.End
 );

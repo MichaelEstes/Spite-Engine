@@ -1,9 +1,11 @@
 package ECS
 
-import SparseSet
+import Array
 import ArrayView
+import SparseSet
+import MultipleConsumerQueue
 import Atomic
-import Stack
+import Mutex
 
 state Scene
 {
@@ -13,8 +15,12 @@ state Scene
 	tagComponents := SparseSet<BitSet>(),
 
 	entityVersions := SparseSet<Atomic<uint16>>(),
+	recycledEntities := MultipleConsumerQueue<uint32>(1024),
+	entitiesToDelete := Array<Entity>(),
+	toDeleteMutex := Mutex(),
 
-	recycledEntities := Stack<uint32>(),
+	entityComponents := SparseSet<Array<Component>>(),
+	entityTagComponents := SparseSet<Array<TagComponent>>(),
 
 	singletonComponents := SingletonComponentMap(),
 	currEntity := Atomic<uint32>(uint32(1)),
@@ -47,6 +53,7 @@ Scene::delete
 
 	delete this.entityVersions;
 	delete this.recycledEntities;
+	delete this.entitiesToDelete;
 
 	delete this.commonComponents;
 	delete this.sparseComponents;
@@ -122,7 +129,15 @@ Entity Scene::RegisterEntity(id: uint32)
 
 Entity Scene::CreateEntity()
 {
+	id := uint32(0);
+	if (this.recycledEntities.TryDequeue(id@))
+	{
+		return this.RegisterEntity(id);
+	}
+
 	currEntity := this.currEntity.Add(1);
+	this.entityComponents.Insert(currEntity, Array<Component>());
+	this.entityTagComponents.Insert(currEntity, Array<TagComponent>());
 	this.entityVersions.Insert(currEntity, Atomic<uint16>(1));
 	return this.RegisterEntity(currEntity);
 }
@@ -130,97 +145,82 @@ Entity Scene::CreateEntity()
 bool Scene::IsValidEntity(entity: Entity) => 
 		entity.version == this.entityVersions.Get(entity.id).Load();
 
+Scene::AddEntityComponent(entity: Entity, component: Component) =>
+{
+	this.entityComponents.Get(entity.id).SortedInsertUnique(
+		component, 
+		::byte(left: Component, right: Component) 
+		{
+			if (left.id < right.id) return -1;
+			if (left.id > right.id) return 1;
+			return 0;
+		}
+	);
+}
+
+Scene::RemoveEntityComponent(entity: Entity, component: Component) =>
+{
+	this.entityComponents.Get(entity.id).SortedRemove(
+		component,
+		::byte(left: Component, right: Component) 
+		{
+			if (left.id < right.id) return -1;
+			if (left.id > right.id) return 1;
+			return 0;
+		}
+	);
+}
+
+Scene::AddEntityTagComponent(entity: Entity, component: TagComponent) =>
+{
+	this.entityTagComponents.Get(entity.id).SortedInsertUnique(
+		component, 
+		::byte(left: TagComponent, right: TagComponent) 
+		{
+			if (left.id < right.id) return -1;
+			if (left.id > right.id) return 1;
+			return 0;
+		}
+	);
+}
+
+Scene::RemoveEntityTagComponent(entity: Entity, component: TagComponent) =>
+{
+	this.entityTagComponents.Get(entity.id).SortedRemove(
+		component,
+		::byte(left: TagComponent, right: TagComponent) 
+		{
+			if (left.id < right.id) return -1;
+			if (left.id > right.id) return 1;
+			return 0;
+		}
+	);
+}
+
 Scene::RemoveEntity(entity: Entity)
 {
+	this.toDeleteMutex.Lock();
+	defer this.toDeleteMutex.Unlock();
+
 	if (!this.IsValidEntity(entity)) return;
 	entityID := entity.id;
 
-	for (keyValue in this.commonComponents)
-	{
-		componentID := keyValue.key;
-		component := instance.GetComponentByID(componentID);
-		if (keyValue.value.Has(entityID))
-		{
-			componentData := keyValue.value.GetUntyped(entityID, component.size);
-			instance.OnComponentRemove(componentID, entity, componentData, this);
-			keyValue.value.Remove(entityID);
-		}
-	}
-
-	for (keyValue in this.sparseComponents)
-	{
-		componentID := keyValue.key;
-		component := instance.GetComponentByID(componentID);
-		if (keyValue.value.Has(entityID))
-		{
-			componentData := keyValue.value.GetUntyped(entityID, component.size);
-			instance.OnComponentRemove(componentID, entity, componentData, this);
-			keyValue.value.RemoveUntyped(entityID, component.size);
-		}
-	}
-
-	for (keyValue in this.tagComponents)
-	{
-		componentID := keyValue.key;
-		bitSet := keyValue.value~;
-		if (bitSet[entityID])
-		{
-			bitSet.Clear(entityID);
-			instance.OnTagComponentRemove(componentID, entity, this);
-		}
-	}
+	this.entityVersions.Get(entityID).Add(1);
+	this.entitiesToDelete.Add(entity);
 }
 
 Scene::RemoveEntities(entities: []Entity)
 {
-	for (keyValue in this.commonComponents)
-	{
-		componentID := keyValue.key;
-		component := instance.GetComponentByID(componentID);
-		for (entity in entities) 
-		{
-			if (!this.IsValidEntity(entity)) continue;
-			entityID := entity.id;
-			if (keyValue.value.Has(entityID))
-			{
-				componentData := keyValue.value.GetUntyped(entityID, component.size);
-				instance.OnComponentRemove(componentID, entity, componentData, this);
-				keyValue.value.Remove(entityID);
-			}
-		}
-	}
+	this.toDeleteMutex.Lock();
+	defer this.toDeleteMutex.Unlock();
 
-	for (keyValue in this.sparseComponents)
+	for (entity in entities)
 	{
-		componentID := keyValue.key;
-		component := instance.GetComponentByID(componentID);
-		for (entity in entities) 
-		{
-			if (!this.IsValidEntity(entity)) continue;
-			entityID := entity.id;
-			if (keyValue.value.Has(entityID))
-			{
-				componentData := keyValue.value.GetUntyped(entityID, component.size);
-				instance.OnComponentRemove(componentID, entity, componentData, this);
-				keyValue.value.RemoveUntyped(entityID, component.size);
-			}
-		}
-	}
+		if (!this.IsValidEntity(entity)) continue;
+		entityID := entity.id;
 
-	for (keyValue in this.tagComponents)
-	{
-		componentID := keyValue.key;
-		bitSet := keyValue.value~;
-		for (entity in entities) 
-		{
-			if (!this.IsValidEntity(entity)) continue;
-			entityID := entity.id;
-			if (bitSet[entityID])
-			{
-				bitSet.Clear(entityID);
-				instance.OnTagComponentRemove(componentID, entity, this);
-			}
-		}
+		this.entityVersions.Get(entityID).Add(1);
+		this.entitiesToDelete.Add(entity);
 	}
 }
 
@@ -252,6 +252,7 @@ Scene::SetComponentDirect<Type>(entity: Entity, value: Type, component: Componen
 		default return;
 	}
 
+	this.AddEntityComponent(entity, component);
 	instance.OnComponentEnter(id, entity, inserted, this);
 }
 
@@ -287,6 +288,7 @@ Scene::SetComponentUntyped(entity: Entity, data: *any, component: Component)
 		default return;
 	}
 
+	this.AddEntityComponent(entity, component);
 	instance.OnComponentEnter(id, entity, inserted, this);
 }
 
@@ -385,6 +387,8 @@ Scene::RemoveComponentDirect<Type>(entity: Entity, component: Component)
 			}
 		}
 	}
+
+	this.RemoveEntityComponent(entity, component);
 }
 
 Scene::SetTagComponent(entity: Entity, tagComponent: TagComponent)
@@ -400,6 +404,7 @@ Scene::SetTagComponent(entity: Entity, tagComponent: TagComponent)
 	bitSet := this.tagComponents.Get(id)
 	bitSet.Set(entity.id);
 
+	this.AddEntityTagComponent(entity, tagComponent);
 	instance.OnTagComponentEnter(id, entity, this);
 }
 
@@ -412,6 +417,7 @@ Scene::RemoveTagComponent(entity: Entity, tagComponent: TagComponent)
 	{
 		bitSet := this.tagComponents.Get(id)
 		bitSet.Clear(entity.id);
+		this.RemoveEntityTagComponent(entity, tagComponent);
 		instance.OnTagComponentRemove(id, entity, this);
 	}
 }
@@ -469,4 +475,61 @@ bool Scene::HasSingleton<Type>()
 *Type Scene::GetSingleton<Type>()
 {
 	return this.singletonComponents.Get<Type>();
+}
+
+Scene::PostFrame()
+{
+	this.DeleteEntities();
+}
+
+Scene::DeleteEntities()
+{
+	entities := this.entitiesToDelete;
+
+	for (entity in entities)
+	{
+		entityID := entity.id;
+		components := this.entityComponents.Get(entityID)~;
+		tagComponents := this.entityTagComponents.Get(entityID)~;
+
+		for (component in components)
+		{
+			componentID := component.id;
+
+			switch (component.kind)
+			{
+				case (ComponentKind.Common)
+				{
+					componentArr := this.commonComponents.Get(componentID);
+					componentData := componentArr.GetUntyped(entityID, component.size);
+					instance.OnComponentRemove(componentID, entity, componentData, this);
+					componentArr.Remove(entityID);
+				}
+				case (ComponentKind.Sparse)
+				{
+					componentMap := this.sparseComponents.Get(componentID);
+					componentData := componentMap.GetUntyped(entityID, component.size);
+					instance.OnComponentRemove(componentID, entity, componentData, this);
+					componentMap.Remove(entityID);
+				}
+			}
+		}
+
+		for (tagComponent in tagComponents)
+		{
+			componentID := tagComponent.id;
+			bitset := this.tagComponents.Get(componentID)~;
+			if (bitset[entityID])
+			{
+				bitset.Clear(entityID);
+				instance.OnTagComponentRemove(componentID, entity, this);
+			}
+		}
+
+		components.Clear();
+		tagComponents.Clear();
+		this.recycledEntities.Enqueue(entityID);
+	}
+
+	this.entitiesToDelete.Clear();
 }

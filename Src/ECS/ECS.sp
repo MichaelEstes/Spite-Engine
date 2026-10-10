@@ -9,9 +9,15 @@ import Atomic
 import Event
 import Math
 
+import Tracy
+
 fixedUpdateRate: float = 1.0 / 60.0;
 
 instance: ECS = ECS();
+
+scenePostFrameZone: Tracy.SourceLocationData = Tracy.SourceLocationData("Scene PostFrame"[0], "ECS::PostFrame"[0], "Src/ECS/ECS.sp"[0], 430, 0);
+systemZone: Tracy.SourceLocationData = Tracy.SourceLocationData("System"[0], "RunSystem"[0], "Src/ECS/ECS.sp"[0], 299, 0);
+frameSystemZone: Tracy.SourceLocationData = Tracy.SourceLocationData("Frame System"[0], "RunFrameSystem"[0], "Src/ECS/ECS.sp"[0], 328, 0);
 
 SceneCreatedEvent := RegisterEvent<*Scene>();
 SceneRemovedEvent := RegisterEvent<*Scene>();
@@ -290,7 +296,9 @@ RunSystem(sceneSystem: *SceneSystem)
 		}
 		Fiber.WaitForHandle(beforeHandle);
 
+		zone := Tracy.ZoneBeginFunction(system.run as *_Function, systemZone@);
 		system.run(scene~, dt);
+		Tracy.ZoneEnd(zone);
 
 		for (after in system.after)
 		{
@@ -317,7 +325,9 @@ RunFrameSystem(frameSystemJob: *FrameSystemJob)
 		}
 		Fiber.WaitForHandle(beforeHandle);
 
+		zone := Tracy.ZoneBeginFunction(system.run as *_Function, frameSystemZone@);
 		system.run(dt);
+		Tracy.ZoneEnd(zone);
 
 		for (after in system.after)
 		{
@@ -412,6 +422,17 @@ ECS::PostFrame()
 {
 	this.RunSystems(this.systems.onPostFrame, this.dt);
 	this.RunFrameSystems(this.systems.frameEnd);
+
+	handle: *Fiber.JobHandle = null;
+	for (scene in this.scenes.Values())
+	{
+		Fiber.AddJob(::(scene: *Scene) {
+			zone := Tracy.ZoneBegin(scenePostFrameZone@, 1);
+			scene.PostFrame();
+			Tracy.ZoneEnd(zone);
+		}, scene@, handle@);
+	}
+	Fiber.WaitForHandle(handle);
 
 	Fiber.ClearFrameAllocators();
 	this.frameCount += 1;

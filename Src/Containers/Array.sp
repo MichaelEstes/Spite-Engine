@@ -378,3 +378,53 @@ uint32 Array::SortedInsert(item: Type, compare: ::byte(Type, Type))
 	this.count += 1;
 	return low;
 }
+
+uint32 Array::SortedInsertUnique(item: Type, compare: ::byte(Type, Type))
+{
+	if (!this.count || compare(this[this.count - 1], item) < 0)
+	{
+		return this.Add(item);
+	}
+
+	low := uint32(0);
+	high := this.count;
+	while (low < high)
+	{
+		mid := low + (high - low) / 2;
+		if (compare(this[mid], item) < 0) low = mid + 1;
+		else high = mid;
+	}
+
+	if (compare(this[low], item) == 0) return low;
+
+	if (this.count >= this.capacity) this.Expand();
+
+	i := this.count;
+	while (i > low)
+	{
+		this[i] = this[i - 1];
+		i -= 1;
+	}
+
+	this[low] = item;
+	this.count += 1;
+	return low;
+}
+
+bool Array::SortedRemove(item: Type, compare: ::byte(Type, Type))
+{
+	low := uint32(0);
+	high := this.count;
+	while (low < high)
+	{
+		mid := low + (high - low) / 2;
+		if (compare(this[mid], item) < 0) low = mid + 1;
+		else high = mid;
+	}
+
+	if (low >= this.count || compare(this[low], item) != 0) return false;
+
+	this.Shift(low);
+	this.count -= 1;
+	return true;
+}

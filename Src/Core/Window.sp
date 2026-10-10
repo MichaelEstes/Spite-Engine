@@ -27,9 +27,9 @@ DestroyWindow(window: *SDL.Window)
 {
 	if (!window) return;
 
-	SDL.DestroyWindow(window);
 	windowMap.Remove(window.id);
 	Event.SDLEvents.Remove(window.id);
+	SDL.DestroyWindow(window);
 }
 
 { width: uint32, height: uint32 } GetWindowSize(window: *SDL.Window)

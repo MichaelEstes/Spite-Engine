@@ -138,8 +138,8 @@ SparseSet::Remove(key: uint32)
 	this.sparseArr[key]~ = 0;
 
 	this.count -= 1;
-	if (!this.count) return;
-	
+	if (index == this.count) return;
+
 	endKey := this.denseKeyArr[this.count]~;
 	endValue := this.denseValueArr[this.count]~;
 

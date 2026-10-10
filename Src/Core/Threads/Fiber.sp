@@ -11,6 +11,8 @@ import Mutex
 import BitSet
 import FrameAllocator
 
+import Tracy
+
 state JobHandle 
 {
 	counter: Atomic<uint32>
@@ -70,8 +72,8 @@ state Fibers
 }
 
 fibers := Fibers();
-
 FiberJobCount := 128;
+fiberThreadNameStr := "Fiber ";
 
 InitalizeFibers()
 {
@@ -205,9 +207,10 @@ RunOnMainThread(func: ::(*any), data: *any, handle: **JobHandle = null)
 	}
 }
 
-RunFiberJob(job: FiberJob) => 
+RunFiberJob(job: FiberJob) =>
 {
 	job.func(job.data);
+
 	if (job.handle)
 	{
 		job.handle.Decrement(1);
@@ -218,6 +221,13 @@ uint32 RunFiber(data: *void)
 {
 	index := data as uint;
 	log "Starting fiber: " +  UIntToString(index);
+
+	indexStr := UIntToString(index);
+	threadName := fiberThreadNameStr.Copy();
+	threadName.AppendIn(indexStr);
+	Tracy.SetThreadName(threadName[0]);
+	delete indexStr;
+	delete threadName;
 
 	while (fibers.fiberEnabled[index]~)
 	{

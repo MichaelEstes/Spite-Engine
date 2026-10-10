@@ -77,8 +77,8 @@ Emitter::Emit<Arg>(id: uint32, arg: Arg)
 	{
 		onceArr := this.onceCallbacks.Get(id)~;
 		for (callback in onceArr) (callback.func as ::(Arg, *any))(arg, callback.data);
-		this.onceCallbacks.Remove(id);
 		delete onceArr;
+		this.onceCallbacks.Remove(id);
 	}
 }
 

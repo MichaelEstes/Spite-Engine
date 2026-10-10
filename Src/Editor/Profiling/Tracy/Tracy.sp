@@ -129,6 +129,15 @@ state SourceLocationData
 	color: uint32
 }
 
+SourceLocationData::(name: *byte, function: *byte, file: *byte, line: uint32, color: uint32)
+{
+	this.name = name;
+	this.function = function;
+	this.file = file;
+	this.line = line;
+	this.color = color;
+}
+
 state ZoneContext
 {
 	id: uint32,
@@ -221,6 +230,17 @@ ZoneContext ZoneBeginAlloc(srcloc: uint64, active: int32)
 						   => ___tracy_emit_zone_begin_alloc(srcloc, active);
 ZoneContext ZoneBeginAllocCallstack(srcloc: uint64, depth: int32, active: int32)
 									=> ___tracy_emit_zone_begin_alloc_callstack(srcloc, depth, active);
+ZoneContext ZoneBeginFunction(func: *_Function, fallback: *SourceLocationData)
+{
+	if (!interpreted) return ZoneBegin(fallback, 1);
+
+	name := func.name.ToString();
+	position := func.metadata.position;
+	file := position.file.ToString();
+
+	srcloc := AllocSrcLoc(position.line as uint32, file[0], file.count, name[0], name.count, 0);
+	return ZoneBeginAlloc(srcloc, 1);
+}
 ZoneEnd(ctx: ZoneContext) => ___tracy_emit_zone_end(ctx);
 ZoneText(ctx: ZoneContext, txt: *byte, size: uint) => ___tracy_emit_zone_text(ctx, txt, size);
 ZoneName(ctx: ZoneContext, txt: *byte, size: uint) => ___tracy_emit_zone_name(ctx, txt, size);

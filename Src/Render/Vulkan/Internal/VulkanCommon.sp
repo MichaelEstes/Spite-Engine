@@ -375,6 +375,21 @@ VkBufferCreateInfo BufferDescToCreateInfo(createDesc: BufferDesc)
     return semaphore;
 }
 
+*VkSemaphore_T CreateTimelineSemaphore(device: *VkDevice_T)
+{
+    typeInfo := VkSemaphoreTypeCreateInfo();
+    typeInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+    typeInfo.semaphoreType = VkSemaphoreType.VK_SEMAPHORE_TYPE_TIMELINE;
+
+    createInfo := VkSemaphoreCreateInfo();
+    createInfo.sType = VkStructureType.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    createInfo.pNext = typeInfo@;
+
+    semaphore: *VkSemaphore_T = null;
+    CheckResult(vkCreateSemaphore(device, createInfo@, null, semaphore@), "Error creating Vulkan timeline semaphore");
+    return semaphore;
+}
+
 *VkCommandBuffer_T BeginCommands(device: *VkDevice_T, commandPool: *VkCommandPool_T)
 {
 	allocInfo := VkCommandBufferAllocateInfo();

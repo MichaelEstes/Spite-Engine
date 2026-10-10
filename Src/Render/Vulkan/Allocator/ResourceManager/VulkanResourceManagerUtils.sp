@@ -22,6 +22,25 @@ state VulkanRenderBuffer
 	handle: VulkanAllocHandle
 }
 
+enum VulkanRetiredKind: uint32
+{
+	Alloc,
+	ImageView,
+	BindlessImage,
+	BindlessBuffer
+}
+
+state VulkanRetiredResource
+{
+	data: ?{
+		alloc: VulkanAllocHandle,
+		imageView: *VkImageView_T,
+		slot: uint32
+	},
+	submitValue: uint64,
+	kind: VulkanRetiredKind
+}
+
 state DefaultTextureKey
 {
 	pixel: [4]ubyte,

@@ -7,21 +7,6 @@ import ArrayView
 import Array
 import Resource
 
-state GeometryVariableUpdate
-{
-    geometry: *Geometry,
-    index: uint32
-}
-
-state GeometryAttributeUpdate
-{
-    geometry: *Geometry,
-    index: uint32
-}
-
-GeometryVariableUpdateEvent := RegisterEvent<GeometryVariableUpdate>();
-GeometryAttributeUpdateEvent := RegisterEvent<GeometryAttributeUpdate>();
-
 enum TopologyKind: ubyte
 {
     PointList
@@ -117,22 +102,6 @@ ref VariableDefinition Geometry::GetVariableDef(index: uint32)
     vertex := assetDef.vertex;
     offset := FindVariableSetOffsetAtIndex(vertex.variables, index);
     return (this.variables + offset) as *T;
-}
-
-Geometry::UpdatedVariableSet(index: uint32)
-{
-    event := GeometryVariableUpdate();
-    event.geometry = this@;
-    event.index = index;
-    ECS.instance.events.Emit<GeometryVariableUpdate>(GeometryVariableUpdateEvent, event);
-}
-
-Geometry::UpdatedAttribute(index: uint32)
-{
-    event := GeometryAttributeUpdate();
-    event.geometry = this@;
-    event.index = index;
-    ECS.instance.events.Emit<GeometryAttributeUpdate>(GeometryAttributeUpdateEvent, event);
 }
 
 Geometry::ComputeBounds()

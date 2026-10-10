@@ -597,78 +597,64 @@ AssignMaterialToPrimitive(gltfData: GLTFResource, gltfMaterial: GLTFMaterial, pr
 		pbr = gltfMaterial.pbrMetallicRoughness~;
 	}
 
-	primitive.material.SetVariable<Color>("baseColor", pbr.baseColorFactor, false);
-	primitive.material.SetVariable<float32>("metallicFactor", pbr.metallicFactor, false);
-	primitive.material.SetVariable<float32>("roughnessFactor", pbr.roughnessFactor, false);
+	primitive.material.SetVariable<Color>("baseColor", pbr.baseColorFactor);
+	primitive.material.SetVariable<float32>("metallicFactor", pbr.metallicFactor);
+	primitive.material.SetVariable<float32>("roughnessFactor", pbr.roughnessFactor);
 
 	if (pbr.baseColorTexture)
 	{
 		colorTextureMap := LoadTexture(gltfData, pbr.baseColorTexture.index);
-		primitive.material.SetTexture("colorTexture", colorTextureMap, false);
+		primitive.material.SetTexture("colorTexture", colorTextureMap);
 	}
 
 	if (pbr.metallicRoughnessTexture)
 	{
 		metallicRoughnessTextureMap := LoadTexture(gltfData, pbr.metallicRoughnessTexture.index);
-		primitive.material.SetTexture("metallicRoughnessTexture", metallicRoughnessTextureMap, false);
+		primitive.material.SetTexture("metallicRoughnessTexture", metallicRoughnessTextureMap);
 	}
 
 	if (gltfMaterial.normalTexture)
 	{
 		primitive.material.SetVariable<float32>(
 			"normalScale", 
-			gltfMaterial.normalTexture.scale, 
-			false
+			gltfMaterial.normalTexture.scale
 		);
 		normalTextureMap := LoadTexture(gltfData, gltfMaterial.normalTexture.info.index);
-		primitive.material.SetTexture("normalTexture", normalTextureMap, false);
+		primitive.material.SetTexture("normalTexture", normalTextureMap);
 	}
 	else
 	{
 		normalDefault := GLTFNormalTextureInfo();
-		primitive.material.SetVariable<float32>(
-			"normalScale", 
-			normalDefault.scale, 
-			false
-		);
+		primitive.material.SetVariable<float32>("normalScale", normalDefault.scale);
 	}
 
 	if (gltfMaterial.occlusionTexture)
 	{
 		primitive.material.SetVariable<float32>(
 			"occlusionStrength",
-			gltfMaterial.occlusionTexture.strength,
-			false
+			gltfMaterial.occlusionTexture.strength
 		);
 		occlusionTextureMap := LoadTexture(gltfData, gltfMaterial.occlusionTexture.info.index);
-		primitive.material.SetTexture("occlusionTexture", occlusionTextureMap, false);
+		primitive.material.SetTexture("occlusionTexture", occlusionTextureMap);
 	}
 	else
 	{
 		occlusionDefault := GLTFOcclusionTextureInfo();
-		primitive.material.SetVariable<float32>(
-			"occlusionStrength",
-			occlusionDefault.strength,
-			false
-		);
+		primitive.material.SetVariable<float32>("occlusionStrength", occlusionDefault.strength);
 	}
 
 	if (gltfMaterial.emissiveTexture)
 	{
 		emissiveTextureMap := LoadTexture(gltfData, gltfMaterial.emissiveTexture.index);
-		primitive.material.SetTexture("emissiveTexture", emissiveTextureMap, false);
+		primitive.material.SetTexture("emissiveTexture", emissiveTextureMap);
 	}
 
-	primitive.material.SetVariable<Vec3>(
-		"emissiveFactor", 
-		gltfMaterial.emissiveFactor, 
-		false
-	);
+	primitive.material.SetVariable<Vec3>("emissiveFactor", gltfMaterial.emissiveFactor);
 	
 	primitive.material.alphaMode = GetAlphaMode(gltfMaterial);
 	alphaCutoff := float32(0.0);
 	if (primitive.material.alphaMode == AlphaMode.Mask) alphaCutoff = gltfMaterial.alphaCutoff;
-	primitive.material.SetVariable<float32>("alphaCutoff", alphaCutoff, false);
+	primitive.material.SetVariable<float32>("alphaCutoff", alphaCutoff);
 
 	if (gltfMaterial.doubleSided) primitive.material.cullMode = CullModeFlags.None;
 }

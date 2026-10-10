@@ -149,7 +149,7 @@ EntityComponentMap::Remove(entityID: uint32)
 	this.sparseArr[entityID]~ = 0;
 
 	this.count -= 1;
-	if (!this.count) return;
+	if (index == this.count) return;
 
 	endEntityID := this.entityArr[this.count]~;
 	endComponent := this.componentArr[this.count]~;
@@ -211,7 +211,7 @@ EntityComponentMap::RemoveUntyped(entityID: uint32, size: uint32)
 	componentDst := byteArr[index * size];
 
 	this.count -= 1;
-	if (!this.count) return;
+	if (index == this.count) return;
 
 	endEntityID := this.entityArr[this.count]~;
 	componentSrc := byteArr[this.count * size];

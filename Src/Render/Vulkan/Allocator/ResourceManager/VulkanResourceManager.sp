@@ -23,7 +23,9 @@ state VulkanResourceManager
 
 	meshes := HandleSet<VulkanMesh>(),
 
-	defaultBuffers := Map<Value, BufferHandle, HashValue>()
+	defaultBuffers := Map<Value, BufferHandle, HashValue>(),
+
+	retiredResources: Array<VulkanRetiredResource>,
 
 	sharedIndexBuffer: BufferHandle,
 	sharedIndexCount: uint32
@@ -221,28 +223,251 @@ VulkanResourceManager::UploadMaterial(material: *Material, vulkanMaterial: *Vulk
 	vulkanMaterial.variables = UploadVariableSet(assetDef.fragment.variables, material.variables);
 }
 
+bool VulkanResourceManager::UpdateGeometryVariable(mesh: *Mesh, variableIndex: uint32)
+{
+	if (!mesh.gpuResourceID) return false;
+
+	vulkanMesh := this.meshes.Get(mesh.gpuResourceID);
+
+	assetDef := GetAssetDefWithHandle(mesh.geometry.defHandle);
+	variables := assetDef.vertex.variables;
+	offset := FindVariableSetOffsetAtIndex(variables, variableIndex);
+	size := variables.sets[variableIndex].def.ValueSize();
+
+	stagingBuffer := vulkanInstance.GetStagingBuffer();
+	stagingBuffer.StagedBufferCopy(
+		vulkanInstance.device,
+		(mesh.geometry.variables + offset) as *byte,
+		size,
+		vulkanMesh.geometry.variables.buffer,
+		vulkanInstance.transferCommands,
+		vulkanInstance.queues.transferQueue,
+		offset
+	);
+	return true;
+}
+
+bool VulkanResourceManager::UpdateGeometryAttribute(mesh: *Mesh, attributeIndex: uint32)
+{
+	if (!mesh.gpuResourceID) return false;
+
+	vulkanMesh := this.meshes.Get(mesh.gpuResourceID);
+	vulkanGeometry := vulkanMesh.geometry;
+
+	assetDef := GetAssetDefWithHandle(mesh.geometry.defHandle);
+	attribute := mesh.geometry.attributes[attributeIndex];
+	attrDef := assetDef.vertex.attributes[attributeIndex].def;
+
+	oldAlloc := vulkanGeometry.attributes[attributeIndex];
+	defaultBuffer := this.defaultBuffers.Find(attrDef.defaultValue);
+	if (!defaultBuffer || defaultBuffer.handle.handle != oldAlloc.handle) this.RetireAlloc(oldAlloc);
+	this.RetireSlot(VulkanRetiredKind.BindlessBuffer, vulkanGeometry.attributeBufferSlots[attributeIndex]);
+
+	bufferHandle := BufferHandle();
+	attrSlot := VulkanGeometryAttrSlot();
+
+	if (attribute.count)
+	{
+		bufferHandle = UploadBuffer(VertexBufferCreateInfo(attribute.count), attribute.start, attribute.count);
+		attrSlot.index = this.bindless.RegisterBuffer(bufferHandle.buffer);
+		attrSlot.stride = attrDef.ValueSize() / #sizeof uint32;
+	}
+	else
+	{
+		bufferHandle = this.GetDefaultBuffer(attrDef.defaultValue, attrDef.ValueSize());
+		attrSlot.index = this.bindless.RegisterBuffer(bufferHandle.buffer);
+		attrSlot.stride = uint32(0);
+	}
+
+	vulkanGeometry.attributes[attributeIndex] = bufferHandle.handle;
+	vulkanGeometry.attributeBufferSlots[attributeIndex] = attrSlot.index;
+
+	slotSize := #sizeof VulkanGeometryAttrSlot;
+	stagingBuffer := vulkanInstance.GetStagingBuffer();
+	stagingBuffer.StagedBufferCopy(
+		vulkanInstance.device,
+		attrSlot@ as *byte,
+		slotSize,
+		vulkanGeometry.attributeSlots.buffer,
+		vulkanInstance.transferCommands,
+		vulkanInstance.queues.transferQueue,
+		attributeIndex * slotSize
+	);
+
+	if (attributeIndex == 0)
+	{
+		vulkanGeometry.vertexCount = uint32(attribute.count / attrDef.ValueSize());
+		mesh.geometry.ComputeBounds();
+	}
+
+	return true;
+}
+
+bool VulkanResourceManager::UpdateMaterialVariable(mesh: *Mesh, variableIndex: uint32)
+{
+	if (!mesh.gpuResourceID) return false;
+
+	vulkanMesh := this.meshes.Get(mesh.gpuResourceID);
+
+	assetDef := GetAssetDefWithHandle(mesh.material.defHandle);
+	variables := assetDef.fragment.variables;
+	offset := FindVariableSetOffsetAtIndex(variables, variableIndex);
+	size := variables.sets[variableIndex].def.ValueSize();
+
+	stagingBuffer := vulkanInstance.GetStagingBuffer();
+	stagingBuffer.StagedBufferCopy(
+		vulkanInstance.device,
+		(mesh.material.variables + offset) as *byte,
+		size,
+		vulkanMesh.material.variables.buffer,
+		vulkanInstance.transferCommands,
+		vulkanInstance.queues.transferQueue,
+		offset
+	);
+	return true;
+}
+
+bool VulkanResourceManager::UpdateMaterialTexture(mesh: *Mesh, textureIndex: uint32)
+{
+	if (!mesh.gpuResourceID) return false;
+
+	vulkanMesh := this.meshes.Get(mesh.gpuResourceID);
+
+	assetDef := GetAssetDefWithHandle(mesh.material.defHandle);
+	textureMap := mesh.material.textures[textureIndex];
+	textureDef := assetDef.fragment.textures[textureIndex];
+
+	textureSlot := VulkanMaterialTextureSlot();
+	if (!textureMap)
+	{
+		textureSlot.textureIndex = this.bindless.UploadDefaultTexture(textureDef);
+		textureSlot.samplerIndex = this.bindless.UploadSampler(Texture());
+	}
+	else
+	{
+		textureSlot.textureIndex = this.bindless.UploadTexture(textureMap, textureDef);
+		textureSlot.samplerIndex = this.bindless.UploadSampler(textureMap.texture);
+	}
+
+	slotSize := #sizeof VulkanMaterialTextureSlot;
+	stagingBuffer := vulkanInstance.GetStagingBuffer();
+	stagingBuffer.StagedBufferCopy(
+		vulkanInstance.device,
+		textureSlot@ as *byte,
+		slotSize,
+		vulkanMesh.material.textureSlots.buffer,
+		vulkanInstance.transferCommands,
+		vulkanInstance.queues.transferQueue,
+		textureIndex * slotSize
+	);
+	return true;
+}
+
 bool VulkanResourceManager::RemoveMesh(mesh: *Mesh)
 {
 	resourceID := mesh.gpuResourceID;
 	if (!this.meshes.Has(resourceID)) return false;
 
 	vulkanMesh := this.meshes.Get(resourceID);
-	allocator := vulkanInstance.allocator;
 
 	vulkanGeometry := vulkanMesh.geometry;
 	for (i .. vulkanGeometry.attributes.count)
 	{
-		if (mesh.geometry.attributes[i].count) allocator.FreeAlloc(vulkanGeometry.attributes[i]);
-		this.bindless.buffers.Remove(vulkanGeometry.attributeBufferSlots[i]);
+		if (mesh.geometry.attributes[i].count) this.RetireAlloc(vulkanGeometry.attributes[i]);
+		this.RetireSlot(VulkanRetiredKind.BindlessBuffer, vulkanGeometry.attributeBufferSlots[i]);
 	}
 	delete vulkanGeometry.attributes;
 	delete vulkanGeometry.attributeBufferSlots;
 
-	FreeBuffer(vulkanGeometry.attributeSlots);
-	FreeBuffer(vulkanGeometry.variables);
-	FreeBuffer(vulkanMesh.material.textureSlots);
-	FreeBuffer(vulkanMesh.material.variables);
+	this.RetireBuffer(vulkanGeometry.attributeSlots);
+	this.RetireBuffer(vulkanGeometry.variables);
+	this.RetireBuffer(vulkanMesh.material.textureSlots);
+	this.RetireBuffer(vulkanMesh.material.variables);
 
 	this.meshes.Remove(resourceID);
 	return true;
+}
+
+bool VulkanResourceManager::RemoveImage(id: uint32)
+{
+	imageHandleCache := this.bindless.imageHandleCache;
+	if (!imageHandleCache.Has(id)) return false;
+
+	slot := imageHandleCache.Get(id)~;
+	vulkanTexture := this.bindless.images.Get(slot);
+
+	this.RetireImageView(vulkanTexture.imageView);
+	this.RetireAlloc(vulkanTexture.imageAlloc);
+	this.RetireSlot(VulkanRetiredKind.BindlessImage, slot);
+
+	imageHandleCache.Remove(id);
+	return true;
+}
+
+VulkanResourceManager::Retire(retired: VulkanRetiredResource)
+{
+	retired.submitValue = vulkanInstance.submitValue;
+	this.retiredResources.Add(retired);
+}
+
+VulkanResourceManager::RetireAlloc(alloc: VulkanAllocHandle)
+{
+	retired := VulkanRetiredResource();
+	retired.kind = VulkanRetiredKind.Alloc;
+	retired.data.alloc = alloc;
+	this.Retire(retired);
+}
+
+VulkanResourceManager::RetireBuffer(bufferHandle: BufferHandle)
+{
+	if (!bufferHandle.buffer) return;
+	this.RetireAlloc(bufferHandle.handle);
+}
+
+VulkanResourceManager::RetireImageView(imageView: *VkImageView_T)
+{
+	retired := VulkanRetiredResource();
+	retired.kind = VulkanRetiredKind.ImageView;
+	retired.data.imageView = imageView;
+	this.Retire(retired);
+}
+
+VulkanResourceManager::RetireSlot(kind: VulkanRetiredKind, slot: uint32)
+{
+	retired := VulkanRetiredResource();
+	retired.kind = kind;
+	retired.data.slot = slot;
+	this.Retire(retired);
+}
+
+VulkanResourceManager::DestroyRetired(retired: VulkanRetiredResource)
+{
+	switch (retired.kind)
+	{
+		case (VulkanRetiredKind.Alloc) vulkanInstance.allocator.FreeAlloc(retired.data.alloc);
+		case (VulkanRetiredKind.ImageView) vkDestroyImageView(vulkanInstance.device, retired.data.imageView, null);
+		case (VulkanRetiredKind.BindlessImage) this.bindless.images.Remove(retired.data.slot);
+		case (VulkanRetiredKind.BindlessBuffer) this.bindless.buffers.Remove(retired.data.slot);
+	}
+}
+
+VulkanResourceManager::ReleaseRetired()
+{
+	completed := vulkanInstance.CompletedSubmitValue();
+
+	kept := uint32(0);
+	for (i .. this.retiredResources.count)
+	{
+		retired := this.retiredResources[i];
+		if (retired.submitValue <= completed)
+		{
+			this.DestroyRetired(retired);
+		}
+		else
+		{
+			this.retiredResources[kept] = retired;
+			kept += 1;
+		}
+	}
+	this.retiredResources.count = kept;
 }

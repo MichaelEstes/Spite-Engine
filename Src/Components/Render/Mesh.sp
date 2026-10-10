@@ -10,6 +10,19 @@ MeshEntitySetEvent := RegisterEvent<SceneEntity>();
 MeshEntityRemovedEvent := RegisterEvent<SceneEntity>();
 MeshDeletedEvent := RegisterEvent<*Mesh>();
 
+state MeshPropertyUpdate
+{
+    mesh: *Mesh,
+    index: uint32
+}
+
+GeometryVariableUpdateEvent := RegisterEvent<MeshPropertyUpdate>();
+GeometryAttributeUpdateEvent := RegisterEvent<MeshPropertyUpdate>();
+
+MaterialVariableUpdateEvent := RegisterEvent<MeshPropertyUpdate>();
+MaterialTextureUpdateEvent := RegisterEvent<MeshPropertyUpdate>();
+
+
 state Mesh
 {
 	geometry: Geometry,
@@ -55,6 +68,38 @@ Mesh::Init()
 		if (textureMap.texture.imageHandle == InvalidResourceHandle) continue;
 		TakeResourceRef<ImageResource>(textureMap.texture.imageHandle);
 	}
+}
+
+Mesh::UpdatedGeoVariableSet(index: uint32)
+{
+    event := MeshPropertyUpdate();
+    event.mesh = this@;
+    event.index = index;
+    ECS.instance.events.Emit<MeshPropertyUpdate>(GeometryVariableUpdateEvent, event);
+}
+
+Mesh::UpdatedAttribute(index: uint32)
+{
+    event := MeshPropertyUpdate();
+    event.mesh = this@;
+    event.index = index;
+    ECS.instance.events.Emit<MeshPropertyUpdate>(GeometryAttributeUpdateEvent, event);
+}
+
+Mesh::UpdatedMatVariableSet(index: uint32)
+{
+    event := MeshPropertyUpdate();
+    event.mesh = this@;
+    event.index = index;
+    ECS.instance.events.Emit<MeshPropertyUpdate>(MaterialVariableUpdateEvent, event);
+}
+
+Mesh::UpdatedTexture(index: uint32)
+{
+	event := MeshPropertyUpdate();
+    event.mesh = this@;
+    event.index = index;
+    ECS.instance.events.Emit<MeshPropertyUpdate>(MaterialTextureUpdateEvent, event);
 }
 
 MeshComponent := ECS.RegisterComponent<Mesh>(
